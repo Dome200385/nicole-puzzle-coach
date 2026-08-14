@@ -1,5 +1,8 @@
 from urllib.parse import urlencode
 from datetime import datetime, timezone
+import asyncio
+import time
+import re
 import httpx
 from app.config import (
     MSP_AUTHORIZE_URL, MSP_TOKEN_URL, MSP_API_BASE,
@@ -98,6 +101,7 @@ def normalize_competitions(payload):
             "id": row.get("id"),
             "name": row.get("name"),
             "shortcode": row.get("shortcode"),
+            "slug": row.get("slug"),
             "url": row.get("url"),
             "logo": row.get("logo"),
             "location": row.get("location"),
@@ -169,3 +173,141 @@ def detect_participation(detail):
         "signals": found,
         "has_participation_fields": bool(found),
     }
+
+
+# --- V5.3: confirmed personal tournament detection ----------------------------
+
+_MSP_WEB_BASE = "https://myspeedpuzzling.com"
+_MY_COMP_CACHE = {"ts": 0.0, "player_id": None, "data": None}
+_MY_COMP_CACHE_SECONDS = 30 * 60
+
+def _event_slug(row):
+    slug = row.get("slug")
+    if slug:
+        return str(slug).strip("/")
+
+    # Some Competition API versions expose the MySpeedPuzzling path as "url".
+    for key in ("url", "link"):
+        value = row.get(key)
+        if not value:
+            continue
+        m = re.search(r"/(?:en/)?events/([^/?#]+)", str(value))
+        if m:
+            return m.group(1)
+
+    # Last-resort slugification of the name. This is only used when the API
+    # does not expose its canonical event slug.
+    name = (row.get("name") or "").lower().strip()
+    name = re.sub(r"[^a-z0-9]+", "-", name).strip("-")
+    return name or None
+
+async def _is_player_connected_participant(client, competition, player_id):
+    slug = _event_slug(competition)
+    if not slug or not player_id:
+        return False, {"reason": "missing_slug_or_player_id"}
+
+    url = f"{_MSP_WEB_BASE}/en/events/{slug}"
+    try:
+        response = await client.get(
+            url,
+            headers={
+                "Accept": "text/html,application/xhtml+xml",
+                "User-Agent": "NicolePuzzleCoach/5.3 (+personal tournament sync)",
+            },
+            follow_redirects=True,
+        )
+        response.raise_for_status()
+        html = response.text
+    except Exception as exc:
+        return False, {"url": url, "error": str(exc)}
+
+    # The participant list links every connected participant to their unique
+    # player-profile UUID. We match the authenticated Nicole profile UUID,
+    # not merely the display name.
+    patterns = (
+        f"/en/player-profile/{player_id}",
+        f"/player-profile/{player_id}",
+        player_id,
+    )
+    detected = any(p in html for p in patterns)
+
+    return detected, {
+        "url": str(response.url),
+        "player_id_match": detected,
+        "source": "connected_participants_html",
+    }
+
+async def get_my_confirmed_competitions(token, limit=30, cache=True):
+    profile = await get_profile(token)
+    player_id = profile.get("id") if isinstance(profile, dict) else None
+    if not player_id:
+        return {
+            "player_id": None,
+            "competitions": [],
+            "checked": 0,
+            "error": "MySpeedPuzzling profile did not provide a player id.",
+        }
+
+    now = time.time()
+    if (
+        cache
+        and _MY_COMP_CACHE["data"] is not None
+        and _MY_COMP_CACHE["player_id"] == player_id
+        and now - _MY_COMP_CACHE["ts"] < _MY_COMP_CACHE_SECONDS
+    ):
+        cached = dict(_MY_COMP_CACHE["data"])
+        cached["cached"] = True
+        return cached
+
+    payload = await get_competitions(token, status="all", online=False)
+    candidates = upcoming_competitions(payload, limit=max(1, min(int(limit), 60)))
+
+    confirmed = []
+    checked = []
+    semaphore = asyncio.Semaphore(6)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        async def inspect(comp):
+            async with semaphore:
+                yes, info = await _is_player_connected_participant(
+                    client, comp, player_id
+                )
+                return comp, yes, info
+
+        results = await asyncio.gather(
+            *(inspect(comp) for comp in candidates),
+            return_exceptions=True
+        )
+
+    for result in results:
+        if isinstance(result, Exception):
+            checked.append({"error": str(result)})
+            continue
+
+        comp, yes, info = result
+        checked.append({
+            "id": comp.get("id"),
+            "name": comp.get("name"),
+            "registered": yes,
+            "check": info,
+        })
+        if yes:
+            clean = {k: v for k, v in comp.items() if k != "raw"}
+            clean["registered"] = True
+            clean["registration_source"] = "connected_participants"
+            confirmed.append(clean)
+
+    result = {
+        "player_id": player_id,
+        "player_name": profile.get("name"),
+        "competitions": confirmed,
+        "count": len(confirmed),
+        "checked": len(candidates),
+        "cached": False,
+    }
+    _MY_COMP_CACHE.update({
+        "ts": now,
+        "player_id": player_id,
+        "data": result,
+    })
+    return result

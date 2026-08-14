@@ -32,10 +32,10 @@ a{color:inherit}.hero{background:linear-gradient(135deg,#fff,#fff3f3)}
 <section class="card kpi"><div class="label">Form</div><div class="value" id="trendKpi">–</div><div class="small">manuelle Trainings</div></section>
 <section class="card kpi"><div class="label">Konsistenz</div><div class="value" id="consistencyKpi">–</div><div class="small">0–100</div></section>
 
-<section class="card half hero"><h2>🏆 Nächstes MySpeedPuzzling-Turnier</h2><div id="nextMspCompetition" class="small">Lade Turniere…</div></section>
+<section class="card half hero"><h2>🏆 Mein nächstes Turnier</h2><div id="nextMspCompetition" class="small">Prüfe bestätigte Anmeldung…</div></section>
 <section class="card half hero"><h2>🎯 Coach-Empfehlung</h2><div id="coachRecommendation" class="small">Lade Trainingsdaten…</div></section>
 
-<section class="card full"><h2>🌍 Kommende Wettbewerbe</h2><div id="mspCompetitions" class="list"><div class="small">Lade Turniere…</div></div></section>
+<section class="card full"><h2>✅ Meine bestätigten Turniere</h2><div id="mspCompetitions" class="list"><div class="small">Prüfe MySpeedPuzzling-Anmeldungen…</div></div></section>
 
 <section class="card half"><h2>Turnier manuell eintragen</h2><div class="formgrid">
 <input id="tName" placeholder="Turniername"><input id="tDate" type="date"><input id="tLocation" placeholder="Ort">
@@ -56,10 +56,10 @@ a{color:inherit}.hero{background:linear-gradient(135deg,#fff,#fff3f3)}
 <section class="card half"><h2>⏱️ Letzte Trainings</h2><div id="trainings" class="list"></div></section>
 
 <section class="card full"><h2>🧠 Tournament Intelligence</h2>
-<div class="small">V5.2 lädt kommende Wettbewerbe direkt von MySpeedPuzzling. Zusätzlich gibt es einen technischen Teilnahme-Check, der prüft, ob Competition-Details Nicoles Registrierungsstatus enthalten.</div>
+<div class="small">V5.3 zeigt nur zukünftige Turniere, bei denen Nicoles eindeutige MySpeedPuzzling-Player-ID in der Liste der Connected participants gefunden wird. Andere Wettbewerbe bleiben vollständig ausgeblendet.</div>
 <div style="margin-top:12px">
 <a class="btn secondary" href="/docs" target="_blank">API-Dokumentation</a>
-<a class="btn secondary" href="/msp/participation-check" target="_blank">Teilnahme-Check</a>
+<a class="btn secondary" href="/msp/my-competitions?refresh=true" target="_blank">Anmeldungen neu prüfen</a>
 </div></section>
 </div></div>
 
@@ -67,6 +67,16 @@ a{color:inherit}.hero{background:linear-gradient(135deg,#fff,#fff3f3)}
 function timeToSeconds(v){if(!v)return null;let p=v.split(':').map(Number);if(p.some(Number.isNaN))return null;if(p.length===3)return p[0]*3600+p[1]*60+p[2];if(p.length===2)return p[0]*60+p[1];return Number(v)}
 async function getj(u){let r=await fetch(u),d=await r.json();if(!r.ok)throw new Error(d.detail||'Fehler');return d}
 function dateText(v){if(!v)return'–';try{return new Date(v).toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit',year:'numeric'})}catch(e){return v}}
+function countdownText(v){
+  if(!v)return'';
+  let target=new Date(v), now=new Date(), ms=target-now;
+  if(ms<=0)return'Heute / bereits gestartet';
+  let days=Math.floor(ms/86400000);
+  let hours=Math.floor((ms%86400000)/3600000);
+  if(days>1)return`Noch ${days} Tage`;
+  if(days===1)return`Noch 1 Tag ${hours} Std.`;
+  return`Noch ${hours} Stunden`;
+}
 async function loadAll(){
  try{
    let st=await getj('/coach/status');
@@ -83,19 +93,20 @@ async function loadAll(){
  }catch(e){}
 
  try{
-   let data=await getj('/msp/competitions/upcoming?limit=12');
+   let data=await getj('/msp/my-competitions?limit=30');
    let rows=data.competitions||[];
    if(rows.length){
       let c=rows[0];
-      nextMspCompetition.innerHTML=`<strong>${c.name||'Turnier'}</strong><br>${dateText(c.date_from)}${c.location?' · '+c.location:''}${c.country_code?' · '+String(c.country_code).toUpperCase():''}<br>${c.registration_link?`<a class="btn secondary" style="margin-top:10px" href="${c.registration_link}" target="_blank">Anmeldung</a>`:''}`;
-      mspCompetitions.innerHTML=rows.map(c=>`<div class="item"><strong>${c.name||'Turnier'}</strong><div class="small">${dateText(c.date_from)}${c.location?' · '+c.location:''}${c.country_code?' · '+String(c.country_code).toUpperCase():''}</div>${c.is_online?'<span class="pill">Online</span>':'<span class="pill">Vor Ort</span>'}${c.status?`<span class="pill">${c.status}</span>`:''}${c.registration_link?`<br><a class="btn secondary" style="margin-top:8px" href="${c.registration_link}" target="_blank">Anmeldung</a>`:''}${c.results_link?` <a class="btn secondary" style="margin-top:8px" href="${c.results_link}" target="_blank">Resultate</a>`:''}</div>`).join('');
+      let cd=countdownText(c.date_from);
+      nextMspCompetition.innerHTML=`<strong>${c.name||'Turnier'}</strong><br>${dateText(c.date_from)}${c.location?' · '+c.location:''}${c.country_code?' · '+String(c.country_code).toUpperCase():''}<br><span class="pill">✅ Anmeldung erkannt</span><span class="pill">⏳ ${cd}</span>`;
+      mspCompetitions.innerHTML=rows.map(c=>`<div class="item"><strong>${c.name||'Turnier'}</strong><div class="small">${dateText(c.date_from)}${c.date_to?' – '+dateText(c.date_to):''}${c.location?' · '+c.location:''}${c.country_code?' · '+String(c.country_code).toUpperCase():''}</div><span class="pill">✅ Angemeldet</span><span class="pill">⏳ ${countdownText(c.date_from)}</span>${c.link?`<br><a class="btn secondary" style="margin-top:8px" href="${c.link}" target="_blank">Turnier öffnen</a>`:''}</div>`).join('');
    } else {
-      nextMspCompetition.textContent='Keine kommenden Wettbewerbe gefunden.';
-      mspCompetitions.innerHTML='<div class="small">Keine kommenden Wettbewerbe gefunden.</div>';
+      nextMspCompetition.innerHTML='Aktuell wurde keine bestätigte zukünftige Anmeldung gefunden.';
+      mspCompetitions.innerHTML='<div class="small">Keine bestätigten zukünftigen Turniere gefunden. Neue Anmeldungen werden bei der nächsten Prüfung automatisch erkannt.</div>';
    }
  }catch(e){
-   nextMspCompetition.textContent='Turniere konnten nicht geladen werden.';
-   mspCompetitions.innerHTML='<div class="small">Turniere konnten nicht geladen werden.</div>';
+   nextMspCompetition.textContent='Anmeldungen konnten nicht geprüft werden.';
+   mspCompetitions.innerHTML='<div class="small">MySpeedPuzzling-Anmeldungen konnten nicht geprüft werden.</div>';
  }
 
  try{renderTournaments(await getj('/tournaments'))}catch(e){}
