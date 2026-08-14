@@ -6,11 +6,11 @@ from sqlalchemy import text
 from starlette.middleware.sessions import SessionMiddleware
 from app.config import APP_BASE_URL,SESSION_SECRET,MSP_CLIENT_ID
 from app.database import Base,engine,get_db
-from app.models.db_models import OAuthToken,SyncSnapshot,Tournament,TrainingSession
-from app.models.schemas import TournamentCreate,TrainingSessionCreate
-from app.services.crypto import encrypt_text,decrypt_text
-from app.services.myspeedpuzzling import *
-from app.services.coach import readiness_score
+from app.db_models import OAuthToken, SyncSnapshot, Tournament, TrainingSession
+from app.schemas import TournamentCreate, TrainingSessionCreate
+from app.crypto import encrypt_text, decrypt_text
+from app.myspeedpuzzling import *
+from app.coach import readiness_score
 Base.metadata.create_all(bind=engine)
 app=FastAPI(title="Nicole Puzzle Coach API",version="2.0.0")
 app.add_middleware(SessionMiddleware,secret_key=SESSION_SECRET)
