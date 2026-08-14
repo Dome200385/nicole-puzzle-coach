@@ -1,25 +1,47 @@
-# Nicole Puzzle Coach Backend V2
+# Nicole Puzzle Coach Backend V3
 
-Neu:
-- PostgreSQL/SQLAlchemy
-- persistente verschlüsselte OAuth-Tokens
-- persistente MySpeedPuzzling-Snapshots
-- Turniere und Trainingseinheiten
-- erster Tournament Readiness Score
-- Python 3.13.5 im Blueprint
+## Was V3 neu kann
+- robuste Normalisierung der echten MySpeedPuzzling-Payloads
+- aktueller Besitz vs. historisch gelöst / nicht mehr im Besitz
+- Performance-Auswertung nach Modus und Teilezahl
+- persönliche Baseline und Trend
+- Consistency Score
+- Turnier-spezifischer Readiness Score
+- Next Puzzle Recommendation nur aus der aktuellen Bibliothek
+- optional nach geplantem Turnier gefiltert
+- automatische persönliche Zielzeit, sobald genügend Resultate vorhanden sind
+- `/coach/status` für schnellen Systemcheck
 
-## Nächster Render-Schritt
-1. Render -> New -> PostgreSQL.
-2. Name: `nicole-puzzle-coach-db`
-3. Internal Database URL kopieren.
-4. Beim Web Service Environment setzen:
-   `DATABASE_URL=<Internal Database URL>`
-5. Optional aber empfohlen:
-   `TOKEN_ENCRYPTION_KEY=<lange zufällige Zeichenfolge>`
-6. V2 nach GitHub hochladen/committen. Render deployt automatisch.
-7. Test:
-   `/health`
-   `/db/health`
-   `/docs`
+## Wichtige URLs nach Deploy
+- `/health`
+- `/db/health`
+- `/coach/status`
+- `/docs`
 
-Nach OAuth-Freigabe MSP_CLIENT_ID und MSP_CLIENT_SECRET ersetzen und `/auth/myspeedpuzzling/login` öffnen.
+Nach MySpeedPuzzling OAuth-Freigabe:
+- `/auth/myspeedpuzzling/login`
+- `/sync`
+- `/coach/performance?mode=solo&pieces=500`
+- `/coach/library`
+- `/coach/next-puzzle`
+
+## GitHub Upload
+Diese Version ist absichtlich passend zu deiner aktuellen Struktur gebaut.
+
+Im Repository soll es so aussehen:
+
+- app/
+  - __init__.py
+  - config.py
+  - database.py
+  - db_models.py
+  - schemas.py
+  - crypto.py
+  - myspeedpuzzling.py
+  - coach.py
+  - main.py
+- README.md
+- render.yaml
+- requirements.txt
+
+Die alten Unterordner `app/models` und `app/services` werden nicht mehr benötigt.
