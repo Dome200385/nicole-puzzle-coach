@@ -39,14 +39,20 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 
 <section class="card full"><h2>✅ Meine bestätigten Turniere</h2><div id="mspCompetitions" class="list"></div></section>
 
-<section class="card full hero"><h2>🏁 WM Coach · 500 Teile</h2>
+<section class="card full hero"><h2>🏁 WM Coach · Adaptive Preparation</h2>
 <div class="metricrow">
 <div class="metric"><div class="label">WM-Readiness</div><b id="wmReadiness">–</b><div class="small" id="wmPhase">–</div></div>
-<div class="metric"><div class="label">Aktuelle 500er-Zone</div><b id="wmZone">–</b><div class="small">aus den letzten 500er-Solo-Ergebnissen</div></div>
-<div class="metric"><div class="label">Dynamische Zielzeit</div><b id="wmTarget">–</b><div class="small" id="wmTrend">–</div></div>
+<div class="metric"><div class="label">Realistisches WM-Ziel</div><b id="wmGoal">–</b><div class="small">aus aktueller 500er-Leistung</div></div>
+<div class="metric"><div class="label">Stretch Goal</div><b id="wmStretch">–</b><div class="small">ambitionierter Best-Case-Tag</div></div>
+</div>
+<div class="metricrow" style="margin-top:10px">
+<div class="metric"><div class="label">Aktuelle 500er-Zone</div><b id="wmZone">–</b><div class="small">zentrale Zone der letzten 10</div></div>
+<div class="metric"><div class="label">Trainings-Zielzeit</div><b id="wmTarget">–</b><div class="small" id="wmTrend">–</div></div>
+<div class="metric"><div class="label">Nächster Trainingstyp</div><b id="wmTrainingType">–</b><div class="small" id="wmTrainingReason">–</div></div>
 </div>
 <div class="item" style="margin-top:12px"><strong>Nächste empfohlene Einheit</strong><div id="wmRecommendation" class="small">WM-Plan wird berechnet…</div></div>
 <div class="item" style="margin-top:10px"><strong>500er-Leistungsbild</strong><div id="wmStats" class="small">–</div></div>
+<div class="item" style="margin-top:10px"><strong>📅 Plan für die aktuelle Trainingswoche</strong><div id="wmWeeklyPlan" class="list" style="margin-top:8px"></div></div>
 </section>
 
 <section class="card full"><h2>📈 Automatische Trainingsanalyse</h2>
@@ -70,7 +76,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <section class="card full"><h2>📝 Zusätzliche manuelle Trainings</h2><div id="manualTrainings" class="list"></div></section>
 
 <section class="card full"><h2>🧠 Tournament Intelligence</h2>
-<div class="small">V5.4 kombiniert bestätigte Turnieranmeldungen mit den echten MySpeedPuzzling-Ergebnissen. Die Form wird aus den letzten Solo-Ergebnissen normalisiert auf Zeit pro 100 Teile berechnet, damit unterschiedliche Teilezahlen nicht direkt miteinander vermischt werden.</div>
+<div class="small">V5.6 steuert die WM-Vorbereitung adaptiv: Countdown, 500er-Form, Konsistenz, Trainingsbelastung und aktuelle Leistung bestimmen Trainingsart, Zielzeiten und Wochenplan. Der Plan passt sich bei neuen MySpeedPuzzling-Ergebnissen automatisch an.</div>
 <div style="margin-top:12px"><a class="btn secondary" href="/docs" target="_blank">API-Dokumentation</a> <a class="btn secondary" href="/msp/my-competitions?refresh=true" target="_blank">Anmeldungen neu prüfen</a> <a class="btn secondary" href="/sync" target="_blank">MySpeedPuzzling neu synchronisieren</a></div>
 </section>
 </div></div>
@@ -109,11 +115,16 @@ async function loadAll(){
    let w=await getj('/coach/wm-plan');
    wmReadiness.textContent=w.readiness_score==null?'–':w.readiness_score+'/100';
    wmPhase.textContent=(w.days_until!=null?`Noch ${w.days_until} Tage · `:'')+w.phase.name+' · '+w.phase.description;
+   wmGoal.textContent=w.wm_goal_realistic||'–';
+   wmStretch.textContent=w.wm_goal_stretch||'–';
    wmZone.textContent=w.current_zone?`${w.current_zone.from}–${w.current_zone.to}`:'–';
    wmTarget.textContent=w.dynamic_target||'–';
    wmTrend.textContent=w.trend10_percent==null?'Noch kein stabiler 500er-Trend':`500er-Trend ${pct(w.trend10_percent)}`;
+   wmTrainingType.textContent=w.next_training?.type||'–';
+   wmTrainingReason.textContent=w.next_training?`${w.next_training.intensity} · ${w.next_training.reason}`:'–';
    wmRecommendation.textContent=w.recommendation;
    wmStats.textContent=w.count?`${w.count} × 500er Solo · Best ${w.best} · Median ${w.median} · Ø letzte 5 ${w.recent5} · Ø letzte 10 ${w.recent10} · Ø letzte 20 ${w.recent20}`:'Noch keine 500er-Daten.';
+   wmWeeklyPlan.innerHTML=(w.weekly_plan||[]).map((s,i)=>`<div class="item"><strong>${i+1}. ${s.session}</strong><div class="small">${s.goal}</div><span class="pill">${s.intensity}</span></div>`).join('')||'<div class="small">Kein Trainingsplan verfügbar.</div>';
  }catch(e){wmRecommendation.textContent='WM-Coach konnte noch nicht berechnet werden.'}
 
  try{
