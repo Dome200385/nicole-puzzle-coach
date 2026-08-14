@@ -62,6 +62,44 @@ async def get_statistics(token):
 async def get_collections(token):
     return await api_get(token, "/me/collections")
 
+async def get_collection_items(token, collection_id):
+    return await api_get(token, f"/me/collections/{collection_id}/items")
+
+async def get_library(token):
+    """
+    Load the user's MySpeedPuzzling collections AND their puzzle items.
+    /me/collections alone only returns collection metadata.
+    """
+    collections_payload = await get_collections(token)
+    collections = (
+        collections_payload.get("collections", [])
+        if isinstance(collections_payload, dict) else []
+    )
+    enriched = []
+    errors = []
+    for collection in collections:
+        if not isinstance(collection, dict):
+            continue
+        cid = collection.get("collection_id") or collection.get("id")
+        entry = dict(collection)
+        if not cid:
+            entry["items_payload"] = {"error": "missing_collection_id"}
+            enriched.append(entry)
+            continue
+        try:
+            entry["items_payload"] = await get_collection_items(token, cid)
+        except Exception as exc:
+            entry["items_payload"] = {"error": str(exc)}
+            errors.append({"collection_id": cid, "error": str(exc)})
+        enriched.append(entry)
+
+    return {
+        "collections": enriched,
+        "player_id": collections_payload.get("player_id") if isinstance(collections_payload, dict) else None,
+        "count": len(enriched),
+        "item_fetch_errors": errors,
+    }
+
 async def get_results(token):
     out = {}
     for mode in ("solo", "duo", "team"):

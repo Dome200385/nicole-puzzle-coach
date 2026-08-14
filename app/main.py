@@ -13,7 +13,7 @@ from app.schemas import TournamentCreate, TrainingSessionCreate
 from app.crypto import encrypt_text, decrypt_text
 from app.myspeedpuzzling import (
     build_authorize_url, exchange_code, refresh_access_token,
-    get_profile, get_results, get_statistics, get_collections,
+    get_profile, get_results, get_statistics, get_collections, get_library,
     get_competitions, get_competition, upcoming_competitions,
     detect_participation, get_my_confirmed_competitions
 )
@@ -27,7 +27,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="5.7.0",
+    version="5.8.0",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -99,10 +99,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"5.7.0","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"5.8.0","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"5.7.0"}
+def health(): return {"status":"ok","version":"5.8.0"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -114,7 +114,7 @@ def coach_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     return {
-        "version":"5.7.0",
+        "version":"5.8.0",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None,
         "oauth_configured":configured
@@ -160,7 +160,7 @@ async def sync(db:Session=Depends(get_db)):
     profile=await get_profile(token)
     results=await get_results(token)
     statistics=await get_statistics(token)
-    collections=await get_collections(token)
+    collections=await get_library(token)
     snap=SyncSnapshot(
         owner_key="nicole",
         profile_json=json.dumps(profile),
@@ -172,6 +172,15 @@ async def sync(db:Session=Depends(get_db)):
     db.commit()
     db.refresh(snap)
     return {"status":"synced","snapshot_id":snap.id,"dashboard":"/dashboard"}
+
+@app.get("/msp/library")
+async def msp_library(db:Session=Depends(get_db)):
+    """Return MySpeedPuzzling collections including the actual puzzle items."""
+    token=await _valid_access_token(db)
+    try:
+        return await get_library(token)
+    except Exception as exc:
+        raise HTTPException(502,f"MySpeedPuzzling library request failed: {exc}")
 
 @app.get("/msp/competitions")
 async def msp_competitions(

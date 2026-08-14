@@ -80,63 +80,249 @@ def _weekly_plan(phase, target, realistic_goal, stretch_goal):
         {'session':'Konstanztraining','goal':'Gleichmässige Zwischenphasen, wenig Such-/Wechselzeiten.','intensity':'Moderat'},
         {'session':'Technik / Recovery','goal':'Start, Sortieren, Randstrategie oder lockere Einheit.','intensity':'Leicht'}]
 
+def _as_int(value):
+    try:
+        if value is None or value == "":
+            return None
+        return int(value)
+    except Exception:
+        return None
+
 def _extract_library_puzzles(payload):
-    """Best-effort extraction from /me/collections without inventing puzzle names."""
-    found={}
-    def walk(obj, inherited_owned=False):
+    """
+    Extract actual puzzle entries from the expanded MySpeedPuzzling library.
+
+    V5.8 expects get_library() output, where every collection contains an
+    items_payload fetched from /me/collections/{collectionId}/items.
+    Parsing remains deliberately defensive because API field names can evolve.
+    A recommendation is only returned when a real puzzle name is present.
+    """
+    found = {}
+
+    def add_candidate(candidate, collection_name=None):
+        if not isinstance(candidate, dict):
+            return
+
+        nested = candidate.get("puzzle")
+        if isinstance(nested, dict):
+            merged = dict(candidate)
+            merged.update(nested)
+            candidate = merged
+
+        pid = (
+            candidate.get("puzzle_id")
+            or candidate.get("puzzleId")
+            or candidate.get("id")
+        )
+        name = (
+            candidate.get("puzzle_name")
+            or candidate.get("puzzleName")
+            or candidate.get("name")
+            or candidate.get("title")
+        )
+        manufacturer = (
+            candidate.get("manufacturer_name")
+            or candidate.get("manufacturerName")
+            or candidate.get("manufacturer")
+            or candidate.get("brand")
+        )
+        if isinstance(manufacturer, dict):
+            manufacturer = (
+                manufacturer.get("name")
+                or manufacturer.get("title")
+                or manufacturer.get("manufacturer_name")
+            )
+
+        pieces = _as_int(
+            candidate.get("pieces_count")
+            or candidate.get("piecesCount")
+            or candidate.get("piece_count")
+            or candidate.get("pieces")
+        )
+        image = (
+            candidate.get("puzzle_image")
+            or candidate.get("image")
+            or candidate.get("image_url")
+            or candidate.get("thumbnail")
+        )
+
+        # We never manufacture a name. Require a real name and at least one
+        # piece of puzzle-specific evidence.
+        puzzle_evidence = bool(pid or pieces or candidate.get("puzzle_id") or isinstance(nested, dict))
+        if not name or not puzzle_evidence:
+            return
+
+        key = str(pid or (str(name).strip().lower(), str(manufacturer or "").strip().lower(), pieces))
+        found[key] = {
+            "id": pid,
+            "name": str(name).strip(),
+            "manufacturer": manufacturer,
+            "pieces": pieces,
+            "image": image,
+            "collection": collection_name,
+            "in_library": True,
+        }
+
+    def walk(obj, collection_name=None):
         if isinstance(obj, dict):
-            owned=inherited_owned or bool(obj.get('owned') or obj.get('is_owned') or obj.get('in_library'))
-            candidate=obj.get('puzzle') if isinstance(obj.get('puzzle'),dict) else obj
-            name=candidate.get('puzzle_name') or candidate.get('name') or candidate.get('title')
-            pid=candidate.get('puzzle_id') or candidate.get('id')
-            pieces=candidate.get('pieces_count') or candidate.get('piece_count') or candidate.get('pieces')
-            manufacturer=candidate.get('manufacturer_name') or candidate.get('manufacturer') or candidate.get('brand')
-            # Require puzzle-like evidence; generic collection names must not become recommendations.
-            puzzle_like=bool(candidate.get('puzzle_id') or candidate.get('pieces_count') or candidate.get('piece_count') or candidate.get('puzzle_name') or isinstance(obj.get('puzzle'),dict))
-            if name and puzzle_like:
-                key=str(pid or (str(name).lower(), str(manufacturer).lower(), pieces))
-                found[key]={'id':pid,'name':str(name),'manufacturer':manufacturer,'pieces':pieces,'owned':owned}
-            for v in obj.values(): walk(v,owned)
-        elif isinstance(obj,list):
-            for v in obj: walk(v,inherited_owned)
+            # Avoid turning collection metadata itself into a puzzle.
+            collection_keys = {"collection_id", "visibility", "description", "items_payload"}
+            looks_like_collection = "collection_id" in obj and "items_payload" in obj
+            if not looks_like_collection:
+                add_candidate(obj, collection_name)
+
+            next_collection = collection_name
+            if looks_like_collection:
+                next_collection = obj.get("name") or collection_name
+
+            for key, value in obj.items():
+                if key in ("description", "visibility"):
+                    continue
+                walk(value, next_collection)
+        elif isinstance(obj, list):
+            for value in obj:
+                walk(value, collection_name)
+
     walk(payload)
     return list(found.values())
 
-def _next_puzzle(library_payload, all_results, target_pieces, training_type):
-    library=_extract_library_puzzles(library_payload)
-    candidates=[]
-    for p in library:
-        try: pieces=int(p.get('pieces')) if p.get('pieces') is not None else None
-        except Exception: pieces=None
-        if pieces != target_pieces: continue
-        candidates.append(p)
-    if not candidates:
-        return {'available':False,'name':None,'reason':f'Kein eindeutig identifizierbares {target_pieces}-Teile-Puzzle in der synchronisierten MySpeedPuzzling-Bibliothek gefunden. Es wird kein Name erfunden.','library_candidates':0}
-
-    history={}
+def _history_for_puzzle(all_results, puzzle):
+    pid = puzzle.get("id")
+    pname = (puzzle.get("name") or "").strip().lower()
+    rows = []
     for r in all_results:
-        if r.get('mode')!='solo': continue
-        pid=r.get('puzzle_id'); name=(r.get('puzzle_name') or '').strip().lower()
-        key=str(pid) if pid else name
-        if not key: continue
-        history.setdefault(key,[]).append(r)
+        if r.get("mode") != "solo":
+            continue
+        rid = r.get("puzzle_id")
+        rname = (r.get("puzzle_name") or "").strip().lower()
+        if (pid and rid and str(pid) == str(rid)) or (pname and rname == pname):
+            rows.append(r)
+    rows.sort(
+        key=lambda r: _dt(r.get("finished_at"))
+        or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )
+    return rows
 
-    scored=[]
-    for p in candidates:
-        key=str(p.get('id')) if p.get('id') else p['name'].strip().lower()
-        solves=history.get(key,[])
-        count=len(solves)
-        # Simulations benefit from unseen/less-rehearsed puzzles; technique/recovery can reuse known material.
-        if training_type in ('Turniersimulation','Speed-Run','Kontrollierter 500er'):
-            score=100-count*18
-            rationale='wenig bzw. noch nicht als Solo-Training gelöst – dadurch näher an einer echten Turniersituation' if count<=1 else 'passt zur 500er-Einheit und wurde bisher nicht übermässig oft trainiert'
+def _days_since_last_solve(rows):
+    if not rows:
+        return None
+    dt = _dt(rows[0].get("finished_at"))
+    if not dt:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return max(0, (datetime.now(timezone.utc) - dt).days)
+
+def _next_puzzle(library_payload, all_results, target_pieces, training_type):
+    library = _extract_library_puzzles(library_payload)
+    candidates = [p for p in library if _as_int(p.get("pieces")) == target_pieces]
+
+    if not candidates:
+        return {
+            "available": False,
+            "name": None,
+            "reason": (
+                f"Kein konkret benanntes {target_pieces}-Teile-Puzzle wurde in den "
+                "geladenen MySpeedPuzzling-Bibliotheks-Einträgen gefunden. "
+                "Es wird kein Puzzle-Name erfunden."
+            ),
+            "library_total": len(library),
+            "library_candidates": 0,
+        }
+
+    scored = []
+    for puzzle in candidates:
+        history = _history_for_puzzle(all_results, puzzle)
+        solve_count = len(history)
+        days_since = _days_since_last_solve(history)
+
+        # Base score rewards a long gap since the last solve.
+        score = 50.0
+        if days_since is None:
+            score += 35
         else:
-            score=70+min(count,4)*5
-            rationale='bekanntes 500er-Puzzle eignet sich für Technik, Routine und kontrolliertes Tempo'
-        scored.append((score,p,count,rationale))
-    scored.sort(key=lambda x:(-x[0],x[2],x[1]['name'].lower()))
-    _,p,count,rationale=scored[0]
-    return {'available':True,'id':p.get('id'),'name':p['name'],'manufacturer':p.get('manufacturer'),'pieces':target_pieces,'previous_solo_solves':count,'reason':rationale,'library_candidates':len(candidates)}
+            score += min(days_since, 120) / 4
+
+        if training_type in ("Turniersimulation", "Speed-Run"):
+            # Novelty is valuable: less memory advantage, closer to competition.
+            score += max(0, 35 - solve_count * 10)
+            if solve_count == 0:
+                rationale = (
+                    "noch nie als Solo-Ergebnis erfasst – dadurch besonders gut "
+                    "für eine realistische Turniersimulation ohne Erinnerungsvorteil"
+                )
+            elif solve_count == 1:
+                rationale = (
+                    "erst einmal als Solo-Ergebnis erfasst – wenig Wiederholungsvorteil "
+                    "und deshalb gut für wettkampfnahes Tempo"
+                )
+            else:
+                rationale = (
+                    "passt zur 500er-Einheit; die Auswahl bevorzugt innerhalb der "
+                    "Bibliothek möglichst wenig wiederholte Puzzles"
+                )
+
+        elif training_type in ("Recovery / Technik", "Regeneration"):
+            # Known puzzles are useful for technique because puzzle difficulty
+            # is less likely to dominate the session.
+            score += min(solve_count, 4) * 8
+            if days_since is not None:
+                score += min(days_since, 60) / 6
+            rationale = (
+                "bereits bekanntes Bibliotheks-Puzzle – dadurch geeignet für "
+                "Start-, Sortier- und Technikarbeit ohne reine Bestzeitjagd"
+            )
+
+        elif training_type == "Konstanztraining":
+            # Prefer one with at least one benchmark but avoid heavy repetition.
+            score += 22 if 1 <= solve_count <= 3 else 0
+            score -= max(0, solve_count - 3) * 6
+            rationale = (
+                "liefert einen brauchbaren Vergleichswert, ohne zu stark durch "
+                "häufige Wiederholung verfälscht zu sein"
+            )
+
+        else:  # Controlled 500
+            score += 18 if solve_count <= 2 else 0
+            rationale = (
+                "passt zur kontrollierten 500er-Einheit und bietet einen guten "
+                "Kompromiss aus Vergleichbarkeit und geringem Wiederholungseffekt"
+            )
+
+        # Slight preference for Ravensburger because current 500er benchmark
+        # data is dominated by Ravensburger, but never at the cost of inventing.
+        manufacturer = str(puzzle.get("manufacturer") or "")
+        if manufacturer.lower() == "ravensburger":
+            score += 4
+
+        scored.append((score, puzzle, history, rationale))
+
+    scored.sort(
+        key=lambda item: (
+            -item[0],
+            len(item[2]),
+            item[1]["name"].lower(),
+        )
+    )
+    score, puzzle, history, rationale = scored[0]
+    days_since = _days_since_last_solve(history)
+
+    return {
+        "available": True,
+        "id": puzzle.get("id"),
+        "name": puzzle["name"],
+        "manufacturer": puzzle.get("manufacturer"),
+        "pieces": target_pieces,
+        "image": puzzle.get("image"),
+        "collection": puzzle.get("collection"),
+        "previous_solo_solves": len(history),
+        "days_since_last_solve": days_since,
+        "reason": rationale,
+        "library_total": len(library),
+        "library_candidates": len(candidates),
+        "selection_score": round(score, 1),
+    }
 
 def build_wm_plan(all_results, my_competitions, library_payload=None, target_pieces=500):
     comps=(my_competitions or {}).get('competitions',[]); next_comp=comps[0] if comps else None
