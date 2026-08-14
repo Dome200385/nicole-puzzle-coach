@@ -174,94 +174,116 @@ def _competition_risk(name, provenance):
 
 
 def _wm_fit_score(puzzle, history, training_type):
-    """
-    Transparent WM-Fit score 0-100.
-    This helper only ranks puzzle candidates. It does NOT alter readiness,
-    goals, training load, pace or the weekly training logic.
+    """WM-Fit 0-100 with deliberately non-saturating weighted dimensions.
+
+    A score near 100 is reserved for exceptionally strong evidence of WM
+    preliminary-round similarity. Ordinary suitable library puzzles should
+    normally land around 65-90 instead of all collapsing to 100.
     """
     history = history or []
     solves = len(history)
     pieces = int(puzzle.get("pieces") or 0)
     manufacturer = str(puzzle.get("manufacturer") or "").strip().lower()
     risk = puzzle.get("competition_risk") or {"score": 0}
+    risk_score = int(risk.get("score", 0) or 0)
+    days = _days_since_last_solve(history)
 
-    score = 50
-    reasons = []
+    # Six independent dimensions. Their maxima sum to 96 on purpose: without
+    # stronger WM-specific metadata we do not claim a perfect 100/100 fit.
+    format_pts = 18 if pieces == 500 else 4
+    brand_pts = 6 if manufacturer == "ravensburger" else 3
 
-    if pieces == 500:
-        score += 15
-        reasons.append("500 Teile")
+    if risk_score >= 80:
+        provenance_pts = 0
+    elif risk_score >= 40:
+        provenance_pts = 8
     else:
-        score -= 20
-
-    if manufacturer == "ravensburger":
-        score += 8
-        reasons.append("Ravensburger")
-
-    if risk.get("score", 0) >= 80:
-        score -= 45
-        reasons.append("früherer Meisterschaftseinsatz")
-    else:
-        score += 12
-        reasons.append("kein Meisterschaftshinweis")
+        provenance_pts = 24
 
     if solves == 0:
-        score += 15
+        novelty_pts = 22
+    elif solves == 1:
+        novelty_pts = 16
+    elif solves == 2:
+        novelty_pts = 11
+    elif solves == 3:
+        novelty_pts = 7
+    elif solves <= 5:
+        novelty_pts = 3
+    else:
+        novelty_pts = 0
+
+    if days is None:
+        memory_pts = 12
+    elif days >= 180:
+        memory_pts = 11
+    elif days >= 120:
+        memory_pts = 9
+    elif days >= 90:
+        memory_pts = 7
+    elif days >= 60:
+        memory_pts = 5
+    elif days >= 31:
+        memory_pts = 3
+    else:
+        memory_pts = 0
+
+    # Training-role match is intentionally small: WM-Fit describes WM
+    # similarity, not merely whether the puzzle is useful for today's drill.
+    if training_type in ("Turniersimulation", "Speed-Run"):
+        role_pts = 14 if solves == 0 else 10 if solves == 1 else 6 if solves <= 3 else 2
+    elif training_type == "Kontrollierter 500er":
+        role_pts = 10 if solves <= 1 else 12 if solves <= 3 else 6
+    elif training_type == "Konstanztraining":
+        role_pts = 5 if solves == 0 else 12 if solves <= 3 else 7
+    else:
+        role_pts = 5
+
+    score = format_pts + brand_pts + provenance_pts + novelty_pts + memory_pts + role_pts
+
+    # A known previous championship puzzle is a poor proxy for a fresh WM
+    # preliminary puzzle, regardless of its usefulness for technique training.
+    if risk_score >= 80:
+        score = min(score, 42)
+    elif risk_score >= 40:
+        score = min(score, 68)
+
+    score = max(0, min(96, int(round(score))))
+    label = "exzellent" if score >= 90 else "sehr hoch" if score >= 82 else "hoch" if score >= 72 else "mittel" if score >= 58 else "niedrig"
+
+    reasons = []
+    if pieces == 500:
+        reasons.append("500 Teile")
+    if manufacturer == "ravensburger":
+        reasons.append("Ravensburger")
+    reasons.append("kein Meisterschaftshinweis" if risk_score < 40 else "Meisterschaftsbezug vorhanden")
+    if solves == 0:
         reasons.append("noch nie Solo gelöst")
     elif solves == 1:
-        score += 7
         reasons.append("1 Solo-Lauf")
-    elif solves <= 3:
-        score += 2
-        reasons.append(f"{solves} Solo-Läufe")
     else:
-        score -= min(12, (solves - 3) * 2)
         reasons.append(f"{solves} Solo-Läufe")
-
-    days = _days_since_last_solve(history)
     if days is None:
-        score += 5
         reasons.append("kein Erinnerungsvorteil")
-    elif days >= 180:
-        score += 5
+    elif days >= 120:
         reasons.append("lange nicht gelöst")
-    elif days >= 90:
-        score += 2
     elif days <= 30:
-        score -= 8
         reasons.append("kürzlich gelöst")
-
-    # Role-specific, limited bonuses only.
-    if training_type in ("Turniersimulation", "Speed-Run"):
-        if solves == 0:
-            score += 8
-            reasons.append("hoher Neuheitseffekt")
-        if risk.get("score", 0) >= 80:
-            score -= 15
-    elif training_type == "Kontrollierter 500er":
-        if 1 <= solves <= 3:
-            score += 8
-            reasons.append("guter Vergleichswert")
-    elif training_type == "Konstanztraining":
-        if 1 <= solves <= 4:
-            score += 10
-            reasons.append("guter Konstanzvergleich")
-        elif solves == 0:
-            score -= 5
-
-    score = max(0, min(100, int(round(score))))
-    label = "sehr hoch" if score >= 85 else "hoch" if score >= 70 else "mittel" if score >= 55 else "niedrig"
-
-    unique = []
-    for r in reasons:
-        if r not in unique:
-            unique.append(r)
 
     return {
         "score": score,
         "label": label,
-        "summary": " · ".join(unique[:4]),
-        "reasons": unique[:6],
+        "summary": " · ".join(reasons[:4]),
+        "reasons": reasons[:6],
+        "components": {
+            "format": format_pts,
+            "brand": brand_pts,
+            "no_prior_championship": provenance_pts,
+            "novelty": novelty_pts,
+            "memory_distance": memory_pts,
+            "training_role": role_pts,
+        },
+        "max_without_wm_specific_evidence": 96,
     }
 
 def _wm_suitability(puzzle, solve_count=0):
