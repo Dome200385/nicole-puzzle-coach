@@ -18,7 +18,7 @@ from app.coach import (
 )
 from app.ui import dashboard
 
-Base.metadata.create_all(bind=engine)
+
 
 app = FastAPI(title="Nicole Puzzle Coach API", version="5.0.0", description="Personal speed-puzzling coach and tournament preparation.")
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
