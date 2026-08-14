@@ -455,6 +455,25 @@ async def get_swiss_motivation_ranking(token, cache=True):
         row["rank"] = i
 
     nicole = next((r for r in ranking if r.get("is_nicole")), None)
+
+    gap_to_first = None
+    gap_to_next = None
+    target_average_seconds = None
+    motivation = None
+    if nicole and ranking:
+        first = ranking[0]
+        gap_to_first = max(0, nicole["average_seconds"] - first["average_seconds"])
+        if nicole["rank"] > 1:
+            ahead = ranking[nicole["rank"]-2]
+            gap_to_next = max(0, nicole["average_seconds"] - ahead["average_seconds"])
+            # Motivational target: beat the next place by 1 second, but never
+            # set an unrealistic target faster than current first place by more than 1s.
+            target_average_seconds = max(1, ahead["average_seconds"] - 1)
+            motivation = f"Noch {gap_to_next} Sekunden bis zum nächsten Platz."
+        else:
+            target_average_seconds = max(1, nicole["average_seconds"] - 15)
+            motivation = "Aktuell vorne in dieser Vergleichsgruppe – nächstes Ziel: Ø nochmals 15 Sekunden schneller."
+
     result = {
         "title": "Schweizer Motivationsranking",
         "subtitle": "Vergleich der öffentlich verbundenen Schweizer Teilnehmer der Swiss Puzzle Championship – kein offizielles nationales Ranking.",
@@ -463,6 +482,10 @@ async def get_swiss_motivation_ranking(token, cache=True):
         "players": ranking,
         "count": len(ranking),
         "nicole": nicole,
+        "gap_to_first_seconds": gap_to_first,
+        "gap_to_next_seconds": gap_to_next,
+        "target_average_seconds": target_average_seconds,
+        "motivation": motivation,
         "cached": False,
     }
     _SWISS_RANK_CACHE.update({"ts": now, "data": result})

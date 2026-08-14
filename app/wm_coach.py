@@ -543,9 +543,16 @@ def _next_puzzle(library_payload, all_results, target_pieces, training_type, exc
         "reason": rationale,
         "library_total": len(library),
         "library_candidates": len(candidates),
+        "excluded_count": len({str(x) for x in (excluded_ids or []) if x}),
         "selection_score": round(score, 1),
     }
 
+
+
+def _is_excluded_puzzle(puzzle, excluded_ids=None):
+    excluded={str(x) for x in (excluded_ids or []) if x}
+    pid=puzzle.get("id") if isinstance(puzzle,dict) else None
+    return bool(pid and str(pid) in excluded)
 
 def _weekly_plan_with_puzzles(weekly_plan, library_payload, all_results, target_pieces=500, excluded_ids=None):
     """
@@ -600,6 +607,8 @@ def _weekly_plan_with_puzzles(weekly_plan, library_payload, all_results, target_
         # while excluding puzzles already assigned elsewhere this week.
         ranked = []
         for puzzle in candidates:
+            if _is_excluded_puzzle(puzzle, excluded_ids):
+                continue
             key = str(puzzle.get("id") or puzzle.get("name"))
             if key in used:
                 continue
@@ -675,7 +684,7 @@ def build_wm_plan(all_results, my_competitions, library_payload=None, target_pie
     rows.sort(key=lambda r:_dt(r.get('finished_at')) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
     load7=_training_load(all_results,7); load14=_training_load(all_results,14)
     if not rows:
-        return {'target_pieces':target_pieces,'next_competition':next_comp,'days_until':days,'phase':phase,'readiness_score':None,'recommendation':f'Noch keine Solo-Ergebnisse mit {target_pieces} Teilen vorhanden.','weekly_plan':[],'training_load_7':load7,'training_load_14':load14,'next_puzzle':_next_puzzle(library_payload or {},all_results,target_pieces,'Kontrollierter 500er')}
+        return {'target_pieces':target_pieces,'next_competition':next_comp,'days_until':days,'phase':phase,'readiness_score':None,'recommendation':f'Noch keine Solo-Ergebnisse mit {target_pieces} Teilen vorhanden.','weekly_plan':[],'training_load_7':load7,'training_load_14':load14,'next_puzzle':_next_puzzle(library_payload or {},all_results,target_pieces,'Kontrollierter 500er',excluded_puzzle_ids)}
 
     times=[r['seconds'] for r in rows]; r5=rows[:5]; r10=rows[:10]; r20=rows[:20]; prev10=rows[10:20]
     avg5=mean(r['seconds'] for r in r5); avg10=mean(r['seconds'] for r in r10); avg20=mean(r['seconds'] for r in r20)
@@ -691,7 +700,7 @@ def build_wm_plan(all_results, my_competitions, library_payload=None, target_pie
     load_penalty=max(0,(load7['units']-5)*3)
     readiness=max(0,min(100,round(.35*consistency+.30*trend_score+.20*volume_score+.15*recency_score-load_penalty)))
     recent_days=_recent_training_days(rows,7); training=_training_type(phase,trend,consistency,avg5,avg10,recent_days); weekly=_weekly_plan(phase,target,_fmt(realistic),_fmt(stretch)); weekly=_weekly_plan_with_puzzles(weekly,library_payload or {},all_results,target_pieces,excluded_puzzle_ids)
-    next_puzzle=_next_puzzle(library_payload or {},all_results,target_pieces,training['type'])
+    next_puzzle=_next_puzzle(library_payload or {},all_results,target_pieces,training['type'],excluded_puzzle_ids)
     if training['type']=='Turniersimulation': base=f'500er Turniersimulation. Ziel {_fmt(realistic)} oder schneller; Stretch {_fmt(stretch)} nur bei sauberem Flow.'
     elif training['type']=='Speed-Run': base=f'500er Speed-Run. Zielbereich {_fmt(target)}–{_fmt(realistic)}.'
     elif training['type']=='Konstanztraining': base=f'Kontrollierter 500er. Ziel {_fmt(avg10)} oder schneller; Schwankungen reduzieren.'

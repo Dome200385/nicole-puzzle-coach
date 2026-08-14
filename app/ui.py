@@ -67,12 +67,12 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="item" style="margin-top:10px"><strong>Nächste empfohlene Einheit</strong><div id="wmRecommendation" class="small">WM-Plan wird berechnet…</div></div>
 <div class="metricrow" style="margin-top:10px"><div class="metric"><div class="label">Training Load · 7 Tage</div><b id="wmLoad7">–</b><div class="small" id="wmLoad7Info">–</div></div><div class="metric"><div class="label">Training Load · 14 Tage</div><b id="wmLoad14">–</b><div class="small" id="wmLoad14Info">–</div></div><div class="metric"><div class="label">WM-Pace / 100 Teile</div><b id="wmPace100">–</b><div class="small" id="wmWeakness">–</div></div></div>
 <div class="item" style="margin-top:10px"><strong>500er-Leistungsbild</strong><div id="wmStats" class="small">–</div></div>
-<div id="unavailableBox" class="item loanBox" style="display:none;margin-top:10px"><strong>📦 Aktuell nicht verfügbare / ausgeliehene Puzzles</strong><div id="unavailableList" style="margin-top:7px"></div><button class="secondary" style="margin-top:7px" onclick="restoreAllPuzzles()">Alle wieder verfügbar</button></div>
+<div id="unavailableBox" class="item loanBox" style="display:none;margin-top:10px"><strong>📦 Aktuell nicht verfügbare / ausgeliehene Puzzles</strong><div class="small">Diese Puzzles werden in allen Empfehlungen und im gesamten Wochenplan ausgeschlossen.</div><div id="unavailableList" style="margin-top:7px"></div><button class="secondary" style="margin-top:7px" onclick="restoreAllPuzzles()">Alle wieder verfügbar</button></div>
 <div class="item" style="margin-top:10px"><strong>📅 Plan für die aktuelle Trainingswoche</strong><div id="wmWeeklyPlan" class="list" style="margin-top:8px"></div></div>
 </section>
 
 <section class="card full"><h2>🇨🇭 Schweizer Motivationsranking</h2>
-<div class="small">Vergleich mit öffentlich verbundenen Schweizer Teilnehmern der Swiss Puzzle Championship. <strong>Kein offizielles Schweizer Ranking.</strong></div>
+<div class="small">Vergleich mit öffentlich verbundenen Schweizer Teilnehmern der Swiss Puzzle Championship. <strong>Kein offizielles Schweizer Ranking.</strong> Das Ranking dient nur als Motivation und beeinflusst den Trainingsplan nicht.</div>
 <div id="swissRankSummary" class="item" style="margin-top:10px">Ranking wird geladen…</div>
 <div id="swissRankList" class="list" style="margin-top:8px"></div>
 </section>
@@ -98,7 +98,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <section class="card full"><h2>📝 Zusätzliche manuelle Trainings</h2><div id="manualTrainings" class="list"></div></section>
 
 <section class="card full"><h2>🧠 Tournament Intelligence</h2>
-<div class="small">V6.2 ergänzt den stabilen WM-Coach um Verfügbarkeitssteuerung für ausgeliehene Puzzles und einen Schweizer Motivationsvergleich. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
+<div class="small">V6.4 macht den Skip global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
 <div style="margin-top:12px"><a class="btn secondary" href="/docs" target="_blank">API-Dokumentation</a> <a class="btn secondary" href="/msp/my-competitions?refresh=true" target="_blank">Anmeldungen neu prüfen</a> <a class="btn secondary" href="/sync" target="_blank">MySpeedPuzzling neu synchronisieren</a> <a class="btn secondary" href="/msp/library" target="_blank">Puzzle-Bibliothek prüfen</a></div>
 </section>
 </div></div>
@@ -133,6 +133,12 @@ function fmtSeconds(v){
   v=Math.round(v);let h=Math.floor(v/3600),m=Math.floor((v%3600)/60),sec=v%60;
   return h?`${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`:`${m}:${String(sec).padStart(2,'0')}`;
 }
+
+function fmtGap(v){
+  if(v==null)return '–';
+  v=Math.round(v);let m=Math.floor(v/60),s=v%60;
+  return `${m}:${String(s).padStart(2,'0')}`;
+}
 function getActiveTraining(){try{return JSON.parse(localStorage.getItem('npc_active_training')||'null')}catch(e){return null}}
 function getUnavailablePuzzles(){try{return JSON.parse(localStorage.getItem('npc_unavailable_puzzles')||'[]')}catch(e){return []}}
 function saveUnavailablePuzzles(v){localStorage.setItem('npc_unavailable_puzzles',JSON.stringify(v))}
@@ -144,6 +150,9 @@ function skipPuzzle(p){
     arr.push({id:p.id,name:p.name,image_url:p.image_url||null,skipped_at:new Date().toISOString()});
     saveUnavailablePuzzles(arr);
   }
+  wmNextPuzzle.innerHTML='<span class="small">Puzzle wird übersprungen – neue Empfehlung wird berechnet…</span>';
+  wmWeeklyPlan.innerHTML='<div class="small">Wochenplan wird mit verfügbaren Puzzles neu berechnet…</div>';
+  renderUnavailable();
   loadAll();
 }
 function restorePuzzle(id){
@@ -257,7 +266,10 @@ async function loadAll(){renderUnavailable();
    }else{
      let me=r.nicole;
      swissRankSummary.innerHTML=me
-       ? `<strong>Nicole: Platz ${me.rank} von ${r.count}</strong> · Ø ${me.average}${me.top?' · Best '+me.top:''}<div class="small">${r.subtitle}</div>`
+       ? `<strong>Nicole: Platz ${me.rank} von ${r.count}</strong> · Ø ${me.average}${me.top?' · Best '+me.top:''}
+          <div class="small" style="margin-top:5px">${me.rank>1?`🥇 Abstand zu Platz 1: <strong>${fmtGap(r.gap_to_first_seconds)}</strong> · 🎯 bis zum nächsten Platz: <strong>${fmtGap(r.gap_to_next_seconds)}</strong>`:'🥇 Aktuell Platz 1 in dieser Vergleichsgruppe.'}</div>
+          ${r.target_average_seconds?`<div class="small">Motivationsziel: Ø <strong>${fmtSeconds(r.target_average_seconds)}</strong>${r.motivation?' · '+r.motivation:''}</div>`:''}
+          <div class="small">${r.subtitle}</div>`
        : `<strong>${r.count} Schweizer Vergleichsprofile gefunden</strong><div class="small">Nicole konnte in dieser Vergleichsgruppe aktuell nicht eindeutig zugeordnet werden. ${r.subtitle}</div>`;
      let show=[...r.players.slice(0,8)];
      if(me && !show.some(x=>x.player_id===me.player_id))show.push(me);
