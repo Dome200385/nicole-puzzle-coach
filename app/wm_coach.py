@@ -88,6 +88,116 @@ def _as_int(value):
     except Exception:
         return None
 
+
+# Puzzles confirmed by user feedback as originating from a prior championship.
+# These are not deleted from the library; they are strongly de-prioritized for
+# WM simulation because the preliminary round is expected to be closer to
+# ordinary published retail puzzles not previously revealed at championships.
+KNOWN_CHAMPIONSHIP_PUZZLES = {
+    "art studio": {
+        "source": "US-Meisterschaft",
+        "confidence": "confirmed_by_user",
+    },
+}
+
+_COMPETITION_WORDS = (
+    "championship", "championships", "competition", "contest", "tournament",
+    "meisterschaft", "national championship", "nationals", "speed puzzling event",
+)
+
+def _image_url(image):
+    if not image:
+        return None
+    image = str(image).strip()
+    if image.startswith("http://") or image.startswith("https://"):
+        return image
+    image = image.lstrip("/")
+    return f"https://img.myspeedpuzzling.com/preset:puzzle_small/plain/{image}"
+
+def _provenance_text(candidate):
+    """
+    Collect only provenance-like metadata. We deliberately do not classify
+    championship origin solely from the puzzle title.
+    """
+    bits = []
+    interesting = (
+        "competition", "championship", "event", "contest", "tournament",
+        "source", "origin", "edition", "category", "tag", "series",
+    )
+
+    def walk(obj, prefix=""):
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                low = str(key).lower()
+                path = f"{prefix}.{low}" if prefix else low
+                if any(k in low for k in interesting):
+                    if isinstance(value, (str, int, float, bool)):
+                        bits.append(f"{path}:{value}")
+                    elif isinstance(value, dict):
+                        for k2, v2 in value.items():
+                            if isinstance(v2, (str, int, float, bool)):
+                                bits.append(f"{path}.{k2}:{v2}")
+                if isinstance(value, (dict, list)):
+                    walk(value, path)
+        elif isinstance(obj, list):
+            for value in obj[:50]:
+                walk(value, prefix)
+    walk(candidate)
+    return " | ".join(bits)
+
+def _competition_risk(name, provenance):
+    normalized = (name or "").strip().lower()
+    if normalized in KNOWN_CHAMPIONSHIP_PUZZLES:
+        info = KNOWN_CHAMPIONSHIP_PUZZLES[normalized]
+        return {
+            "score": 100,
+            "level": "hoch",
+            "reason": f"bereits als Meisterschaftspuzzle bekannt ({info['source']})",
+            "source": info["source"],
+        }
+
+    text = (provenance or "").lower()
+    if any(word in text for word in _COMPETITION_WORDS):
+        return {
+            "score": 90,
+            "level": "hoch",
+            "reason": "Bibliotheks-Metadaten weisen auf einen früheren Wettbewerb hin",
+            "source": provenance,
+        }
+
+    return {
+        "score": 0,
+        "level": "niedrig",
+        "reason": "kein Hinweis auf frühere Meisterschaftsnutzung gefunden",
+        "source": None,
+    }
+
+def _wm_suitability(puzzle, solve_count=0):
+    risk = puzzle.get("competition_risk") or {"score": 0}
+    if risk.get("score", 0) >= 80:
+        return {
+            "level": "niedrig",
+            "label": "WM-Ähnlichkeit niedrig",
+            "reason": "früheres Meisterschaftspuzzle – für eine realistische WM-Vorrunden-Simulation weniger geeignet",
+        }
+    if solve_count == 0:
+        return {
+            "level": "hoch",
+            "label": "WM-Ähnlichkeit hoch",
+            "reason": "veröffentlichtes Bibliotheks-Puzzle ohne bekannten Meisterschaftshinweis und ohne Erinnerungsvorteil",
+        }
+    if solve_count <= 2:
+        return {
+            "level": "gut",
+            "label": "WM-Ähnlichkeit gut",
+            "reason": "kein Meisterschaftshinweis und nur geringer Wiederholungsvorteil",
+        }
+    return {
+        "level": "mittel",
+        "label": "WM-Ähnlichkeit mittel",
+        "reason": "kein Meisterschaftshinweis, aber durch Wiederholungen weniger wettkampfnah",
+    }
+
 def _extract_library_puzzles(payload):
     """
     Extract actual puzzle entries from the expanded MySpeedPuzzling library.
@@ -145,6 +255,8 @@ def _extract_library_puzzles(payload):
             or candidate.get("image_url")
             or candidate.get("thumbnail")
         )
+        provenance = _provenance_text(candidate)
+        competition_risk = _competition_risk(str(name or ""), provenance)
 
         # We never manufacture a name. Require a real name and at least one
         # piece of puzzle-specific evidence.
@@ -159,8 +271,11 @@ def _extract_library_puzzles(payload):
             "manufacturer": manufacturer,
             "pieces": pieces,
             "image": image,
+            "image_url": _image_url(image),
             "collection": collection_name,
             "in_library": True,
+            "provenance": provenance,
+            "competition_risk": competition_risk,
         }
 
     def walk(obj, collection_name=None):
@@ -290,6 +405,16 @@ def _next_puzzle(library_payload, all_results, target_pieces, training_type):
                 "Kompromiss aus Vergleichbarkeit und geringem Wiederholungseffekt"
             )
 
+        # WM relevance: championship-used puzzles are technically valid
+        # training puzzles, but are poor proxies for a WM preliminary round
+        # dominated by already-published retail puzzles that have not already
+        # appeared at a championship.
+        risk = puzzle.get("competition_risk") or {"score": 0}
+        if training_type in ("Turniersimulation", "Speed-Run", "Kontrollierter 500er"):
+            score -= risk.get("score", 0) * 8
+        else:
+            score -= risk.get("score", 0) * 1.5
+
         # Slight preference for Ravensburger because current 500er benchmark
         # data is dominated by Ravensburger, but never at the cost of inventing.
         manufacturer = str(puzzle.get("manufacturer") or "")
@@ -315,7 +440,10 @@ def _next_puzzle(library_payload, all_results, target_pieces, training_type):
         "manufacturer": puzzle.get("manufacturer"),
         "pieces": target_pieces,
         "image": puzzle.get("image"),
+        "image_url": puzzle.get("image_url"),
         "collection": puzzle.get("collection"),
+        "competition_risk": puzzle.get("competition_risk"),
+        "wm_suitability": _wm_suitability(puzzle, len(history)),
         "previous_solo_solves": len(history),
         "days_since_last_solve": days_since,
         "reason": rationale,
@@ -403,6 +531,12 @@ def _weekly_plan_with_puzzles(weekly_plan, library_payload, all_results, target_
                 score += 18 if solve_count <= 2 else 0
                 reason = "für einen kontrollierten 500er als Balance aus Vergleichbarkeit und Neuheit gewählt"
 
+            risk = puzzle.get("competition_risk") or {"score": 0}
+            if ttype in ("Turniersimulation", "Speed-Run", "Kontrollierter 500er"):
+                score -= risk.get("score", 0) * 8
+            else:
+                score -= risk.get("score", 0) * 1.5
+
             if str(puzzle.get("manufacturer") or "").lower() == "ravensburger":
                 score += 4
             ranked.append((score, puzzle, history, reason))
@@ -419,7 +553,10 @@ def _weekly_plan_with_puzzles(weekly_plan, library_payload, all_results, target_
                 "manufacturer": puzzle.get("manufacturer"),
                 "pieces": puzzle.get("pieces"),
                 "image": puzzle.get("image"),
+                "image_url": puzzle.get("image_url"),
                 "collection": puzzle.get("collection"),
+                "competition_risk": puzzle.get("competition_risk"),
+                "wm_suitability": _wm_suitability(puzzle, len(history)),
                 "previous_solo_solves": len(history),
                 "days_since_last_solve": _days_since_last_solve(history),
                 "reason": reason,

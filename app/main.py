@@ -27,7 +27,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="5.9.0",
+    version="6.0.0",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -99,10 +99,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"5.9.0","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.0.0","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"5.9.0"}
+def health(): return {"status":"ok","version":"6.0.0"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -114,7 +114,7 @@ def coach_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     return {
-        "version":"5.9.0",
+        "version":"6.0.0",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None,
         "oauth_configured":configured
@@ -276,6 +276,92 @@ async def wm_plan(db:Session=Depends(get_db)):
     token=await _valid_access_token(db)
     comps=await get_my_confirmed_competitions(token, limit=30)
     return build_wm_plan(rows, comps, library_payload=payload["collections"], target_pieces=500)
+
+
+@app.get("/coach/training-feedback")
+async def training_feedback(
+    puzzle_id:str|None=None,
+    puzzle_name:str|None=None,
+    started_at:str|None=None,
+    target_seconds:int|None=None,
+    db:Session=Depends(get_db)
+):
+    """
+    Check current MySpeedPuzzling results for the planned puzzle after a
+    locally stored start timestamp and evaluate the time against the target.
+    No new DB table is required.
+    """
+    token=await _valid_access_token(db)
+    try:
+        results=await get_results(token)
+    except Exception as exc:
+        raise HTTPException(502,f"Result check failed: {exc}")
+
+    rows=normalize_results(results)
+    start_dt=None
+    if started_at:
+        try:
+            from datetime import datetime, timezone
+            start_dt=datetime.fromisoformat(started_at.replace("Z","+00:00"))
+            if start_dt.tzinfo is None:
+                start_dt=start_dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            start_dt=None
+
+    wanted=(puzzle_name or "").strip().lower()
+    matches=[]
+    for row in rows:
+        if row.get("mode")!="solo":
+            continue
+        id_match=bool(puzzle_id and row.get("puzzle_id") and str(row.get("puzzle_id"))==str(puzzle_id))
+        name_match=bool(wanted and (row.get("puzzle_name") or "").strip().lower()==wanted)
+        if not (id_match or name_match):
+            continue
+        if start_dt:
+            try:
+                dt=datetime.fromisoformat(str(row.get("finished_at")).replace("Z","+00:00"))
+                if dt.tzinfo is None:
+                    dt=dt.replace(tzinfo=timezone.utc)
+                # MySpeedPuzzling may store day precision only. Accept same-day
+                # result even when its normalized timestamp is midnight.
+                if dt.date() < start_dt.date():
+                    continue
+            except Exception:
+                pass
+        matches.append(row)
+
+    if not matches:
+        return {
+            "found":False,
+            "puzzle_name":puzzle_name,
+            "message":"Noch kein passendes neues Solo-Ergebnis gefunden."
+        }
+
+    result=matches[0]
+    seconds=result.get("seconds")
+    delta=None
+    status="erfasst"
+    label="Ergebnis erfasst"
+    if target_seconds and seconds:
+        delta=round(seconds-target_seconds)
+        ratio=seconds/target_seconds
+        if ratio <= 1.00:
+            status="ziel_erreicht"; label="✅ Ziel erreicht"
+        elif ratio <= 1.03:
+            status="knapp"; label="🟡 Ziel knapp verfehlt"
+        else:
+            status="verfehlt"; label="🔴 Ziel verfehlt"
+
+    return {
+        "found":True,
+        "status":status,
+        "label":label,
+        "target_seconds":target_seconds,
+        "actual_seconds":seconds,
+        "delta_seconds":delta,
+        "result":result,
+        "message":label,
+    }
 
 @app.get("/coach/msp-training-summary")
 def msp_training_summary(db:Session=Depends(get_db)):
