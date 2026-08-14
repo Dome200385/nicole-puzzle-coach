@@ -21,11 +21,12 @@ from app.coach import (
     performance_summary, owned_vs_history, tournament_readiness,
     next_puzzle_recommendation, manual_training_overview, tournament_countdown
 )
+from app.msp_analytics import build_training_summary
 from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="5.3.0",
+    version="5.4.0",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -97,10 +98,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"5.3.0","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"5.4.0","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"5.3.0"}
+def health(): return {"status":"ok","version":"5.4.0"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -112,7 +113,7 @@ def coach_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     return {
-        "version":"5.3.0",
+        "version":"5.4.0",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None,
         "oauth_configured":configured
@@ -254,6 +255,25 @@ async def participation_check(limit:int=12,db:Session=Depends(get_db)):
         }
     except Exception as exc:
         raise HTTPException(502,f"Participation check failed: {exc}")
+
+@app.get("/coach/msp-training-summary")
+def msp_training_summary(db:Session=Depends(get_db)):
+    """Analyse the latest synchronized real MySpeedPuzzling solve results."""
+    s=_latest_snapshot(db)
+    if not s:
+        raise HTTPException(404,"Noch keine MySpeedPuzzling-Daten synchronisiert")
+    payload=_snapshot_payload(s)
+    return build_training_summary(payload["results"])
+
+@app.get("/coach/msp-training-live")
+async def msp_training_live(db:Session=Depends(get_db)):
+    """Fetch current MySpeedPuzzling results and return an immediate analysis."""
+    token=await _valid_access_token(db)
+    try:
+        results=await get_results(token)
+        return build_training_summary(results)
+    except Exception as exc:
+        raise HTTPException(502,f"MySpeedPuzzling training analysis failed: {exc}")
 
 @app.get("/data/latest")
 def latest_data(db:Session=Depends(get_db)):
