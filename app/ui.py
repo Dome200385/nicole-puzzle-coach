@@ -14,7 +14,7 @@ h1{margin:0;font-size:30px}.sub,.small{color:var(--muted)}.badge{padding:8px 12p
 .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:var(--shadow)}
 .kpi{grid-column:span 3}.third{grid-column:span 4}.half{grid-column:span 6}.full{grid-column:span 12}
 .label{font-size:12px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.06em}.value{font-size:30px;font-weight:900;margin-top:7px}
-h2{font-size:19px;margin:0 0 14px}.list{display:grid;gap:9px}.item{padding:12px;border:1px solid var(--line);border-radius:12px;background:#fafafa}.item strong{display:block}.puzzleRow{display:flex;gap:14px;align-items:flex-start}.puzzleImg{width:115px;height:90px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:10px;flex:0 0 auto}.puzzleInfo{min-width:0;flex:1}.riskHigh{background:#fff0f0}.wmGood{background:#eef9f1}.activeTraining{border:2px solid #7a89ff}.wmFit{font-weight:800;background:#eef3ff}.fitReason{margin-top:5px;font-size:12px;color:var(--muted)}
+h2{font-size:19px;margin:0 0 14px}.list{display:grid;gap:9px}.item{padding:12px;border:1px solid var(--line);border-radius:12px;background:#fafafa}.item strong{display:block}.puzzleRow{display:flex;gap:14px;align-items:flex-start}.puzzleImg{width:115px;height:90px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:10px;flex:0 0 auto}.puzzleInfo{min-width:0;flex:1}.riskHigh{background:#fff0f0}.wmGood{background:#eef9f1}.activeTraining{border:2px solid #7a89ff}.wmFit{font-weight:800;background:#eef3ff}.fitReason{margin-top:5px;font-size:12px;color:var(--muted)}.skipBtn{background:#fff;border:1px solid #ff8d8d;color:#b52f36;padding:7px 10px;border-radius:9px;font-weight:700}.loanBox{background:#fff7e8}.rankMe{border:2px solid #66c98d}.rankRow{display:grid;grid-template-columns:48px 1fr auto;gap:10px;align-items:center}.rankNum{font-size:18px;font-weight:900}.rankTime{text-align:right;font-weight:800}
 .pill{display:inline-block;margin:5px 5px 0 0;padding:4px 8px;border-radius:999px;background:#eef0f4;font-size:12px}
 input,select,textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff;color:var(--text)}
 .formgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.wide{grid-column:1/-1}
@@ -67,7 +67,14 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="item" style="margin-top:10px"><strong>Nächste empfohlene Einheit</strong><div id="wmRecommendation" class="small">WM-Plan wird berechnet…</div></div>
 <div class="metricrow" style="margin-top:10px"><div class="metric"><div class="label">Training Load · 7 Tage</div><b id="wmLoad7">–</b><div class="small" id="wmLoad7Info">–</div></div><div class="metric"><div class="label">Training Load · 14 Tage</div><b id="wmLoad14">–</b><div class="small" id="wmLoad14Info">–</div></div><div class="metric"><div class="label">WM-Pace / 100 Teile</div><b id="wmPace100">–</b><div class="small" id="wmWeakness">–</div></div></div>
 <div class="item" style="margin-top:10px"><strong>500er-Leistungsbild</strong><div id="wmStats" class="small">–</div></div>
+<div id="unavailableBox" class="item loanBox" style="display:none;margin-top:10px"><strong>📦 Aktuell nicht verfügbare / ausgeliehene Puzzles</strong><div id="unavailableList" style="margin-top:7px"></div><button class="secondary" style="margin-top:7px" onclick="restoreAllPuzzles()">Alle wieder verfügbar</button></div>
 <div class="item" style="margin-top:10px"><strong>📅 Plan für die aktuelle Trainingswoche</strong><div id="wmWeeklyPlan" class="list" style="margin-top:8px"></div></div>
+</section>
+
+<section class="card full"><h2>🇨🇭 Schweizer Motivationsranking</h2>
+<div class="small">Vergleich mit öffentlich verbundenen Schweizer Teilnehmern der Swiss Puzzle Championship. <strong>Kein offizielles Schweizer Ranking.</strong></div>
+<div id="swissRankSummary" class="item" style="margin-top:10px">Ranking wird geladen…</div>
+<div id="swissRankList" class="list" style="margin-top:8px"></div>
 </section>
 
 <section class="card full"><h2>📈 Automatische Trainingsanalyse</h2>
@@ -91,7 +98,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <section class="card full"><h2>📝 Zusätzliche manuelle Trainings</h2><div id="manualTrainings" class="list"></div></section>
 
 <section class="card full"><h2>🧠 Tournament Intelligence</h2>
-<div class="small">V6.1.1 ergänzt die stabile V6.0-Auswahl um einen transparenten WM-Fit-Score, ohne Readiness, Zielzeiten, Trainingslast oder Wochenplan-Berechnung zu verändern: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
+<div class="small">V6.2 ergänzt den stabilen WM-Coach um Verfügbarkeitssteuerung für ausgeliehene Puzzles und einen Schweizer Motivationsvergleich. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
 <div style="margin-top:12px"><a class="btn secondary" href="/docs" target="_blank">API-Dokumentation</a> <a class="btn secondary" href="/msp/my-competitions?refresh=true" target="_blank">Anmeldungen neu prüfen</a> <a class="btn secondary" href="/sync" target="_blank">MySpeedPuzzling neu synchronisieren</a> <a class="btn secondary" href="/msp/library" target="_blank">Puzzle-Bibliothek prüfen</a></div>
 </section>
 </div></div>
@@ -127,6 +134,30 @@ function fmtSeconds(v){
   return h?`${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`:`${m}:${String(sec).padStart(2,'0')}`;
 }
 function getActiveTraining(){try{return JSON.parse(localStorage.getItem('npc_active_training')||'null')}catch(e){return null}}
+function getUnavailablePuzzles(){try{return JSON.parse(localStorage.getItem('npc_unavailable_puzzles')||'[]')}catch(e){return []}}
+function saveUnavailablePuzzles(v){localStorage.setItem('npc_unavailable_puzzles',JSON.stringify(v))}
+function unavailableIds(){return getUnavailablePuzzles().map(x=>String(x.id||'')).filter(Boolean)}
+function skipPuzzle(p){
+  if(!p||!p.id)return;
+  let arr=getUnavailablePuzzles();
+  if(!arr.some(x=>String(x.id)===String(p.id))){
+    arr.push({id:p.id,name:p.name,image_url:p.image_url||null,skipped_at:new Date().toISOString()});
+    saveUnavailablePuzzles(arr);
+  }
+  loadAll();
+}
+function restorePuzzle(id){
+  saveUnavailablePuzzles(getUnavailablePuzzles().filter(x=>String(x.id)!==String(id)));
+  loadAll();
+}
+function restoreAllPuzzles(){saveUnavailablePuzzles([]);loadAll()}
+function renderUnavailable(){
+  let arr=getUnavailablePuzzles();
+  if(!arr.length){unavailableBox.style.display='none';return}
+  unavailableBox.style.display='block';
+  unavailableList.innerHTML=arr.map(p=>`<span class="pill">📦 ${p.name} <button onclick='restorePuzzle(${JSON.stringify(p.id)})' style="border:0;background:none;cursor:pointer">↩</button></span>`).join('');
+}
+
 function startTraining(session,puzzle,goal){
   if(!puzzle||!puzzle.available){alert('Für diese Einheit ist kein vollständiges Puzzle vorgesehen.');return}
   let active={
@@ -172,7 +203,7 @@ function renderActiveTraining(){
   activeTrainingResult.textContent='Training läuft / Ergebnis noch nicht geprüft.';
 }
 
-async function loadAll(){
+async function loadAll(){renderUnavailable();
  try{let st=await getj('/coach/status');systemKpi.textContent='OK';systemText.textContent=`Backend V${st.version} · Datenbank ok`;systemBadge.textContent='🟢 System bereit';mspKpi.textContent=st.has_myspeedpuzzling_data?'LIVE':(st.oauth_configured?'READY':'WAIT');mspText.textContent=st.has_myspeedpuzzling_data?'Daten synchronisiert':'Verbindung möglich'}catch(e){systemBadge.textContent='🔴 Fehler'}
 
  try{
@@ -189,7 +220,7 @@ async function loadAll(){
 
 
  try{
-   let w=await getj('/coach/wm-plan');
+   let ex=unavailableIds(); let w=await getj('/coach/wm-plan'+(ex.length?'?exclude_puzzle_ids='+encodeURIComponent(ex.join(',')):''));
    wmReadiness.textContent=w.readiness_score==null?'–':w.readiness_score+'/100';
    wmPhase.textContent=(w.days_until!=null?`Noch ${w.days_until} Tage · `:'')+w.phase.name+' · '+w.phase.description;
    wmGoal.textContent=w.wm_goal_realistic||'–';
@@ -202,7 +233,7 @@ async function loadAll(){
    wmRecommendation.textContent=w.recommendation;
    let np=w.next_puzzle||{};
    wmNextPuzzle.innerHTML=np.available
-     ? `<div class="puzzleRow">${puzzleImg(np)}<div class="puzzleInfo"><strong>${np.name}</strong>${np.manufacturer?' · '+np.manufacturer:''}${np.pieces?' · '+np.pieces+' Teile':''}<br><span class="small">${np.reason}</span><br><span class="pill">Bibliothek: ${np.library_candidates} passende 500er</span><span class="pill">${np.previous_solo_solves||0} bisherige Solo-Läufe</span>${np.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${np.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}${np.wm_fit?`<span class="pill wmFit">WM-Fit ${np.wm_fit.score}/100</span><div class="fitReason">${np.wm_fit.summary||''}</div>`:''}${np.wm_suitability?`<span class="pill ${np.wm_suitability.level==='hoch'||np.wm_suitability.level==='gut'?'wmGood':''}">${np.wm_suitability.label}</span>`:''}${np.competition_risk?.score>=80?`<div class="small riskHigh" style="padding:7px;border-radius:8px;margin-top:7px">⚠️ ${np.competition_risk.reason}</div>`:''}</div></div>`
+     ? `<div class="puzzleRow">${puzzleImg(np)}<div class="puzzleInfo"><strong>${np.name}</strong>${np.manufacturer?' · '+np.manufacturer:''}${np.pieces?' · '+np.pieces+' Teile':''}<br><span class="small">${np.reason}</span><br><span class="pill">Bibliothek: ${np.library_candidates} passende 500er</span><span class="pill">${np.previous_solo_solves||0} bisherige Solo-Läufe</span>${np.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${np.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}${np.wm_fit?`<span class="pill wmFit">WM-Fit ${np.wm_fit.score}/100</span><div class="fitReason">${np.wm_fit.summary||''}</div>`:''}${np.wm_suitability?`<span class="pill ${np.wm_suitability.level==='hoch'||np.wm_suitability.level==='gut'?'wmGood':''}">${np.wm_suitability.label}</span>`:''}${np.competition_risk?.score>=80?`<div class="small riskHigh" style="padding:7px;border-radius:8px;margin-top:7px">⚠️ ${np.competition_risk.reason}</div>`:''}<br><button class="skipBtn" onclick='skipPuzzle(${JSON.stringify(np)})'>Skip – aktuell ausgeliehen</button></div></div>`
      : `<span class="small">${np.reason||'Keine eindeutige Bibliotheks-Empfehlung verfügbar.'}</span><br><span class="pill">Bibliotheks-Puzzles erkannt: ${np.library_total||0}</span>`;
    wmLoad7.textContent=w.training_load_7?w.training_load_7.units.toFixed(1):'–'; wmLoad7Info.textContent=w.training_load_7?`${w.training_load_7.sessions} Einheiten · 500er-Äquivalente`:'–';
    wmLoad14.textContent=w.training_load_14?w.training_load_14.units.toFixed(1):'–'; wmLoad14Info.textContent=w.training_load_14?`${w.training_load_14.sessions} Einheiten · 500er-Äquivalente`:'–';
@@ -211,11 +242,31 @@ async function loadAll(){
    wmWeeklyPlan.innerHTML=(w.weekly_plan||[]).map((s,i)=>{
      let p=s.puzzle||{};
      let puzzleLine=p.available
-       ? `<div class="puzzleRow" style="margin-top:9px">${puzzleImg(p)}<div class="puzzleInfo"><strong>🧩 ${p.name}</strong>${p.manufacturer?' · '+p.manufacturer:''}${p.pieces?' · '+p.pieces+' Teile':''}<div class="small">${p.reason||''}</div><span class="pill">${p.previous_solo_solves||0} bisherige Solo-Läufe</span>${p.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${p.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}${p.wm_fit?`<span class="pill wmFit">WM-Fit ${p.wm_fit.score}/100</span><div class="fitReason">${p.wm_fit.summary||''}</div>`:''}${p.wm_suitability?`<span class="pill ${p.wm_suitability.level==='hoch'||p.wm_suitability.level==='gut'?'wmGood':''}">${p.wm_suitability.label}</span>`:''}${p.competition_risk?.score>=80?`<div class="small riskHigh" style="padding:7px;border-radius:8px;margin-top:7px">⚠️ ${p.competition_risk.reason}</div>`:''}<br><button class="primary" style="margin-top:8px" onclick='startTraining(${JSON.stringify(s.session)},${JSON.stringify(p)},${JSON.stringify(s.goal)})'>Training starten</button></div></div>`
+       ? `<div class="puzzleRow" style="margin-top:9px">${puzzleImg(p)}<div class="puzzleInfo"><strong>🧩 ${p.name}</strong>${p.manufacturer?' · '+p.manufacturer:''}${p.pieces?' · '+p.pieces+' Teile':''}<div class="small">${p.reason||''}</div><span class="pill">${p.previous_solo_solves||0} bisherige Solo-Läufe</span>${p.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${p.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}${p.wm_fit?`<span class="pill wmFit">WM-Fit ${p.wm_fit.score}/100</span><div class="fitReason">${p.wm_fit.summary||''}</div>`:''}${p.wm_suitability?`<span class="pill ${p.wm_suitability.level==='hoch'||p.wm_suitability.level==='gut'?'wmGood':''}">${p.wm_suitability.label}</span>`:''}${p.competition_risk?.score>=80?`<div class="small riskHigh" style="padding:7px;border-radius:8px;margin-top:7px">⚠️ ${p.competition_risk.reason}</div>`:''}<br><button class="skipBtn" style="margin-top:8px" onclick='skipPuzzle(${JSON.stringify(p)})'>Skip – ausgeliehen</button> <button class="primary" style="margin-top:8px" onclick='startTraining(${JSON.stringify(s.session)},${JSON.stringify(p)},${JSON.stringify(s.goal)})'>Training starten</button></div></div>`
        : (p.not_required?`<div class="small" style="margin-top:7px">🧩 ${p.reason}</div>`:`<div class="small" style="margin-top:7px">🧩 ${p.reason||'Kein Bibliotheks-Puzzle verfügbar.'}</div>`);
      return `<div class="item"><strong>${i+1}. ${s.session}</strong><div class="small">${s.goal}</div><span class="pill">${s.intensity}</span>${puzzleLine}</div>`;
    }).join('')||'<div class="small">Kein Trainingsplan verfügbar.</div>';
  }catch(e){wmRecommendation.textContent='WM-Coach konnte noch nicht berechnet werden.'}
+
+
+ try{
+   let r=await getj('/coach/swiss-ranking');
+   if(!r.players||!r.players.length){
+     swissRankSummary.textContent=r.subtitle||'Vergleichsgruppe derzeit nicht verfügbar.';
+     swissRankList.innerHTML='';
+   }else{
+     let me=r.nicole;
+     swissRankSummary.innerHTML=me
+       ? `<strong>Nicole: Platz ${me.rank} von ${r.count}</strong> · Ø ${me.average}${me.top?' · Best '+me.top:''}<div class="small">${r.subtitle}</div>`
+       : `<strong>${r.count} Schweizer Vergleichsprofile gefunden</strong><div class="small">Nicole konnte in dieser Vergleichsgruppe aktuell nicht eindeutig zugeordnet werden. ${r.subtitle}</div>`;
+     let show=[...r.players.slice(0,8)];
+     if(me && !show.some(x=>x.player_id===me.player_id))show.push(me);
+     swissRankList.innerHTML=show.map(x=>`<div class="item ${x.is_nicole?'rankMe':''}"><div class="rankRow"><div class="rankNum">#${x.rank}</div><div><strong>${x.is_nicole?'⭐ ':''}${x.name}</strong><div class="small">${x.puzzles_solved!=null?x.puzzles_solved+' Puzzles · ':''}${x.top?'Best '+x.top:''}</div></div><div class="rankTime">Ø ${x.average}</div></div></div>`).join('');
+   }
+ }catch(e){
+   swissRankSummary.textContent='Schweizer Vergleich derzeit nicht verfügbar.';
+   swissRankList.innerHTML='';
+ }
 
  try{
    let data=await getj('/msp/my-competitions?limit=30');let rows=data.competitions||[];

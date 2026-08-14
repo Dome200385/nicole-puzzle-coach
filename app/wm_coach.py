@@ -421,9 +421,10 @@ def _days_since_last_solve(rows):
         dt = dt.replace(tzinfo=timezone.utc)
     return max(0, (datetime.now(timezone.utc) - dt).days)
 
-def _next_puzzle(library_payload, all_results, target_pieces, training_type):
+def _next_puzzle(library_payload, all_results, target_pieces, training_type, excluded_ids=None):
+    excluded_ids={str(x) for x in (excluded_ids or []) if x}
     library = _extract_library_puzzles(library_payload)
-    candidates = [p for p in library if _as_int(p.get("pieces")) == target_pieces]
+    candidates = [p for p in library if _as_int(p.get("pieces")) == target_pieces and str(p.get("id")) not in excluded_ids]
 
     if not candidates:
         return {
@@ -546,14 +547,15 @@ def _next_puzzle(library_payload, all_results, target_pieces, training_type):
     }
 
 
-def _weekly_plan_with_puzzles(weekly_plan, library_payload, all_results, target_pieces=500):
+def _weekly_plan_with_puzzles(weekly_plan, library_payload, all_results, target_pieces=500, excluded_ids=None):
     """
     Attach a concrete real MySpeedPuzzling library puzzle to each weekly
     full-puzzle session. Avoid duplicate puzzle assignments inside the same week.
     Technique-only sessions may intentionally have no full puzzle.
     """
+    excluded_ids={str(x) for x in (excluded_ids or []) if x}
     library = _extract_library_puzzles(library_payload or {})
-    candidates = [p for p in library if _as_int(p.get("pieces")) == target_pieces]
+    candidates = [p for p in library if _as_int(p.get("pieces")) == target_pieces and str(p.get("id")) not in excluded_ids]
     used = set()
     enriched = []
 
@@ -666,7 +668,7 @@ def _weekly_plan_with_puzzles(weekly_plan, library_payload, all_results, target_
         enriched.append(row)
     return enriched
 
-def build_wm_plan(all_results, my_competitions, library_payload=None, target_pieces=500):
+def build_wm_plan(all_results, my_competitions, library_payload=None, target_pieces=500, excluded_puzzle_ids=None):
     comps=(my_competitions or {}).get('competitions',[]); next_comp=comps[0] if comps else None
     days=_days_until(next_comp.get('date_from')) if next_comp else None; phase=_phase(days)
     rows=[r for r in all_results if r.get('mode')=='solo' and r.get('pieces')==target_pieces and isinstance(r.get('seconds'),(int,float))]
@@ -688,7 +690,7 @@ def build_wm_plan(all_results, my_competitions, library_payload=None, target_pie
     # Load penalty prevents high solve volume from inflating readiness.
     load_penalty=max(0,(load7['units']-5)*3)
     readiness=max(0,min(100,round(.35*consistency+.30*trend_score+.20*volume_score+.15*recency_score-load_penalty)))
-    recent_days=_recent_training_days(rows,7); training=_training_type(phase,trend,consistency,avg5,avg10,recent_days); weekly=_weekly_plan(phase,target,_fmt(realistic),_fmt(stretch)); weekly=_weekly_plan_with_puzzles(weekly,library_payload or {},all_results,target_pieces)
+    recent_days=_recent_training_days(rows,7); training=_training_type(phase,trend,consistency,avg5,avg10,recent_days); weekly=_weekly_plan(phase,target,_fmt(realistic),_fmt(stretch)); weekly=_weekly_plan_with_puzzles(weekly,library_payload or {},all_results,target_pieces,excluded_puzzle_ids)
     next_puzzle=_next_puzzle(library_payload or {},all_results,target_pieces,training['type'])
     if training['type']=='Turniersimulation': base=f'500er Turniersimulation. Ziel {_fmt(realistic)} oder schneller; Stretch {_fmt(stretch)} nur bei sauberem Flow.'
     elif training['type']=='Speed-Run': base=f'500er Speed-Run. Zielbereich {_fmt(target)}–{_fmt(realistic)}.'

@@ -349,3 +349,121 @@ async def get_my_confirmed_competitions(token, limit=30, cache=True):
         "data": result,
     })
     return result
+
+
+# --- V6.2: Swiss motivational peer comparison -------------------------------
+
+_SWISS_RANK_CACHE = {"ts": 0.0, "data": None}
+_SWISS_RANK_CACHE_SECONDS = 60 * 60
+
+def _clean_html_text(value):
+    import html as _html
+    value = re.sub(r"<[^>]+>", " ", str(value or ""))
+    value = _html.unescape(value)
+    return re.sub(r"\s+", " ", value).strip()
+
+def _hms_to_seconds(value):
+    if not value:
+        return None
+    text = str(value).strip()
+    m = re.search(r"(\d{1,2}):(\d{2}):(\d{2})", text)
+    if not m:
+        return None
+    h, mi, sec = map(int, m.groups())
+    return h*3600 + mi*60 + sec
+
+async def get_swiss_motivation_ranking(token, cache=True):
+    """
+    Motivational peer group, NOT an official Swiss national ranking.
+
+    Source: connected participant section on the public Swiss Puzzle
+    Championship event page. Swiss profiles are detected by the CH flag in
+    the participant row. Ranking uses the public average solve time shown
+    beside those profiles. The parser is deliberately defensive because the
+    website HTML can change.
+    """
+    now = time.time()
+    if cache and _SWISS_RANK_CACHE["data"] is not None and now-_SWISS_RANK_CACHE["ts"] < _SWISS_RANK_CACHE_SECONDS:
+        out = dict(_SWISS_RANK_CACHE["data"])
+        out["cached"] = True
+        return out
+
+    profile = await get_profile(token)
+    my_id = profile.get("id") if isinstance(profile, dict) else None
+    url = f"{_MSP_WEB_BASE}/en/events/swiss-championship-2026"
+
+    async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+        response = await client.get(
+            url,
+            headers={
+                "Accept": "text/html,application/xhtml+xml",
+                "User-Agent": "NicolePuzzleCoach/6.2 (+Swiss motivational comparison)",
+            },
+        )
+        response.raise_for_status()
+        html = response.text
+
+    # Locate every player-profile occurrence and inspect its row-sized HTML
+    # neighborhood. This avoids assuming a specific Bootstrap/Turbo structure.
+    player_re = re.compile(
+        r'href=["\'](?:https?://[^"\']+)?/(?:en/)?player-profile/([0-9a-fA-F-]{20,})[^"\']*["\'][^>]*>(.*?)</a>',
+        re.I | re.S
+    )
+    rows = {}
+    for match in player_re.finditer(html):
+        pid = match.group(1)
+        start = max(0, match.start()-1800)
+        end = min(len(html), match.end()+1800)
+        chunk = html[start:end]
+
+        # Switzerland flag classes used by MySpeedPuzzling.
+        if not re.search(r'\bfi(?:\s+fi)?-ch\b|\bfi-ch\b', chunk, re.I):
+            continue
+
+        name = _clean_html_text(match.group(2))
+        if not name:
+            continue
+
+        avg_match = re.search(r'(?:Ø|Avg(?:erage)?)[^0-9]{0,30}(\d{1,2}:\d{2}:\d{2})', chunk, re.I)
+        top_match = re.search(r'(?:Top|Best)[^0-9]{0,30}(\d{1,2}:\d{2}:\d{2})', chunk, re.I)
+        solved_match = re.search(r'(?:Puzzle\s+solved|Solved)[^0-9]{0,30}(\d+)', chunk, re.I)
+
+        avg = avg_match.group(1) if avg_match else None
+        avg_seconds = _hms_to_seconds(avg)
+        if avg_seconds is None:
+            continue
+
+        candidate = {
+            "player_id": pid,
+            "name": name,
+            "country_code": "ch",
+            "average": avg,
+            "average_seconds": avg_seconds,
+            "top": top_match.group(1) if top_match else None,
+            "puzzles_solved": int(solved_match.group(1)) if solved_match else None,
+            "is_nicole": bool(my_id and str(pid) == str(my_id)),
+        }
+
+        # Same player can appear more than once in dynamic HTML; keep the
+        # candidate with the best-populated metadata.
+        old = rows.get(pid)
+        if not old or sum(v is not None for v in candidate.values()) > sum(v is not None for v in old.values()):
+            rows[pid] = candidate
+
+    ranking = sorted(rows.values(), key=lambda r: (r["average_seconds"], r["name"].lower()))
+    for i, row in enumerate(ranking, 1):
+        row["rank"] = i
+
+    nicole = next((r for r in ranking if r.get("is_nicole")), None)
+    result = {
+        "title": "Schweizer Motivationsranking",
+        "subtitle": "Vergleich der öffentlich verbundenen Schweizer Teilnehmer der Swiss Puzzle Championship – kein offizielles nationales Ranking.",
+        "metric": "Öffentlich angezeigte Durchschnittszeit",
+        "source_url": url,
+        "players": ranking,
+        "count": len(ranking),
+        "nicole": nicole,
+        "cached": False,
+    }
+    _SWISS_RANK_CACHE.update({"ts": now, "data": result})
+    return result

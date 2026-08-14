@@ -15,7 +15,7 @@ from app.myspeedpuzzling import (
     build_authorize_url, exchange_code, refresh_access_token,
     get_profile, get_results, get_statistics, get_collections, get_library,
     get_competitions, get_competition, upcoming_competitions,
-    detect_participation, get_my_confirmed_competitions
+    detect_participation, get_my_confirmed_competitions, get_swiss_motivation_ranking
 )
 from app.coach import (
     performance_summary, owned_vs_history, tournament_readiness,
@@ -27,7 +27,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.1.1",
+    version="6.2.0",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -99,10 +99,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.1.1","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.2.0","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.1.1"}
+def health(): return {"status":"ok","version":"6.2.0"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -114,7 +114,7 @@ def coach_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     return {
-        "version":"6.1.1",
+        "version":"6.2.0",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None,
         "oauth_configured":configured
@@ -267,7 +267,7 @@ async def participation_check(limit:int=12,db:Session=Depends(get_db)):
         raise HTTPException(502,f"Participation check failed: {exc}")
 
 @app.get("/coach/wm-plan")
-async def wm_plan(db:Session=Depends(get_db)):
+async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
     s=_latest_snapshot(db)
     if not s:
         raise HTTPException(404,"Noch keine MySpeedPuzzling-Daten synchronisiert")
@@ -362,6 +362,21 @@ async def training_feedback(
         "result":result,
         "message":label,
     }
+
+
+@app.get("/coach/swiss-ranking")
+async def swiss_ranking(db:Session=Depends(get_db)):
+    token=await _valid_access_token(db)
+    try:
+        return await get_swiss_motivation_ranking(token)
+    except Exception as exc:
+        return {
+            "title":"Schweizer Motivationsranking",
+            "subtitle":"Vergleichsgruppe derzeit nicht verfügbar – kein Einfluss auf den WM-Coach.",
+            "players":[],
+            "count":0,
+            "error":str(exc),
+        }
 
 @app.get("/coach/msp-training-summary")
 def msp_training_summary(db:Session=Depends(get_db)):
