@@ -1,23 +1,25 @@
-# Nicole Puzzle Coach Backend V1
+# Nicole Puzzle Coach Backend V2
 
-Enthalten:
-- FastAPI Backend
-- Render Blueprint
-- MySpeedPuzzling OAuth2
-- Read-only Scopes: profile, results, statistics, collections
-- Daten-Sync
-- Turnier-Eingabe
-- Swagger unter /docs
+Neu:
+- PostgreSQL/SQLAlchemy
+- persistente verschlüsselte OAuth-Tokens
+- persistente MySpeedPuzzling-Snapshots
+- Turniere und Trainingseinheiten
+- erster Tournament Readiness Score
+- Python 3.13.5 im Blueprint
 
-## Deployment
-1. Dateien in ein neues GitHub-Repository hochladen.
-2. Render -> New -> Blueprint -> Repository verbinden.
-3. Nach dem ersten Deploy die Render-URL notieren.
-4. APP_BASE_URL in Render auf diese URL setzen.
-5. Bei MySpeedPuzzling Redirect URL eintragen:
-   https://DEINE-RENDER-URL.onrender.com/auth/myspeedpuzzling/callback
-6. OAuth-Antrag absenden.
-7. Nach Freigabe MSP_CLIENT_ID und MSP_CLIENT_SECRET in Render setzen.
-8. /auth/myspeedpuzzling/login öffnen.
+## Nächster Render-Schritt
+1. Render -> New -> PostgreSQL.
+2. Name: `nicole-puzzle-coach-db`
+3. Internal Database URL kopieren.
+4. Beim Web Service Environment setzen:
+   `DATABASE_URL=<Internal Database URL>`
+5. Optional aber empfohlen:
+   `TOKEN_ENCRYPTION_KEY=<lange zufällige Zeichenfolge>`
+6. V2 nach GitHub hochladen/committen. Render deployt automatisch.
+7. Test:
+   `/health`
+   `/db/health`
+   `/docs`
 
-V1 speichert Tokens absichtlich nur temporär. Nach erfolgreichem API-Test folgt PostgreSQL + Coach Engine.
+Nach OAuth-Freigabe MSP_CLIENT_ID und MSP_CLIENT_SECRET ersetzen und `/auth/myspeedpuzzling/login` öffnen.
