@@ -324,6 +324,117 @@ def _next_puzzle(library_payload, all_results, target_pieces, training_type):
         "selection_score": round(score, 1),
     }
 
+
+def _weekly_plan_with_puzzles(weekly_plan, library_payload, all_results, target_pieces=500):
+    """
+    Attach a concrete real MySpeedPuzzling library puzzle to each weekly
+    full-puzzle session. Avoid duplicate puzzle assignments inside the same week.
+    Technique-only sessions may intentionally have no full puzzle.
+    """
+    library = _extract_library_puzzles(library_payload or {})
+    candidates = [p for p in library if _as_int(p.get("pieces")) == target_pieces]
+    used = set()
+    enriched = []
+
+    def training_type_for_session(name):
+        n = (name or "").lower()
+        if "turnier" in n:
+            return "Turniersimulation"
+        if "speed" in n:
+            return "Speed-Run"
+        if "konstanz" in n:
+            return "Konstanztraining"
+        if "technik" in n or "recovery" in n or "sortier" in n or "routine" in n:
+            return "Recovery / Technik"
+        return "Kontrollierter 500er"
+
+    for session in weekly_plan or []:
+        row = dict(session)
+        session_name = row.get("session", "")
+        ttype = training_type_for_session(session_name)
+
+        # Pure technique/routine sessions do not need a complete puzzle.
+        lower = session_name.lower()
+        full_puzzle = not (
+            ("technik" in lower or "routine" in lower or "aktivierung" in lower)
+            and "500" not in lower
+            and "turnier" not in lower
+            and "speed" not in lower
+            and "konstanz" not in lower
+        )
+
+        if not full_puzzle:
+            row["puzzle"] = {
+                "available": False,
+                "not_required": True,
+                "name": None,
+                "reason": "Für diese Technik-/Routineeinheit ist kein vollständiges Puzzle nötig."
+            }
+            enriched.append(row)
+            continue
+
+        # Score each real candidate with the same principles as _next_puzzle,
+        # while excluding puzzles already assigned elsewhere this week.
+        ranked = []
+        for puzzle in candidates:
+            key = str(puzzle.get("id") or puzzle.get("name"))
+            if key in used:
+                continue
+            history = _history_for_puzzle(all_results, puzzle)
+            solve_count = len(history)
+            days_since = _days_since_last_solve(history)
+            score = 50.0 + (35 if days_since is None else min(days_since, 120) / 4)
+
+            if ttype in ("Turniersimulation", "Speed-Run"):
+                score += max(0, 35 - solve_count * 10)
+                reason = (
+                    "für wettkampfnahes Tempo gewählt; wenig Wiederholung wird bevorzugt"
+                    if solve_count else
+                    "noch nie als Solo-Ergebnis erfasst – ideal für einen Lauf ohne Erinnerungsvorteil"
+                )
+            elif ttype == "Konstanztraining":
+                score += 22 if 1 <= solve_count <= 3 else 0
+                score -= max(0, solve_count - 3) * 6
+                reason = "für Konstanztraining gewählt: vorhandener Vergleichswert bei begrenzter Wiederholung"
+            elif ttype == "Recovery / Technik":
+                score += min(solve_count, 4) * 8
+                reason = "bekanntes Puzzle wird für Technikarbeit und einen kontrollierten Ablauf bevorzugt"
+            else:
+                score += 18 if solve_count <= 2 else 0
+                reason = "für einen kontrollierten 500er als Balance aus Vergleichbarkeit und Neuheit gewählt"
+
+            if str(puzzle.get("manufacturer") or "").lower() == "ravensburger":
+                score += 4
+            ranked.append((score, puzzle, history, reason))
+
+        ranked.sort(key=lambda x: (-x[0], len(x[2]), x[1]["name"].lower()))
+        if ranked:
+            score, puzzle, history, reason = ranked[0]
+            key = str(puzzle.get("id") or puzzle.get("name"))
+            used.add(key)
+            row["puzzle"] = {
+                "available": True,
+                "id": puzzle.get("id"),
+                "name": puzzle.get("name"),
+                "manufacturer": puzzle.get("manufacturer"),
+                "pieces": puzzle.get("pieces"),
+                "image": puzzle.get("image"),
+                "collection": puzzle.get("collection"),
+                "previous_solo_solves": len(history),
+                "days_since_last_solve": _days_since_last_solve(history),
+                "reason": reason,
+                "selection_score": round(score, 1),
+            }
+        else:
+            row["puzzle"] = {
+                "available": False,
+                "not_required": False,
+                "name": None,
+                "reason": f"Kein weiteres eindeutig benanntes {target_pieces}-Teile-Puzzle aus der Bibliothek verfügbar."
+            }
+        enriched.append(row)
+    return enriched
+
 def build_wm_plan(all_results, my_competitions, library_payload=None, target_pieces=500):
     comps=(my_competitions or {}).get('competitions',[]); next_comp=comps[0] if comps else None
     days=_days_until(next_comp.get('date_from')) if next_comp else None; phase=_phase(days)
@@ -346,7 +457,7 @@ def build_wm_plan(all_results, my_competitions, library_payload=None, target_pie
     # Load penalty prevents high solve volume from inflating readiness.
     load_penalty=max(0,(load7['units']-5)*3)
     readiness=max(0,min(100,round(.35*consistency+.30*trend_score+.20*volume_score+.15*recency_score-load_penalty)))
-    recent_days=_recent_training_days(rows,7); training=_training_type(phase,trend,consistency,avg5,avg10,recent_days); weekly=_weekly_plan(phase,target,_fmt(realistic),_fmt(stretch))
+    recent_days=_recent_training_days(rows,7); training=_training_type(phase,trend,consistency,avg5,avg10,recent_days); weekly=_weekly_plan(phase,target,_fmt(realistic),_fmt(stretch)); weekly=_weekly_plan_with_puzzles(weekly,library_payload or {},all_results,target_pieces)
     next_puzzle=_next_puzzle(library_payload or {},all_results,target_pieces,training['type'])
     if training['type']=='Turniersimulation': base=f'500er Turniersimulation. Ziel {_fmt(realistic)} oder schneller; Stretch {_fmt(stretch)} nur bei sauberem Flow.'
     elif training['type']=='Speed-Run': base=f'500er Speed-Run. Zielbereich {_fmt(target)}–{_fmt(realistic)}.'

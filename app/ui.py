@@ -78,7 +78,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <section class="card full"><h2>📝 Zusätzliche manuelle Trainings</h2><div id="manualTrainings" class="list"></div></section>
 
 <section class="card full"><h2>🧠 Tournament Intelligence</h2>
-<div class="small">V5.8 verbindet den adaptiven WM-Coach mit der echten MySpeedPuzzling-Puzzle-Bibliothek. Für die nächste Einheit wird ein konkretes vorhandenes 500er-Puzzle gewählt; Wiederholungen, letzte Nutzung und Trainingstyp beeinflussen die Auswahl.</div>
+<div class="small">V5.9 verbindet jede vollständige Einheit des adaptiven Wochenplans mit einem konkreten Puzzle aus der echten MySpeedPuzzling-Bibliothek. Innerhalb derselben Trainingswoche werden Puzzle möglichst nicht doppelt vergeben; Technik-/Routineeinheiten können bewusst ohne vollständiges Puzzle bleiben.</div>
 <div style="margin-top:12px"><a class="btn secondary" href="/docs" target="_blank">API-Dokumentation</a> <a class="btn secondary" href="/msp/my-competitions?refresh=true" target="_blank">Anmeldungen neu prüfen</a> <a class="btn secondary" href="/sync" target="_blank">MySpeedPuzzling neu synchronisieren</a> <a class="btn secondary" href="/msp/library" target="_blank">Puzzle-Bibliothek prüfen</a></div>
 </section>
 </div></div>
@@ -133,7 +133,13 @@ async function loadAll(){
    wmLoad14.textContent=w.training_load_14?w.training_load_14.units.toFixed(1):'–'; wmLoad14Info.textContent=w.training_load_14?`${w.training_load_14.sessions} Einheiten · 500er-Äquivalente`:'–';
    wmPace100.textContent=w.wm_pace_per_100||'–'; wmWeakness.textContent=w.weakness_focus?`Aktueller Fokus: ${w.weakness_focus}`:'–';
    wmStats.textContent=w.count?`${w.count} × 500er Solo · Best ${w.best} · Median ${w.median} · Ø letzte 5 ${w.recent5} · Ø letzte 10 ${w.recent10} · Ø letzte 20 ${w.recent20}`:'Noch keine 500er-Daten.';
-   wmWeeklyPlan.innerHTML=(w.weekly_plan||[]).map((s,i)=>`<div class="item"><strong>${i+1}. ${s.session}</strong><div class="small">${s.goal}</div><span class="pill">${s.intensity}</span></div>`).join('')||'<div class="small">Kein Trainingsplan verfügbar.</div>';
+   wmWeeklyPlan.innerHTML=(w.weekly_plan||[]).map((s,i)=>{
+     let p=s.puzzle||{};
+     let puzzleLine=p.available
+       ? `<div style="margin-top:7px"><strong>🧩 ${p.name}</strong>${p.manufacturer?' · '+p.manufacturer:''}${p.pieces?' · '+p.pieces+' Teile':''}<div class="small">${p.reason||''}</div><span class="pill">${p.previous_solo_solves||0} bisherige Solo-Läufe</span>${p.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${p.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}</div>`
+       : (p.not_required?`<div class="small" style="margin-top:7px">🧩 ${p.reason}</div>`:`<div class="small" style="margin-top:7px">🧩 ${p.reason||'Kein Bibliotheks-Puzzle verfügbar.'}</div>`);
+     return `<div class="item"><strong>${i+1}. ${s.session}</strong><div class="small">${s.goal}</div><span class="pill">${s.intensity}</span>${puzzleLine}</div>`;
+   }).join('')||'<div class="small">Kein Trainingsplan verfügbar.</div>';
  }catch(e){wmRecommendation.textContent='WM-Coach konnte noch nicht berechnet werden.'}
 
  try{
