@@ -172,6 +172,127 @@ def _competition_risk(name, provenance):
         "source": None,
     }
 
+
+def _wm_puzzle_score(puzzle, history=None, training_type=None):
+    """
+    Transparent 0-100 WM-fit score.
+    It is intentionally conservative: prior championship use is a major penalty.
+    The score is not a prediction of the actual WM puzzle; it ranks Nicole's
+    library for realistic preparation.
+    """
+    history = history or []
+    score = 50
+    reasons = []
+
+    pieces = int(puzzle.get("pieces") or 0)
+    manufacturer = str(puzzle.get("manufacturer") or "").strip().lower()
+    risk = puzzle.get("competition_risk") or {"score": 0}
+    solves = len(history)
+
+    if pieces == 500:
+        score += 15
+        reasons.append("500 Teile")
+    else:
+        score -= 20
+
+    if manufacturer == "ravensburger":
+        score += 8
+        reasons.append("Ravensburger")
+
+    if risk.get("score", 0) >= 80:
+        score -= 45
+        reasons.append("früherer Meisterschaftseinsatz")
+    else:
+        score += 12
+        reasons.append("kein Meisterschaftshinweis")
+
+    if solves == 0:
+        score += 15
+        reasons.append("noch nie Solo gelöst")
+    elif solves == 1:
+        score += 7
+        reasons.append("nur 1 Solo-Lauf")
+    elif solves <= 3:
+        score += 2
+        reasons.append(f"nur {solves} Solo-Läufe")
+    else:
+        score -= min(12, (solves - 3) * 2)
+        reasons.append(f"{solves} Solo-Läufe")
+
+    days = _days_since_last(history)
+    if days is None:
+        score += 5
+        reasons.append("kein Erinnerungsvorteil")
+    elif days >= 180:
+        score += 5
+        reasons.append("lange nicht gelöst")
+    elif days >= 90:
+        score += 2
+    elif days <= 30:
+        score -= 8
+        reasons.append("kürzlich gelöst")
+
+    # Role-specific intent.
+    if training_type == "Speed-Run":
+        if solves == 0:
+            score += 8
+            reasons.append("ideal für unbekannten Speed-Run")
+        if risk.get("score", 0) >= 80:
+            score -= 15
+    elif training_type == "Kontrollierter 500er":
+        # A small amount of history is useful as a benchmark, but avoid
+        # heavily memorised puzzles.
+        if 1 <= solves <= 3:
+            score += 8
+            reasons.append("guter Vergleichswert")
+        elif solves == 0:
+            score += 3
+        elif solves >= 6:
+            score -= 8
+    elif training_type == "Konstanztraining":
+        # Prefer a known but not overused puzzle for repeatable process work.
+        if 1 <= solves <= 4:
+            score += 10
+            reasons.append("geeignet für Konstanzvergleich")
+        elif solves == 0:
+            score -= 5
+        elif solves >= 7:
+            score -= 8
+    elif training_type == "Turniersimulation":
+        if solves == 0:
+            score += 10
+            reasons.append("hoher Neuheitseffekt")
+        if risk.get("score", 0) >= 80:
+            score -= 20
+
+    score = max(0, min(100, int(round(score))))
+    if score >= 85:
+        label = "sehr hoch"
+    elif score >= 70:
+        label = "hoch"
+    elif score >= 55:
+        label = "mittel"
+    else:
+        label = "niedrig"
+
+    # Keep the explanation concise and deterministic.
+    seen = []
+    for r in reasons:
+        if r not in seen:
+            seen.append(r)
+    return {
+        "score": score,
+        "label": label,
+        "reasons": seen[:5],
+        "summary": " · ".join(seen[:4]),
+    }
+
+def _role_score(puzzle, history, training_type):
+    fit = _wm_puzzle_score(puzzle, history, training_type)
+    # The transparent WM score is the dominant factor. A tiny deterministic
+    # tie-breaker avoids unstable choices without hiding the selection logic.
+    return fit["score"] * 100
+
 def _wm_suitability(puzzle, solve_count=0):
     risk = puzzle.get("competition_risk") or {"score": 0}
     if risk.get("score", 0) >= 80:
@@ -444,6 +565,7 @@ def _next_puzzle(library_payload, all_results, target_pieces, training_type):
         "collection": puzzle.get("collection"),
         "competition_risk": puzzle.get("competition_risk"),
         "wm_suitability": _wm_suitability(puzzle, len(history)),
+        "wm_puzzle_score": _wm_puzzle_score(puzzle, history, training_type),
         "previous_solo_solves": len(history),
         "days_since_last_solve": days_since,
         "reason": rationale,
@@ -557,6 +679,7 @@ def _weekly_plan_with_puzzles(weekly_plan, library_payload, all_results, target_
                 "collection": puzzle.get("collection"),
                 "competition_risk": puzzle.get("competition_risk"),
                 "wm_suitability": _wm_suitability(puzzle, len(history)),
+                "wm_puzzle_score": _wm_puzzle_score(puzzle, history, ttype),
                 "previous_solo_solves": len(history),
                 "days_since_last_solve": _days_since_last_solve(history),
                 "reason": reason,
