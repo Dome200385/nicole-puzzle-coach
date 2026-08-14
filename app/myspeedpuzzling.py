@@ -1,4 +1,5 @@
 from urllib.parse import urlencode
+from datetime import datetime, timezone
 import httpx
 from app.config import (
     MSP_AUTHORIZE_URL, MSP_TOKEN_URL, MSP_API_BASE,
@@ -78,3 +79,93 @@ async def get_competitions(token, status="all", online=False, country=None):
 
 async def get_competition(token, competition_id):
     return await api_get(token, f"/competitions/{competition_id}")
+
+def _parse_dt(value):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+def normalize_competitions(payload):
+    rows = payload.get("competitions", []) if isinstance(payload, dict) else []
+    out = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        out.append({
+            "id": row.get("id"),
+            "name": row.get("name"),
+            "shortcode": row.get("shortcode"),
+            "url": row.get("url"),
+            "logo": row.get("logo"),
+            "location": row.get("location"),
+            "country_code": row.get("country_code"),
+            "is_online": row.get("is_online"),
+            "date_from": row.get("date_from"),
+            "date_to": row.get("date_to"),
+            "status": row.get("status"),
+            "link": row.get("link"),
+            "registration_link": row.get("registration_link"),
+            "results_link": row.get("results_link"),
+            "raw": row,
+        })
+    return out
+
+def upcoming_competitions(payload, limit=20):
+    now = datetime.now(timezone.utc)
+    rows = []
+    for row in normalize_competitions(payload):
+        end = _parse_dt(row.get("date_to")) or _parse_dt(row.get("date_from"))
+        if end and end < now:
+            continue
+        start = _parse_dt(row.get("date_from")) or datetime.max.replace(tzinfo=timezone.utc)
+        row["_sort"] = start
+        rows.append(row)
+    rows.sort(key=lambda r: r["_sort"])
+    for r in rows:
+        r.pop("_sort", None)
+    return rows[:limit]
+
+PARTICIPATION_KEYS = (
+    "is_registered", "registered", "is_participant", "participating",
+    "is_attending", "attending", "my_registration", "registration_status",
+    "participation_status", "user_registration", "my_participation"
+)
+
+def detect_participation(detail):
+    if not isinstance(detail, dict):
+        return {"detected": False, "reason": "Competition detail is not an object."}
+
+    found = {}
+    stack = [("", detail)]
+    while stack:
+        prefix, obj = stack.pop()
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                path = f"{prefix}.{key}" if prefix else key
+                low = key.lower()
+                if low in PARTICIPATION_KEYS or any(k in low for k in ("register", "participat", "attend")):
+                    found[path] = value
+                if isinstance(value, (dict, list)):
+                    stack.append((path, value))
+        elif isinstance(obj, list):
+            for idx, value in enumerate(obj[:100]):
+                if isinstance(value, (dict, list)):
+                    stack.append((f"{prefix}[{idx}]", value))
+
+    positive = False
+    for value in found.values():
+        if value is True:
+            positive = True
+        elif isinstance(value, str) and value.lower() in (
+            "registered", "confirmed", "participating", "attending", "yes", "active"
+        ):
+            positive = True
+
+    return {
+        "detected": positive,
+        "signals": found,
+        "has_participation_fields": bool(found),
+    }
