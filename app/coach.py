@@ -1,5 +1,6 @@
-from datetime import datetime
+from datetime import datetime, date
 from statistics import mean, median, pstdev
+from collections import defaultdict
 
 def _list_from_payload(payload, keys=("results", "items", "data", "collections", "puzzles")):
     if isinstance(payload, list):
@@ -64,7 +65,10 @@ def _date_value(row):
     try:
         return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
     except Exception:
-        return None
+        try:
+            return datetime.strptime(str(raw), "%Y-%m-%d")
+        except Exception:
+            return None
 
 def normalize_results(results_payload):
     rows = []
@@ -173,18 +177,11 @@ def performance_summary(results_payload, mode="solo", pieces=None):
 def owned_vs_history(results_payload, collections_payload):
     results = normalize_results(results_payload)
     owned = normalize_owned(collections_payload)
-
     owned_ids = {x["puzzle_id"] for x in owned if x["puzzle_id"]}
     solved_ids = {x["puzzle_id"] for x in results if x["puzzle_id"]}
 
-    historical_not_owned = [
-        r for r in results
-        if r["puzzle_id"] and r["puzzle_id"] not in owned_ids
-    ]
-    owned_unsolved = [
-        p for p in owned
-        if p["puzzle_id"] and p["puzzle_id"] not in solved_ids
-    ]
+    historical_not_owned = [r for r in results if r["puzzle_id"] and r["puzzle_id"] not in owned_ids]
+    owned_unsolved = [p for p in owned if p["puzzle_id"] and p["puzzle_id"] not in solved_ids]
 
     return {
         "owned_count": len(owned),
@@ -223,7 +220,6 @@ def tournament_readiness(training_sessions, tournament):
     ]
 
     specific = min(100, len(relevant) * 12)
-
     consistency = 50
     if len(times) >= 3 and mean(times) > 0:
         consistency = max(0, min(100, 100 - (pstdev(times) / mean(times)) * 240))
@@ -240,7 +236,6 @@ def tournament_readiness(training_sessions, tournament):
         "Aufbauphase" if score >= 50 else
         "Mehr gezieltes Training nötig"
     )
-
     return {
         "score": score,
         "label": label,
@@ -266,40 +261,30 @@ def next_puzzle_recommendation(results_payload, collections_payload, tournament=
     for p in owned:
         if p["puzzle_id"] and p["puzzle_id"] in solved_ids:
             continue
-
         score = 40.0
         reasons = []
-
         if tournament:
             target_mfr = (tournament.get("manufacturer") or "").lower()
             if target_mfr and target_mfr in p["manufacturer"].lower():
                 score += 25
                 reasons.append("passt zum Hersteller des geplanten Turniers")
-
             target_pieces = tournament.get("piece_count")
             if target_pieces and p["pieces"] == target_pieces:
                 score += 25
                 reasons.append("passt exakt zur Turnier-Teilezahl")
-
         if "ravensburger" in p["manufacturer"].lower():
             score += 5
             reasons.append("Ravensburger-Training")
-
         if p["pieces"] in solo_by_pieces and len(solo_by_pieces[p["pieces"]]) >= 3:
             score += 5
             reasons.append("genügend persönliche Vergleichsdaten für eine Zielzeit")
-
         candidates.append((score, p, reasons))
 
     if not candidates:
-        return {
-            "status": "no_candidate",
-            "message": "Noch kein ungelöstes Puzzle aus der aktuellen Bibliothek erkannt."
-        }
+        return {"status": "no_candidate", "message": "Noch kein ungelöstes Puzzle aus der aktuellen Bibliothek erkannt."}
 
     candidates.sort(key=lambda x: x[0], reverse=True)
     score, puzzle, reasons = candidates[0]
-
     target_seconds = None
     history = solo_by_pieces.get(puzzle["pieces"], [])
     if history:
@@ -314,4 +299,109 @@ def next_puzzle_recommendation(results_payload, collections_payload, tournament=
         "training_score": round(min(score, 100), 1),
         "target_seconds": target_seconds,
         "reason": ", ".join(reasons) if reasons else "ungelöstes Puzzle aus der aktuellen Bibliothek",
+    }
+
+def manual_training_overview(sessions):
+    valid = [s for s in sessions if s.get("duration_seconds")]
+    if not valid:
+        return {
+            "count": len(sessions),
+            "timed_count": 0,
+            "best_seconds": None,
+            "average_seconds": None,
+            "recent_average_seconds": None,
+            "trend_percent": None,
+            "consistency_score": None,
+            "by_pieces": [],
+            "by_manufacturer": [],
+            "recommendation": "Erfasse einige Trainingszeiten, damit der Coach Muster erkennen kann."
+        }
+
+    valid = sorted(valid, key=lambda x: x.get("date") or "")
+    times = [s["duration_seconds"] for s in valid]
+    recent = times[-5:]
+    previous = times[-10:-5] if len(times) >= 6 else times[:-len(recent)]
+
+    avg = mean(times)
+    recent_avg = mean(recent)
+    previous_avg = mean(previous) if previous else avg
+    trend = round((previous_avg - recent_avg) / previous_avg * 100, 1) if previous_avg else 0
+
+    consistency = 100
+    if len(recent) >= 3 and mean(recent) > 0:
+        consistency = max(0, min(100, 100 - (pstdev(recent) / mean(recent)) * 250))
+
+    by_pieces = []
+    groups = defaultdict(list)
+    for s in valid:
+        if s.get("piece_count"):
+            groups[s["piece_count"]].append(s["duration_seconds"])
+    for pieces, vals in sorted(groups.items()):
+        by_pieces.append({
+            "piece_count": pieces,
+            "count": len(vals),
+            "average_seconds": round(mean(vals)),
+            "best_seconds": min(vals),
+        })
+
+    by_manufacturer = []
+    mgroups = defaultdict(list)
+    for s in valid:
+        m = (s.get("manufacturer") or "").strip()
+        if m:
+            mgroups[m].append(s["duration_seconds"])
+    for m, vals in sorted(mgroups.items(), key=lambda kv: (-len(kv[1]), kv[0].lower()))[:8]:
+        by_manufacturer.append({
+            "manufacturer": m,
+            "count": len(vals),
+            "average_seconds": round(mean(vals)),
+            "best_seconds": min(vals),
+        })
+
+    recommendation = "Weiter konstant trainieren."
+    if len(valid) < 4:
+        recommendation = "Noch 2–3 Trainings mit Zeit erfassen, damit Form und Konsistenz belastbarer werden."
+    elif consistency < 65:
+        recommendation = "Fokus auf Konstanz: gleiche Teilezahl mehrfach trainieren und Zielzeit nur leicht verschärfen."
+    elif trend < -3:
+        recommendation = "Leistung zuletzt schwächer: heute ein vertrautes Puzzleformat mit sauberer Technik statt Maximaltempo."
+    elif trend > 3 and consistency >= 75:
+        recommendation = "Form ist gut: nächste Session als Turniersimulation mit realem Zeitlimit durchführen."
+
+    return {
+        "count": len(sessions),
+        "timed_count": len(valid),
+        "best_seconds": min(times),
+        "average_seconds": round(avg),
+        "recent_average_seconds": round(recent_avg),
+        "trend_percent": trend,
+        "consistency_score": round(consistency),
+        "by_pieces": by_pieces,
+        "by_manufacturer": by_manufacturer,
+        "recommendation": recommendation,
+    }
+
+def tournament_countdown(tournaments):
+    today = date.today()
+    upcoming = []
+    for t in tournaments:
+        try:
+            d = datetime.strptime(t["date"], "%Y-%m-%d").date()
+        except Exception:
+            continue
+        if d >= today:
+            upcoming.append((d, t))
+    if not upcoming:
+        return None
+    upcoming.sort(key=lambda x: x[0])
+    d, t = upcoming[0]
+    return {
+        "id": t["id"],
+        "name": t["name"],
+        "date": t["date"],
+        "days_left": (d - today).days,
+        "location": t.get("location"),
+        "mode": t.get("mode"),
+        "manufacturer": t.get("manufacturer"),
+        "piece_count": t.get("piece_count"),
     }
