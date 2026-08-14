@@ -1,8 +1,15 @@
-import base64,hashlib
+import base64
+import hashlib
 from cryptography.fernet import Fernet
-from app.config import TOKEN_ENCRYPTION_KEY,SESSION_SECRET
-def _f():
-    seed=TOKEN_ENCRYPTION_KEY or SESSION_SECRET
-    return Fernet(base64.urlsafe_b64encode(hashlib.sha256(seed.encode()).digest()))
-def encrypt_text(v): return _f().encrypt(v.encode()).decode()
-def decrypt_text(v): return _f().decrypt(v.encode()).decode()
+from app.config import TOKEN_ENCRYPTION_KEY, SESSION_SECRET
+
+def _fernet():
+    seed = TOKEN_ENCRYPTION_KEY or SESSION_SECRET
+    key = base64.urlsafe_b64encode(hashlib.sha256(seed.encode()).digest())
+    return Fernet(key)
+
+def encrypt_text(value: str) -> str:
+    return _fernet().encrypt(value.encode()).decode()
+
+def decrypt_text(value: str) -> str:
+    return _fernet().decrypt(value.encode()).decode()
