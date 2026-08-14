@@ -66,3 +66,15 @@ async def get_results(token):
         except Exception as exc:
             out[mode] = {"error": str(exc)}
     return out
+
+async def get_competitions(token, status="all", online=False, country=None):
+    params = {
+        "status": status,
+        "online": str(bool(online)).lower(),
+    }
+    if country:
+        params["country"] = country
+    return await api_get(token, "/competitions", params)
+
+async def get_competition(token, competition_id):
+    return await api_get(token, f"/competitions/{competition_id}")

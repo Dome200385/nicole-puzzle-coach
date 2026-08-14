@@ -11,16 +11,18 @@ from app.database import Base, engine, get_db
 from app.db_models import OAuthToken, SyncSnapshot, Tournament, TrainingSession
 from app.schemas import TournamentCreate, TrainingSessionCreate
 from app.crypto import encrypt_text, decrypt_text
-from app.myspeedpuzzling import build_authorize_url, exchange_code, get_profile, get_results, get_statistics, get_collections
+from app.myspeedpuzzling import (
+    build_authorize_url, exchange_code, refresh_access_token,
+    get_profile, get_results, get_statistics, get_collections,
+    get_competitions, get_competition
+)
 from app.coach import (
     performance_summary, owned_vs_history, tournament_readiness,
     next_puzzle_recommendation, manual_training_overview, tournament_countdown
 )
 from app.ui import dashboard
 
-
-
-app = FastAPI(title="Nicole Puzzle Coach API", version="5.0.0", description="Personal speed-puzzling coach and tournament preparation.")
+app = FastAPI(title="Nicole Puzzle Coach API", version="5.1.0", description="Personal speed-puzzling coach and tournament preparation.")
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
 
 def _latest_snapshot(db):
@@ -35,21 +37,57 @@ def _training_dicts(rows):
 def _tournament_dicts(rows):
     return [{"id":r.id,"name":r.name,"date":r.date,"location":r.location,"mode":r.mode,"manufacturer":r.manufacturer,"piece_count":r.piece_count,"time_limit_minutes":r.time_limit_minutes,"priority":r.priority,"international":r.international,"notes":r.notes} for r in rows]
 
+def _load_token_row(db):
+    row=db.query(OAuthToken).filter(OAuthToken.owner_key=="nicole").first()
+    if not row:
+        raise HTTPException(401,"Noch nicht verbunden")
+    return row
+
+def _load_token(db):
+    row=_load_token_row(db)
+    return json.loads(decrypt_text(row.encrypted_payload))
+
+async def _valid_access_token(db):
+    row=_load_token_row(db)
+    token=json.loads(decrypt_text(row.encrypted_payload))
+    access=token.get("access_token")
+    if not access:
+        raise HTTPException(401,"Kein Access Token")
+
+    # A lightweight request checks whether the access token is still valid.
+    try:
+        await get_profile(access)
+        return access
+    except Exception:
+        refresh=token.get("refresh_token")
+        if not refresh:
+            raise HTTPException(401,"Access Token abgelaufen und kein Refresh Token vorhanden")
+        try:
+            refreshed=await refresh_access_token(refresh)
+        except Exception as exc:
+            raise HTTPException(401,f"Token konnte nicht erneuert werden: {exc}")
+        # Some providers do not return a new refresh token on every refresh.
+        if not refreshed.get("refresh_token"):
+            refreshed["refresh_token"]=refresh
+        row.encrypted_payload=encrypt_text(json.dumps(refreshed))
+        db.commit()
+        return refreshed.get("access_token")
+
 @app.get("/", include_in_schema=False)
 def root(): return RedirectResponse("/dashboard")
 @app.get("/dashboard", include_in_schema=False)
 def dashboard_route(): return dashboard()
 @app.get("/api")
-def api_root(): return {"app":"Nicole Puzzle Coach API","version":"5.0.0","status":"online","dashboard":"/dashboard","docs":"/docs"}
+def api_root(): return {"app":"Nicole Puzzle Coach API","version":"5.1.0","status":"online","dashboard":"/dashboard","docs":"/docs"}
 @app.get("/health")
-def health(): return {"status":"ok","version":"5.0.0"}
+def health(): return {"status":"ok","version":"5.1.0"}
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)): db.execute(text("SELECT 1")); return {"database":"ok"}
 
 @app.get("/coach/status")
 def coach_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db); configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
-    return {"version":"5.0.0","database":"ok","has_myspeedpuzzling_data":snap is not None,"oauth_configured":configured}
+    return {"version":"5.1.0","database":"ok","has_myspeedpuzzling_data":snap is not None,"oauth_configured":configured}
 
 @app.get("/coach/manual-summary")
 def manual_summary(db:Session=Depends(get_db)):
@@ -79,19 +117,29 @@ async def callback(request:Request,code:str|None=None,state:str|None=None,db:Ses
     db.commit()
     return HTMLResponse("<h2>MySpeedPuzzling verbunden ✅</h2><p><a href='/sync'>Daten synchronisieren</a></p>")
 
-def _load_token(db):
-    row=db.query(OAuthToken).filter(OAuthToken.owner_key=="nicole").first()
-    if not row: raise HTTPException(401,"Noch nicht verbunden")
-    return json.loads(decrypt_text(row.encrypted_payload))
-
 @app.get("/sync")
 async def sync(db:Session=Depends(get_db)):
-    t=_load_token(db).get("access_token")
-    if not t: raise HTTPException(401,"Kein Access Token")
+    t=await _valid_access_token(db)
     p=await get_profile(t); r=await get_results(t); s=await get_statistics(t); c=await get_collections(t)
     snap=SyncSnapshot(owner_key="nicole",profile_json=json.dumps(p),results_json=json.dumps(r),statistics_json=json.dumps(s),collections_json=json.dumps(c))
     db.add(snap); db.commit(); db.refresh(snap)
     return {"status":"synced","snapshot_id":snap.id,"dashboard":"/dashboard"}
+
+@app.get("/msp/competitions")
+async def msp_competitions(status:str="all", online:bool=False, country:str|None=None, db:Session=Depends(get_db)):
+    token=await _valid_access_token(db)
+    try:
+        return await get_competitions(token,status=status,online=online,country=country)
+    except Exception as exc:
+        raise HTTPException(502,f"MySpeedPuzzling competitions request failed: {exc}")
+
+@app.get("/msp/competitions/{competition_id}")
+async def msp_competition_detail(competition_id:str,db:Session=Depends(get_db)):
+    token=await _valid_access_token(db)
+    try:
+        return await get_competition(token,competition_id)
+    except Exception as exc:
+        raise HTTPException(502,f"MySpeedPuzzling competition detail request failed: {exc}")
 
 @app.get("/data/latest")
 def latest_data(db:Session=Depends(get_db)):
