@@ -18,6 +18,37 @@ def build_authorize_url(redirect_uri, state):
         "state": state,
     })
 
+def _safe_token_error(response, action):
+    ctype=(response.headers.get("content-type") or "").lower()
+    text=(response.text or "").strip()
+    # Avoid ever echoing token-like data. Only a short generic HTML/text hint.
+    if "<html" in text.lower() or "<!doctype" in text.lower():
+        hint="HTML response received instead of OAuth JSON"
+    elif not text:
+        hint="empty response received"
+    else:
+        hint=re.sub(r'[\r\n\t]+',' ',text)[:180]
+    return RuntimeError(
+        f"MySpeedPuzzling OAuth {action} failed: HTTP {response.status_code}; "
+        f"content-type={ctype or 'unknown'}; {hint}"
+    )
+
+def _parse_token_response(response, action):
+    if response.status_code < 200 or response.status_code >= 300:
+        raise _safe_token_error(response, action)
+
+    ctype=(response.headers.get("content-type") or "").lower()
+    try:
+        payload=response.json()
+    except Exception:
+        raise _safe_token_error(response, action)
+
+    if not isinstance(payload,dict) or not payload.get("access_token"):
+        raise RuntimeError(
+            f"MySpeedPuzzling OAuth {action} returned JSON without an access_token"
+        )
+    return payload
+
 async def exchange_code(code, redirect_uri):
     data = {
         "grant_type": "authorization_code",
@@ -26,10 +57,14 @@ async def exchange_code(code, redirect_uri):
         "client_id": MSP_CLIENT_ID,
         "client_secret": MSP_CLIENT_SECRET,
     }
-    async with httpx.AsyncClient(timeout=30) as client:
-        response = await client.post(MSP_TOKEN_URL, data=data)
-        response.raise_for_status()
-        return response.json()
+    headers={
+        "Accept":"application/json",
+        "Content-Type":"application/x-www-form-urlencoded",
+        "User-Agent":"NicolePuzzleCoach/6.7.6",
+    }
+    async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
+        response = await client.post(MSP_TOKEN_URL, data=data, headers=headers)
+        return _parse_token_response(response, "authorization-code exchange")
 
 async def refresh_access_token(refresh_token):
     data = {
@@ -38,10 +73,14 @@ async def refresh_access_token(refresh_token):
         "client_id": MSP_CLIENT_ID,
         "client_secret": MSP_CLIENT_SECRET,
     }
-    async with httpx.AsyncClient(timeout=30) as client:
-        response = await client.post(MSP_TOKEN_URL, data=data)
-        response.raise_for_status()
-        return response.json()
+    headers={
+        "Accept":"application/json",
+        "Content-Type":"application/x-www-form-urlencoded",
+        "User-Agent":"NicolePuzzleCoach/6.7.6",
+    }
+    async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
+        response = await client.post(MSP_TOKEN_URL, data=data, headers=headers)
+        return _parse_token_response(response, "refresh-token exchange")
 
 async def api_get(token, path, params=None):
     async with httpx.AsyncClient(timeout=30) as client:
