@@ -27,7 +27,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.6.0",
+    version="6.7.2",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -99,10 +99,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.6.0","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.7.2","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.6.0"}
+def health(): return {"status":"ok","version":"6.7.2"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -114,7 +114,7 @@ def coach_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     return {
-        "version":"6.6.0",
+        "version":"6.7.2",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None,
         "oauth_configured":configured
@@ -380,6 +380,94 @@ async def swiss_ranking(db:Session=Depends(get_db)):
             "count":0,
             "error":str(exc),
         }
+
+
+@app.get("/coach/wm-simulation-feedback")
+async def wm_simulation_feedback(
+    puzzle_id:str|None=None,
+    puzzle_name:str|None=None,
+    started_at:str|None=None,
+    target_seconds:int|None=None,
+    realistic_goal_seconds:int|None=None,
+    stretch_goal_seconds:int|None=None,
+    db:Session=Depends(get_db)
+):
+    """Evaluate a newly completed 500-piece Solo result as a WM simulation."""
+    token=await _valid_access_token(db)
+    try:
+        results=await get_results(token)
+    except Exception as exc:
+        raise HTTPException(502,f"Result check failed: {exc}")
+
+    rows=normalize_results(results)
+    wanted=(puzzle_name or "").strip().lower()
+    from datetime import datetime, timezone
+    start_dt=None
+    if started_at:
+        try:
+            start_dt=datetime.fromisoformat(started_at.replace("Z","+00:00"))
+            if start_dt.tzinfo is None:
+                start_dt=start_dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            start_dt=None
+
+    matches=[]
+    for row in rows:
+        if row.get("mode")!="solo" or row.get("pieces")!=500:
+            continue
+        id_match=bool(puzzle_id and row.get("puzzle_id") and str(row.get("puzzle_id"))==str(puzzle_id))
+        name_match=bool(wanted and (row.get("puzzle_name") or "").strip().lower()==wanted)
+        if not (id_match or name_match):
+            continue
+        if start_dt:
+            try:
+                dt=datetime.fromisoformat(str(row.get("finished_at")).replace("Z","+00:00"))
+                if dt.tzinfo is None:
+                    dt=dt.replace(tzinfo=timezone.utc)
+                if dt.date() < start_dt.date():
+                    continue
+            except Exception:
+                pass
+        matches.append(row)
+
+    if not matches:
+        return {"found":False,"message":"Noch kein neues passendes 500er-Solo-Ergebnis gefunden."}
+
+    result=matches[0]
+    actual=result.get("seconds")
+    if not actual:
+        return {"found":False,"message":"Ergebnis gefunden, aber keine auswertbare Zeit vorhanden."}
+
+    target=target_seconds or realistic_goal_seconds
+    if target:
+        if actual <= target:
+            outcome="ziel_erreicht"; label="✅ Ziel erreicht"
+        elif actual <= target*1.03:
+            outcome="knapp"; label="🟡 Ziel knapp verfehlt"
+        else:
+            outcome="verfehlt"; label="🔴 Ziel verfehlt"
+    else:
+        outcome="erfasst"; label="Ergebnis erfasst"
+
+    anchor=realistic_goal_seconds or target or actual
+    score=round(max(0,min(100,100-(actual-anchor)/anchor*120))) if anchor else None
+    if stretch_goal_seconds and actual <= stretch_goal_seconds:
+        score=100
+
+    return {
+        "found":True,
+        "status":outcome,
+        "label":label,
+        "actual_seconds":actual,
+        "target_seconds":target,
+        "realistic_goal_seconds":realistic_goal_seconds,
+        "stretch_goal_seconds":stretch_goal_seconds,
+        "delta_target_seconds":actual-target if target else None,
+        "delta_realistic_seconds":actual-realistic_goal_seconds if realistic_goal_seconds else None,
+        "delta_stretch_seconds":actual-stretch_goal_seconds if stretch_goal_seconds else None,
+        "simulation_score":score,
+        "result":result,
+    }
 
 @app.get("/coach/msp-training-summary")
 def msp_training_summary(db:Session=Depends(get_db)):

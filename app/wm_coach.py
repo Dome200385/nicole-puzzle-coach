@@ -723,6 +723,19 @@ def build_wm_plan(all_results, my_competitions, library_payload=None, target_pie
     readiness=max(0,min(100,round(.35*consistency+.30*trend_score+.20*volume_score+.15*recency_score-load_penalty)))
     recent_days=_recent_training_days(rows,7); training=_training_type(phase,trend,consistency,avg5,avg10,recent_days); weekly=_weekly_plan(phase,target,_fmt(realistic),_fmt(stretch)); weekly=_weekly_plan_with_puzzles(weekly,library_payload or {},all_results,target_pieces,excluded_puzzle_ids)
     next_puzzle=_next_puzzle(library_payload or {},all_results,target_pieces,training['type'],excluded_puzzle_ids)
+    weekly_puzzle_ids=[
+        str(item.get('puzzle',{}).get('id'))
+        for item in weekly
+        if item.get('puzzle',{}).get('available') and item.get('puzzle',{}).get('id')
+    ]
+    sim_excluded=list({str(x) for x in (excluded_puzzle_ids or []) if x}.union(weekly_puzzle_ids))
+    simulation_puzzle=_next_puzzle(
+        library_payload or {},
+        all_results,
+        target_pieces,
+        'Turniersimulation',
+        sim_excluded,
+    )
     if training['type']=='Turniersimulation': base=f'500er Turniersimulation. Ziel {_fmt(realistic)} oder schneller; Stretch {_fmt(stretch)} nur bei sauberem Flow.'
     elif training['type']=='Speed-Run': base=f'500er Speed-Run. Zielbereich {_fmt(target)}–{_fmt(realistic)}.'
     elif training['type']=='Konstanztraining': base=f'Kontrollierter 500er. Ziel {_fmt(avg10)} oder schneller; Schwankungen reduzieren.'
@@ -730,6 +743,21 @@ def build_wm_plan(all_results, my_competitions, library_payload=None, target_pie
     elif training['type']=='Regeneration': base='Kein vollständiger Speed-Run mehr. Frische und Start-Routine priorisieren.'
     else: base=f'Kontrollierter 500er im Bereich {_fmt(target)}–{_fmt(target*1.06)}.'
     recommendation=('Nächstes Puzzle: '+next_puzzle['name']+'. '+base) if next_puzzle.get('available') else base+' '+next_puzzle['reason']
+    by_name={}
+    for r in reversed(rows):
+        key=(r.get('puzzle_name') or '').strip().lower()
+        if key: by_name.setdefault(key,[]).append(r)
+    first_try_secs=[]; repeat_secs=[]
+    for attempts in by_name.values():
+        for i,r in enumerate(attempts):
+            if isinstance(r.get('seconds'),(int,float)):
+                (first_try_secs if i==0 else repeat_secs).append(r['seconds'])
+    def _split_target(vals,fallback):
+        vals=vals[-30:]
+        return median(vals) if len(vals)>=3 else fallback
+    repeat_target=_split_target(repeat_secs,realistic)
+    first_try_target=_split_target(first_try_secs,max(realistic*1.08,repeat_target*1.08))
+    first_try_target=max(first_try_target,repeat_target*1.05)
     pace100=avg10/5
     weakness='Konstanz' if consistency<80 else ('Tempo' if trend is not None and trend<0 else ('Belastungssteuerung' if load7['units']>5 else 'Turnierroutine'))
     progress_recent = [
@@ -740,4 +768,4 @@ def build_wm_plan(all_results, my_competitions, library_payload=None, target_pie
             'time': _fmt(r.get('seconds')),
         } for r in reversed(r10)
     ]
-    return {'target_pieces':target_pieces,'next_competition':next_comp,'days_until':days,'phase':phase,'count':len(rows),'best':_fmt(min(times)),'median':_fmt(median(times)),'average_all':_fmt(mean(times)),'recent5':_fmt(avg5),'recent10':_fmt(avg10),'recent20':_fmt(avg20),'trend10_percent':trend,'current_zone':{'from':_fmt(lo),'to':_fmt(hi)},'dynamic_target':_fmt(target),'dynamic_target_seconds':round(target),'wm_goal_realistic':_fmt(realistic),'wm_goal_realistic_seconds':round(realistic),'wm_goal_stretch':_fmt(stretch),'wm_goal_stretch_seconds':round(stretch),'recent10_seconds':round(avg10),'progress_recent':progress_recent,'consistency_500':consistency,'readiness_score':readiness,'next_training':training,'recent_training_days_7':recent_days,'weekly_plan':weekly,'recommendation':recommendation,'training_load_7':load7,'training_load_14':load14,'wm_pace_per_100':_fmt(pace100),'weakness_focus':weakness,'next_puzzle':next_puzzle,'readiness_explanation':'Kombiniert 500er-Konsistenz, Trend, Datenmenge, Aktualität und aktuelle Trainingsbelastung.','goal_explanation':'Realistisches WM-Ziel basiert auf den letzten 5/10 500er-Solozeiten; Stretch Goal bleibt durch die historische Bestzeit begrenzt.'}
+    return {'target_pieces':target_pieces,'next_competition':next_comp,'days_until':days,'phase':phase,'count':len(rows),'best':_fmt(min(times)),'median':_fmt(median(times)),'average_all':_fmt(mean(times)),'recent5':_fmt(avg5),'recent10':_fmt(avg10),'recent20':_fmt(avg20),'trend10_percent':trend,'current_zone':{'from':_fmt(lo),'to':_fmt(hi)},'dynamic_target':_fmt(target),'dynamic_target_seconds':round(target),'wm_goal_realistic':_fmt(realistic),'wm_goal_realistic_seconds':round(realistic),'wm_goal_first_try':_fmt(first_try_target),'wm_goal_first_try_seconds':round(first_try_target),'wm_goal_repeat':_fmt(repeat_target),'wm_goal_repeat_seconds':round(repeat_target),'wm_goal_first_try_samples':len(first_try_secs),'wm_goal_repeat_samples':len(repeat_secs),'wm_goal_stretch':_fmt(stretch),'wm_goal_stretch_seconds':round(stretch),'recent10_seconds':round(avg10),'progress_recent':progress_recent,'consistency_500':consistency,'readiness_score':readiness,'next_training':training,'recent_training_days_7':recent_days,'weekly_plan':weekly,'recommendation':recommendation,'training_load_7':load7,'training_load_14':load14,'wm_pace_per_100':_fmt(pace100),'weakness_focus':weakness,'next_puzzle':next_puzzle,'simulation_puzzle':simulation_puzzle,'readiness_explanation':'Kombiniert 500er-Konsistenz, Trend, Datenmenge, Aktualität und aktuelle Trainingsbelastung.','goal_explanation':'Realistisches WM-Ziel basiert auf den letzten 5/10 500er-Solozeiten; Stretch Goal bleibt durch die historische Bestzeit begrenzt.'}
