@@ -51,38 +51,39 @@ def _parse_token_response(response, action):
         )
     return payload
 
+async def _reference_form_post(form_data, action):
+    """
+    Mirrors the official MySpeedPuzzling PHP OAuth demo:
+    CURLOPT_POSTFIELDS => http_build_query($formData)
+    Content-Type: application/x-www-form-urlencoded
+    No custom Accept or User-Agent headers.
+    """
+    encoded=urlencode({k:str(v) for k,v in form_data.items() if v is not None})
+    headers={"Content-Type":"application/x-www-form-urlencoded"}
+    async with httpx.AsyncClient(timeout=30,follow_redirects=False) as client:
+        response=await client.post(
+            MSP_CANONICAL_TOKEN_URL,
+            content=encoded.encode("utf-8"),
+            headers=headers,
+        )
+    return _parse_token_response(response,action)
+
 async def exchange_code(code, redirect_uri):
-    data = {
-        "grant_type": "authorization_code",
-        "code": code,
-        "redirect_uri": redirect_uri,
-        "client_id": MSP_CLIENT_ID,
-        "client_secret": MSP_CLIENT_SECRET,
-    }
-    headers={
-        "Accept":"application/json",
-        "Content-Type":"application/x-www-form-urlencoded",
-        "User-Agent":"NicolePuzzleCoach/6.7.6",
-    }
-    async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
-        response = await client.post(MSP_CANONICAL_TOKEN_URL, data=data, headers=headers)
-        return _parse_token_response(response, "authorization-code exchange")
+    return await _reference_form_post({
+        "grant_type":"authorization_code",
+        "code":code,
+        "redirect_uri":redirect_uri,
+        "client_id":MSP_CLIENT_ID,
+        "client_secret":MSP_CLIENT_SECRET,
+    },"authorization-code exchange")
 
 async def refresh_access_token(refresh_token):
-    data = {
-        "grant_type": "refresh_token",
-        "refresh_token": refresh_token,
-        "client_id": MSP_CLIENT_ID,
-        "client_secret": MSP_CLIENT_SECRET,
-    }
-    headers={
-        "Accept":"application/json",
-        "Content-Type":"application/x-www-form-urlencoded",
-        "User-Agent":"NicolePuzzleCoach/6.7.6",
-    }
-    async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
-        response = await client.post(MSP_CANONICAL_TOKEN_URL, data=data, headers=headers)
-        return _parse_token_response(response, "refresh-token exchange")
+    return await _reference_form_post({
+        "grant_type":"refresh_token",
+        "refresh_token":refresh_token,
+        "client_id":MSP_CLIENT_ID,
+        "client_secret":MSP_CLIENT_SECRET,
+    },"refresh-token exchange")
 
 async def api_get(token, path, params=None):
     async with httpx.AsyncClient(timeout=30) as client:
@@ -609,24 +610,24 @@ async def get_puzzle_insights(puzzle_id):
 
 async def oauth_endpoint_probe():
     """
-    Safe reachability probe for the canonical token endpoint.
-    Sends no credentials. A standards-compliant OAuth server should reject the
-    empty request with JSON/4xx; receiving the normal website HTML would mean
-    we are not reaching the OAuth token handler.
+    Safe probe using the exact request framing of the official demo.
+    No credentials, code, secret, or token are sent.
     """
-    headers={
-        "Accept":"application/json",
-        "Content-Type":"application/x-www-form-urlencoded",
-        "User-Agent":"NicolePuzzleCoach/6.7.7",
-    }
+    encoded=urlencode({"grant_type":"authorization_code"})
+    headers={"Content-Type":"application/x-www-form-urlencoded"}
     async with httpx.AsyncClient(timeout=20,follow_redirects=False) as client:
-        response=await client.post(MSP_CANONICAL_TOKEN_URL,data={},headers=headers)
+        response=await client.post(
+            MSP_CANONICAL_TOKEN_URL,
+            content=encoded.encode("utf-8"),
+            headers=headers,
+        )
     ctype=(response.headers.get("content-type") or "").lower()
     location=response.headers.get("location")
     body=(response.text or "").strip()
     is_html="<html" in body.lower() or "<!doctype" in body.lower()
     return {
         "url":MSP_CANONICAL_TOKEN_URL,
+        "request_framing":"official-demo-compatible",
         "status_code":response.status_code,
         "content_type":ctype,
         "location":location,
