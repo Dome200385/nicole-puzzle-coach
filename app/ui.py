@@ -14,7 +14,7 @@ h1{margin:0;font-size:30px}.sub,.small{color:var(--muted)}.badge{padding:8px 12p
 .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:var(--shadow)}
 .kpi{grid-column:span 3}.third{grid-column:span 4}.half{grid-column:span 6}.full{grid-column:span 12}
 .label{font-size:12px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.06em}.value{font-size:30px;font-weight:900;margin-top:7px}
-h2{font-size:19px;margin:0 0 14px}.list{display:grid;gap:9px}.item{padding:12px;border:1px solid var(--line);border-radius:12px;background:#fafafa}.item strong{display:block}.puzzleRow{display:flex;gap:14px;align-items:flex-start}.puzzleImg{width:115px;height:90px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:10px;flex:0 0 auto}.puzzleInfo{min-width:0;flex:1}.riskHigh{background:#fff0f0}.wmGood{background:#eef9f1}.activeTraining{border:2px solid #7a89ff}.wmFit{font-weight:800;background:#eef3ff}.fitReason{margin-top:5px;font-size:12px;color:var(--muted)}.skipBtn{background:#fff;border:1px solid #ff8d8d;color:#b52f36;padding:7px 10px;border-radius:9px;font-weight:700}.loanBox{background:#fff7e8}.rankMe{border:2px solid #66c98d}.rankRow{display:grid;grid-template-columns:48px 1fr auto;gap:10px;align-items:center}.rankNum{font-size:18px;font-weight:900}.rankTime{text-align:right;font-weight:800}
+h2{font-size:19px;margin:0 0 14px}.list{display:grid;gap:9px}.item{padding:12px;border:1px solid var(--line);border-radius:12px;background:#fafafa}.item strong{display:block}.puzzleRow{display:flex;gap:14px;align-items:flex-start}.puzzleImg{width:115px;height:90px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:10px;flex:0 0 auto}.puzzleInfo{min-width:0;flex:1}.riskHigh{background:#fff0f0}.wmGood{background:#eef9f1}.activeTraining{border:2px solid #7a89ff}.wmFit{font-weight:800;background:#eef3ff}.fitReason{margin-top:5px;font-size:12px;color:var(--muted)}.skipBtn{background:#fff;border:1px solid #ff8d8d;color:#b52f36;padding:7px 10px;border-radius:9px;font-weight:700}.loanBox{background:#fff7e8}.rankMe{border:2px solid #66c98d}.rankRow{display:grid;grid-template-columns:48px 1fr auto;gap:10px;align-items:center}.rankNum{font-size:18px;font-weight:900}.rankTime{text-align:right;font-weight:800}.progressBars{display:flex;align-items:flex-end;gap:7px;height:170px;padding:14px 8px 4px;border-bottom:1px solid var(--line)}.pbar{flex:1;min-width:18px;text-align:center}.pbarFill{background:#cfd8f7;border-radius:7px 7px 2px 2px;min-height:8px}.pbarTime{font-size:10px;font-weight:800;margin-top:5px}.pbarDate{font-size:9px;color:var(--muted)}.progressLegend{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
 .pill{display:inline-block;margin:5px 5px 0 0;padding:4px 8px;border-radius:999px;background:#eef0f4;font-size:12px}
 input,select,textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff;color:var(--text)}
 .formgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.wide{grid-column:1/-1}
@@ -71,6 +71,12 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="item" style="margin-top:10px"><strong>📅 Plan für die aktuelle Trainingswoche</strong><div id="wmWeeklyPlan" class="list" style="margin-top:8px"></div></div>
 </section>
 
+<section class="card full"><h2>📈 Fortschritt bis zur WM</h2>
+<div class="small">Die letzten 10 erfassten 500er-Solozeiten in zeitlicher Reihenfolge. Niedrigere Balken bedeuten schnellere Zeiten.</div>
+<div id="wmProgressSummary" class="item" style="margin-top:10px">Fortschritt wird berechnet…</div>
+<div id="wmProgressChart" class="item" style="margin-top:8px"></div>
+</section>
+
 <section class="card full"><h2>🇨🇭 Schweizer Motivationsranking</h2>
 <div class="small">Vergleich mit öffentlich verbundenen Schweizer Teilnehmern der Swiss Puzzle Championship. <strong>Kein offizielles Schweizer Ranking.</strong> Das Ranking dient nur als Motivation und beeinflusst den Trainingsplan nicht.</div>
 <div id="swissRankSummary" class="item" style="margin-top:10px">Ranking wird geladen…</div>
@@ -98,7 +104,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <section class="card full"><h2>📝 Zusätzliche manuelle Trainings</h2><div id="manualTrainings" class="list"></div></section>
 
 <section class="card full"><h2>🧠 Tournament Intelligence</h2>
-<div class="small">V6.4 macht den Skip global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
+<div class="small">V6.6 ergänzt WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
 <div style="margin-top:12px"><a class="btn secondary" href="/docs" target="_blank">API-Dokumentation</a> <a class="btn secondary" href="/msp/my-competitions?refresh=true" target="_blank">Anmeldungen neu prüfen</a> <a class="btn secondary" href="/sync" target="_blank">MySpeedPuzzling neu synchronisieren</a> <a class="btn secondary" href="/msp/library" target="_blank">Puzzle-Bibliothek prüfen</a></div>
 </section>
 </div></div>
@@ -248,6 +254,14 @@ async function loadAll(){renderUnavailable();
    wmLoad14.textContent=w.training_load_14?w.training_load_14.units.toFixed(1):'–'; wmLoad14Info.textContent=w.training_load_14?`${w.training_load_14.sessions} Einheiten · 500er-Äquivalente`:'–';
    wmPace100.textContent=w.wm_pace_per_100||'–'; wmWeakness.textContent=w.weakness_focus?`Aktueller Fokus: ${w.weakness_focus}`:'–';
    wmStats.textContent=w.count?`${w.count} × 500er Solo · Best ${w.best} · Median ${w.median} · Ø letzte 5 ${w.recent5} · Ø letzte 10 ${w.recent10} · Ø letzte 20 ${w.recent20}`:'Noch keine 500er-Daten.';
+   let pr=w.progress_recent||[];
+   if(pr.length){
+     let vals=pr.map(x=>x.seconds), mn=Math.min(...vals,w.wm_goal_stretch_seconds||99999), mx=Math.max(...vals);
+     let span=Math.max(1,mx-mn);
+     wmProgressSummary.innerHTML=`<strong>Aktuelles Niveau: Ø ${w.recent10}</strong> · realistisches WM-Ziel <strong>${w.wm_goal_realistic}</strong> · Trainingsziel <strong>${w.dynamic_target}</strong>${w.trend10_percent!=null?`<div class="small">Trend gegenüber dem vorherigen Vergleichsfenster: <strong>${pct(w.trend10_percent)}</strong>. Ziele werden nach jeder Synchronisation neu berechnet.</div>`:''}`;
+     wmProgressChart.innerHTML=`<div class="progressBars">${pr.map(x=>{let h=35+((mx-x.seconds)/span)*105;let d=x.finished_at?new Date(x.finished_at).toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'}):'';return `<div class="pbar" title="${x.puzzle_name||''}"><div class="pbarFill" style="height:${Math.max(20,h)}px"></div><div class="pbarTime">${x.time}</div><div class="pbarDate">${d}</div></div>`}).join('')}</div><div class="progressLegend"><span class="pill">Ø letzte 10: ${w.recent10}</span><span class="pill">WM-Ziel: ${w.wm_goal_realistic}</span><span class="pill">Stretch: ${w.wm_goal_stretch}</span></div>`;
+   }else{wmProgressSummary.textContent='Noch nicht genügend 500er-Daten.';wmProgressChart.innerHTML='';}
+
    wmWeeklyPlan.innerHTML=(w.weekly_plan||[]).map((s,i)=>{
      let p=s.puzzle||{};
      let puzzleLine=p.available
@@ -269,7 +283,7 @@ async function loadAll(){renderUnavailable();
        ? `<strong>Nicole: Platz ${me.rank} von ${r.count}</strong> · Ø ${me.average}${me.top?' · Best '+me.top:''}
           <div class="small" style="margin-top:5px">${me.rank>1?`🥇 Abstand zu Platz 1: <strong>${fmtGap(r.gap_to_first_seconds)}</strong> · 🎯 bis zum nächsten Platz: <strong>${fmtGap(r.gap_to_next_seconds)}</strong>`:'🥇 Aktuell Platz 1 in dieser Vergleichsgruppe.'}</div>
           ${r.target_average_seconds?`<div class="small">Motivationsziel: Ø <strong>${fmtSeconds(r.target_average_seconds)}</strong>${r.motivation?' · '+r.motivation:''}</div>`:''}
-          <div class="small">${r.subtitle}</div>`
+          <div class="small">${r.subtitle}</div><div class="small" style="margin-top:5px"><strong>Datenbasis:</strong> öffentlich angezeigte Profil-Durchschnittszeit${me.puzzles_solved!=null?' · '+me.puzzles_solved+' gelöste Puzzles bei Nicole':''}. Diese Kennzahl ist nicht auf identische 500er-Puzzles oder denselben Zeitraum normiert und wird deshalb bewusst nicht für den Trainingsplan verwendet.</div>`
        : `<strong>${r.count} Schweizer Vergleichsprofile gefunden</strong><div class="small">Nicole konnte in dieser Vergleichsgruppe aktuell nicht eindeutig zugeordnet werden. ${r.subtitle}</div>`;
      let show=[...r.players.slice(0,8)];
      if(me && !show.some(x=>x.player_id===me.player_id))show.push(me);

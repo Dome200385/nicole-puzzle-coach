@@ -27,7 +27,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.3.0",
+    version="6.6.0",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -99,10 +99,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.3.0","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.6.0","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.3.0"}
+def health(): return {"status":"ok","version":"6.6.0"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -114,7 +114,7 @@ def coach_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     return {
-        "version":"6.3.0",
+        "version":"6.6.0",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None,
         "oauth_configured":configured
