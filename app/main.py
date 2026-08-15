@@ -27,7 +27,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.7.4",
+    version="6.7.5",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -99,10 +99,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.7.4","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.7.5","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.7.4"}
+def health(): return {"status":"ok","version":"6.7.5"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -114,7 +114,7 @@ def coach_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     return {
-        "version":"6.7.4",
+        "version":"6.7.5",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None,
         "oauth_configured":configured
@@ -282,15 +282,24 @@ def _difficulty_factor(insights):
 def _personal_puzzle_prediction(base_seconds, insights):
     if not base_seconds:
         return None
-    difficulty_adjusted=base_seconds*_difficulty_factor(insights)
-    msp_pred=(insights or {}).get("prediction_seconds")
-    if msp_pred:
-        relative=max(0.75,min(1.30,msp_pred/3600.0))
-        aggregate_adjusted=base_seconds*relative
-        blended=difficulty_adjusted*0.80+aggregate_adjusted*0.20
+    insights=insights or {}
+    pct=insights.get("difficulty_percent")
+    if pct is None:
+        difficulty_factor=1.0
     else:
-        blended=difficulty_adjusted
-    return round(max(base_seconds*0.80,min(base_seconds*1.30,blended)))
+        difficulty_factor=1.0+(float(pct)/100.0)*0.40
+        difficulty_factor=max(0.92,min(1.10,difficulty_factor))
+    personal_adjusted=base_seconds*difficulty_factor
+    msp_pred=insights.get("prediction_seconds")
+    if msp_pred:
+        aggregate_relative=max(0.85,min(1.15,msp_pred/3600.0))
+        aggregate_adjusted=base_seconds*aggregate_relative
+        blended=personal_adjusted*0.85+aggregate_adjusted*0.15
+    else:
+        blended=personal_adjusted
+    predicted=round(max(base_seconds*0.90,min(base_seconds*1.15,blended)))
+    half_width=max(90,round(predicted*0.04))
+    return {"seconds":predicted,"corridor_from_seconds":max(1,predicted-half_width),"corridor_to_seconds":predicted+half_width,"difficulty_factor":round(difficulty_factor,3),"msp_anchor_used":bool(msp_pred)}
 
 async def _enrich_plan_puzzle_predictions(plan):
     targets=[]
@@ -310,9 +319,19 @@ async def _enrich_plan_puzzle_predictions(plan):
         puzzle["msp_insights"]=insights
         first_try=(puzzle.get("previous_solo_solves") or 0)==0
         base=plan.get("wm_goal_first_try_seconds") if first_try else plan.get("wm_goal_repeat_seconds")
-        predicted=_personal_puzzle_prediction(base,insights)
-        puzzle["personal_prediction_seconds"]=predicted
-        puzzle["personal_prediction"]=_fmt_seconds(predicted) if predicted else None
+        prediction=_personal_puzzle_prediction(base,insights)
+        if prediction:
+            puzzle["personal_prediction_seconds"]=prediction["seconds"]
+            puzzle["personal_prediction"]=_fmt_seconds(prediction["seconds"])
+            puzzle["prediction_corridor_from_seconds"]=prediction["corridor_from_seconds"]
+            puzzle["prediction_corridor_to_seconds"]=prediction["corridor_to_seconds"]
+            puzzle["prediction_corridor_from"]=_fmt_seconds(prediction["corridor_from_seconds"])
+            puzzle["prediction_corridor_to"]=_fmt_seconds(prediction["corridor_to_seconds"])
+            puzzle["prediction_difficulty_factor"]=prediction["difficulty_factor"]
+            puzzle["prediction_msp_anchor_used"]=prediction["msp_anchor_used"]
+        else:
+            puzzle["personal_prediction_seconds"]=None
+            puzzle["personal_prediction"]=None
         puzzle["prediction_basis"]="first_try" if first_try else "known"
     return plan
 

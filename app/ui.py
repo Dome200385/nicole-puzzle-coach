@@ -74,7 +74,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="item" style="margin-top:10px"><strong>📅 Plan für die aktuelle Trainingswoche</strong><div id="wmWeeklyPlan" class="list" style="margin-top:8px"></div></div>
 </section>
 
-<section class="card full simHero" id="wmSimulationCard"><h2>🏁 WM-Simulation <span class="pill">V6.7.4</span></h2>
+<section class="card full simHero" id="wmSimulationCard"><h2>🏁 WM-Simulation <span class="pill">V6.7.5</span></h2>
 <div class="small">Eigenständige WM-Simulation mit einem <strong>anderen Puzzle als im normalen Wochenplan</strong>. Ausgeliehene Puzzles bleiben ausgeschlossen.</div>
 <div id="wmSimSuggestion" class="item" style="margin-top:10px">Simulations-Puzzle wird gewählt…</div>
 <div id="wmSimActive" class="item activeTraining" style="display:none;margin-top:10px">
@@ -161,15 +161,15 @@ function puzzleImg(p){
 }
 
 function puzzleInsightHtml(p){
-  let i=p?.msp_insights||{};
-  let bits=[];
-  if(i.difficulty_label){
-    let pct=i.difficulty_percent!=null?` (${i.difficulty_percent>0?'+':''}${i.difficulty_percent}% ggü. Ø)`:'';
-    bits.push(`Difficulty: ${i.difficulty_label}${pct}`);
-  }
+  let i=p?.msp_insights||{},bits=[];
+  if(i.difficulty_label){let pct=i.difficulty_percent!=null?` (${i.difficulty_percent>0?'+':''}${i.difficulty_percent}% ggü. Ø)`:'';
+    bits.push(`Difficulty: ${i.difficulty_label}${pct}`);}
   if(i.prediction_text)bits.push(`MSP Prediction: ~${i.prediction_text}`);
-  if(p?.personal_prediction)bits.push(`Nicole Prediction: ${p.personal_prediction}${p.prediction_basis==='first_try'?' · First Try':' · bekannt'}`);
-  return bits.length?`<div class="small" style="margin-top:5px"><strong>MSP:</strong> ${bits.join(' · ')}</div>`:'';
+  let details=bits.length?`<div class="small" style="margin-top:5px"><strong>MSP:</strong> ${bits.join(' · ')}</div>`:'';
+  let personal='';
+  if(p?.personal_prediction){let basis=p.prediction_basis==='first_try'?'First Try':'bekannt';let corridor=(p.prediction_corridor_from&&p.prediction_corridor_to)?` · Zielkorridor ${p.prediction_corridor_from}–${p.prediction_corridor_to}`:'';
+    personal=`<div class="small" style="margin-top:4px"><strong>Nicole Prediction:</strong> ${p.personal_prediction} · ${basis}${corridor}</div>`;}
+  return details+personal;
 }
 function goalTargetSeconds(text){
   if(!text)return null;
@@ -358,7 +358,7 @@ async function loadAll(){renderUnavailable();
    let realSec=(simCandidate && Number(simCandidate.solo_count||0)>0)?repeatSec:firstTrySec;
    let stretchSec=w.wm_goal_stretch_seconds||goalTargetSeconds(w.wm_goal_stretch||'');
    if(simCandidate){
-     wmSimSuggestion.innerHTML=`<div class="puzzleRow">${puzzleImg(simCandidate)}<div class="puzzleInfo"><strong>🧩 ${simCandidate.name}</strong>${simCandidate.manufacturer?' · '+simCandidate.manufacturer:''}${simCandidate.pieces?' · '+simCandidate.pieces+' Teile':''}<div class="small">WM-Fit ${simCandidate.wm_fit?.score||'–'}/100 · Basis First Try ${w.wm_goal_first_try||w.wm_goal_realistic||'–'} · bekannt ${w.wm_goal_repeat||w.wm_goal_realistic||'–'} · Puzzle-Prediction ${simCandidate.personal_prediction||'–'} · Stretch ${w.wm_goal_stretch||'–'}</div><div class="small">Dieses Puzzle ist bewusst nicht im normalen Wochenplan enthalten und nicht als ausgeliehen markiert.</div><button class="primary" style="margin-top:8px" onclick='startWMSimulation(${JSON.stringify(simCandidate)},${realSec||'null'},${realSec||'null'},${stretchSec||'null'})'>WM-Simulation starten</button></div></div>`;
+     wmSimSuggestion.innerHTML=`<div class="puzzleRow">${puzzleImg(simCandidate)}<div class="puzzleInfo"><strong>🧩 ${simCandidate.name}</strong>${simCandidate.manufacturer?' · '+simCandidate.manufacturer:''}${simCandidate.pieces?' · '+simCandidate.pieces+' Teile':''}<div class="small">WM-Fit ${simCandidate.wm_fit?.score||'–'}/100 · Basis First Try ${w.wm_goal_first_try||w.wm_goal_realistic||'–'} · bekannt ${w.wm_goal_repeat||w.wm_goal_realistic||'–'} · Puzzle-Prediction ${simCandidate.personal_prediction||'–'}${simCandidate.prediction_corridor_from&&simCandidate.prediction_corridor_to?` · Zielkorridor ${simCandidate.prediction_corridor_from}–${simCandidate.prediction_corridor_to}`:''} · Stretch ${w.wm_goal_stretch||'–'}</div><div class="small">Dieses Puzzle ist bewusst nicht im normalen Wochenplan enthalten und nicht als ausgeliehen markiert.</div><button class="primary" style="margin-top:8px" onclick='startWMSimulation(${JSON.stringify(simCandidate)},${realSec||'null'},${realSec||'null'},${stretchSec||'null'})'>WM-Simulation starten</button></div></div>`;
    }else{
      wmSimSuggestion.innerHTML='<div class="small">Aktuell kein zusätzliches verfügbares 500er-Puzzle für eine separate WM-Simulation gefunden.</div>';
    }
