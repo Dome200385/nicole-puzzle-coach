@@ -24,7 +24,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 .infoBtn{border:1px solid var(--line);background:#eef3ff;color:var(--text);width:20px;height:20px;padding:0;border-radius:50%;font-size:12px;line-height:18px;margin-left:4px}
 .modal{display:none;position:fixed;inset:0;background:rgba(20,25,35,.45);z-index:99;align-items:center;justify-content:center;padding:20px}.modal.open{display:flex}.modalbox{max-width:620px;width:100%;background:#fff;border-radius:18px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.2)}.modalbox h2{margin-bottom:10px}.modalbox p{line-height:1.5}.scale{display:grid;gap:7px;margin:14px 0}.scale div{padding:9px;border-radius:9px;background:#f5f7fb}
 @media(max-width:900px){.kpi,.third,.half{grid-column:span 12}.formgrid,.metricrow,.simGrid,.progressTargets{grid-template-columns:1fr}.historyRow{grid-template-columns:50px 1fr auto}}
-</style></head>
+.goalSplit{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:4px 0}.goalSplit b{font-size:18px}</style></head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div id="systemBadge" class="badge">System wird geprüft…</div></header>
 
@@ -55,7 +55,10 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 </div>
 <div class="metricrow">
 <div class="metric"><div class="label">WM-Readiness</div><b id="wmReadiness">–</b><div class="small" id="wmPhase">–</div></div>
-<div class="metric"><div class="label">Realistisches WM-Ziel</div><b id="wmGoal">–</b><div class="small">aus aktueller 500er-Leistung</div></div>
+<div class="metric"><div class="label">Realistisches Puzzle-Ziel</div>
+<div class="goalSplit"><span class="small">First Try</span><b id="wmGoalFirstTry">–</b></div>
+<div class="goalSplit"><span class="small">bekannt / mehrfach gemacht</span><b id="wmGoalRepeat">–</b></div>
+<div class="small">First Try wird bewusst langsamer bewertet, da Bild, Sortierung und Suchmuster noch unbekannt sind.</div></div>
 <div class="metric"><div class="label">Stretch Goal</div><b id="wmStretch">–</b><div class="small">ambitionierter Best-Case-Tag</div></div>
 </div>
 <div class="metricrow" style="margin-top:10px">
@@ -71,7 +74,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="item" style="margin-top:10px"><strong>📅 Plan für die aktuelle Trainingswoche</strong><div id="wmWeeklyPlan" class="list" style="margin-top:8px"></div></div>
 </section>
 
-<section class="card full simHero" id="wmSimulationCard"><h2>🏁 WM-Simulation <span class="pill">V6.7.2</span></h2>
+<section class="card full simHero" id="wmSimulationCard"><h2>🏁 WM-Simulation <span class="pill">V6.7.3</span></h2>
 <div class="small">Eigenständige WM-Simulation mit einem <strong>anderen Puzzle als im normalen Wochenplan</strong>. Ausgeliehene Puzzles bleiben ausgeschlossen.</div>
 <div id="wmSimSuggestion" class="item" style="margin-top:10px">Simulations-Puzzle wird gewählt…</div>
 <div id="wmSimActive" class="item activeTraining" style="display:none;margin-top:10px">
@@ -99,7 +102,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="progressTargets">
 <div class="targetCard"><div class="label">Aktuelles Niveau</div><b id="progressCurrent">–</b><div class="small">Ø letzte 10</div></div>
 <div class="targetCard"><div class="label">Trainingsziel</div><b id="progressTraining">–</b></div>
-<div class="targetCard"><div class="label">WM-Ziel</div><b id="progressGoal">–</b></div>
+<div class="targetCard"><div class="label">First-Try-Ziel</div><b id="progressGoal">–</b></div>
 <div class="targetCard"><div class="label">Stretch Goal</div><b id="progressStretch">–</b></div>
 </div></div>
 <div id="wmProgressSummary" class="item" style="margin-top:10px">Fortschritt wird berechnet…</div>
@@ -304,8 +307,8 @@ async function loadAll(){renderUnavailable();
    let ex=unavailableIds(); let w=await getj('/coach/wm-plan'+(ex.length?'?exclude_puzzle_ids='+encodeURIComponent(ex.join(',')):''));
    wmReadiness.textContent=w.readiness_score==null?'–':w.readiness_score+'/100';
    wmPhase.textContent=(w.days_until!=null?`Noch ${w.days_until} Tage · `:'')+w.phase.name+' · '+w.phase.description;
-   wmGoalFirstTry.textContent=w.wm_goal_first_try||w.wm_goal_realistic||'–';
-   wmGoalRepeat.textContent=w.wm_goal_repeat||w.wm_goal_realistic||'–';
+   if(document.getElementById('wmGoalFirstTry')) wmGoalFirstTry.textContent=w.wm_goal_first_try||w.wm_goal_realistic||'–';
+   if(document.getElementById('wmGoalRepeat')) wmGoalRepeat.textContent=w.wm_goal_repeat||w.wm_goal_realistic||'–';
    wmStretch.textContent=w.wm_goal_stretch||'–';
    wmZone.textContent=w.current_zone?`${w.current_zone.from}–${w.current_zone.to}`:'–';
    wmTarget.textContent=w.dynamic_target||'–';
@@ -321,7 +324,7 @@ async function loadAll(){renderUnavailable();
    wmLoad14.textContent=w.training_load_14?w.training_load_14.units.toFixed(1):'–'; wmLoad14Info.textContent=w.training_load_14?`${w.training_load_14.sessions} Einheiten · 500er-Äquivalente`:'–';
    wmPace100.textContent=w.wm_pace_per_100||'–'; wmWeakness.textContent=w.weakness_focus?`Aktueller Fokus: ${w.weakness_focus}`:'–';
    wmStats.textContent=w.count?`${w.count} × 500er Solo · Best ${w.best} · Median ${w.median} · Ø letzte 5 ${w.recent5} · Ø letzte 10 ${w.recent10} · Ø letzte 20 ${w.recent20}`:'Noch keine 500er-Daten.';
-   progressCurrent.textContent=w.recent10||'–';progressTraining.textContent=w.dynamic_target||'–';progressGoal.textContent=w.wm_goal_realistic||'–';progressStretch.textContent=w.wm_goal_stretch||'–';
+   progressCurrent.textContent=w.recent10||'–';progressTraining.textContent=w.dynamic_target||'–';progressGoal.textContent=w.wm_goal_first_try||w.wm_goal_realistic||'–';progressStretch.textContent=w.wm_goal_stretch||'–';
    let pr=w.progress_recent||[];
    if(pr.length){
      let vals=pr.map(x=>x.seconds), mn=Math.min(...vals,w.wm_goal_stretch_seconds||99999), mx=Math.max(...vals);
