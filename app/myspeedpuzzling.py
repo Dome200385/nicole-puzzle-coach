@@ -9,6 +9,8 @@ from app.config import (
     MSP_CLIENT_ID, MSP_CLIENT_SECRET, MSP_SCOPES
 )
 
+MSP_CANONICAL_TOKEN_URL = "https://myspeedpuzzling.com/oauth2/token"
+
 def build_authorize_url(redirect_uri, state):
     return MSP_AUTHORIZE_URL + "?" + urlencode({
         "client_id": MSP_CLIENT_ID,
@@ -63,7 +65,7 @@ async def exchange_code(code, redirect_uri):
         "User-Agent":"NicolePuzzleCoach/6.7.6",
     }
     async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
-        response = await client.post(MSP_TOKEN_URL, data=data, headers=headers)
+        response = await client.post(MSP_CANONICAL_TOKEN_URL, data=data, headers=headers)
         return _parse_token_response(response, "authorization-code exchange")
 
 async def refresh_access_token(refresh_token):
@@ -79,7 +81,7 @@ async def refresh_access_token(refresh_token):
         "User-Agent":"NicolePuzzleCoach/6.7.6",
     }
     async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
-        response = await client.post(MSP_TOKEN_URL, data=data, headers=headers)
+        response = await client.post(MSP_CANONICAL_TOKEN_URL, data=data, headers=headers)
         return _parse_token_response(response, "refresh-token exchange")
 
 async def api_get(token, path, params=None):
@@ -603,3 +605,31 @@ async def get_puzzle_insights(puzzle_id):
             "prediction_range_from_seconds":range_from,"prediction_range_to_seconds":range_to,"cached":False}
     _PUZZLE_INSIGHTS_CACHE[pid]={"ts":now,"data":result}
     return result
+
+
+async def oauth_endpoint_probe():
+    """
+    Safe reachability probe for the canonical token endpoint.
+    Sends no credentials. A standards-compliant OAuth server should reject the
+    empty request with JSON/4xx; receiving the normal website HTML would mean
+    we are not reaching the OAuth token handler.
+    """
+    headers={
+        "Accept":"application/json",
+        "Content-Type":"application/x-www-form-urlencoded",
+        "User-Agent":"NicolePuzzleCoach/6.7.7",
+    }
+    async with httpx.AsyncClient(timeout=20,follow_redirects=False) as client:
+        response=await client.post(MSP_CANONICAL_TOKEN_URL,data={},headers=headers)
+    ctype=(response.headers.get("content-type") or "").lower()
+    location=response.headers.get("location")
+    body=(response.text or "").strip()
+    is_html="<html" in body.lower() or "<!doctype" in body.lower()
+    return {
+        "url":MSP_CANONICAL_TOKEN_URL,
+        "status_code":response.status_code,
+        "content_type":ctype,
+        "location":location,
+        "looks_like_html":is_html,
+        "body_preview":("HTML response" if is_html else re.sub(r"[\r\n\t]+"," ",body)[:180]),
+    }

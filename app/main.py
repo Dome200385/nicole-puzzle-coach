@@ -15,7 +15,7 @@ from app.myspeedpuzzling import (
     build_authorize_url, exchange_code, refresh_access_token,
     get_profile, get_results, get_statistics, get_collections, get_library,
     get_competitions, get_competition, upcoming_competitions,
-    detect_participation, get_my_confirmed_competitions, get_swiss_motivation_ranking, get_puzzle_insights
+    detect_participation, get_my_confirmed_competitions, get_swiss_motivation_ranking, get_puzzle_insights, oauth_endpoint_probe
 )
 from app.coach import (
     performance_summary, owned_vs_history, tournament_readiness,
@@ -27,7 +27,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.7.6",
+    version="6.7.7",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -99,10 +99,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.7.6","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.7.7","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.7.6"}
+def health(): return {"status":"ok","version":"6.7.7"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -114,7 +114,7 @@ def coach_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     return {
-        "version":"6.7.6",
+        "version":"6.7.7",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None,
         "oauth_configured":configured
@@ -130,6 +130,11 @@ def manual_summary(db:Session=Depends(get_db)):
 @app.get("/coach/countdown")
 def countdown(db:Session=Depends(get_db)):
     return tournament_countdown(_tournament_dicts(db.query(Tournament).all()))
+
+
+@app.get("/auth/myspeedpuzzling/token-probe")
+async def myspeedpuzzling_token_probe():
+    return await oauth_endpoint_probe()
 
 @app.get("/auth/myspeedpuzzling/login")
 def login(request:Request):
