@@ -9,8 +9,6 @@ from app.config import (
     MSP_CLIENT_ID, MSP_CLIENT_SECRET, MSP_SCOPES
 )
 
-MSP_CANONICAL_TOKEN_URL = "https://myspeedpuzzling.com/oauth2/token"
-
 def build_authorize_url(redirect_uri, state):
     return MSP_AUTHORIZE_URL + "?" + urlencode({
         "client_id": MSP_CLIENT_ID,
@@ -20,70 +18,62 @@ def build_authorize_url(redirect_uri, state):
         "state": state,
     })
 
-def _safe_token_error(response, action):
-    ctype=(response.headers.get("content-type") or "").lower()
-    text=(response.text or "").strip()
-    # Avoid ever echoing token-like data. Only a short generic HTML/text hint.
-    if "<html" in text.lower() or "<!doctype" in text.lower():
-        hint="HTML response received instead of OAuth JSON"
-    elif not text:
-        hint="empty response received"
-    else:
-        hint=re.sub(r'[\r\n\t]+',' ',text)[:180]
-    return RuntimeError(
-        f"MySpeedPuzzling OAuth {action} failed: HTTP {response.status_code}; "
-        f"content-type={ctype or 'unknown'}; {hint}"
-    )
-
-def _parse_token_response(response, action):
-    if response.status_code < 200 or response.status_code >= 300:
-        raise _safe_token_error(response, action)
-
-    ctype=(response.headers.get("content-type") or "").lower()
-    try:
-        payload=response.json()
-    except Exception:
-        raise _safe_token_error(response, action)
-
-    if not isinstance(payload,dict) or not payload.get("access_token"):
-        raise RuntimeError(
-            f"MySpeedPuzzling OAuth {action} returned JSON without an access_token"
-        )
-    return payload
-
-async def _reference_form_post(form_data, action):
-    """
-    Mirrors the official MySpeedPuzzling PHP OAuth demo:
-    CURLOPT_POSTFIELDS => http_build_query($formData)
-    Content-Type: application/x-www-form-urlencoded
-    No custom Accept or User-Agent headers.
-    """
-    encoded=urlencode({k:str(v) for k,v in form_data.items() if v is not None})
-    headers={"Content-Type":"application/x-www-form-urlencoded"}
-    async with httpx.AsyncClient(timeout=30,follow_redirects=False) as client:
-        response=await client.post(
-            MSP_CANONICAL_TOKEN_URL,
-            content=encoded.encode("utf-8"),
-            headers=headers,
-        )
-    return _parse_token_response(response,action)
-
 async def exchange_code(code, redirect_uri):
-    return await _reference_form_post({
-        "grant_type":"authorization_code",
-        "code":code,
-        "redirect_uri":redirect_uri,
-        "client_id":MSP_CLIENT_ID,
-        "client_secret":MSP_CLIENT_SECRET,
-    },"authorization-code exchange")
+    data = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": redirect_uri,
+        "client_id": MSP_CLIENT_ID,
+        "client_secret": MSP_CLIENT_SECRET,
+    }
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "NicolePuzzleCoach/6.7.6",
+    }
+    async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
+        response = await client.post(MSP_TOKEN_URL, data=data, headers=headers)
+        response.raise_for_status()
+        content_type = (response.headers.get("content-type") or "").lower()
+        if "json" not in content_type:
+            preview = response.text[:240].replace("\n", " ").replace("\r", " ")
+            raise RuntimeError(
+                "MySpeedPuzzling token endpoint returned non-JSON "
+                f"(HTTP {response.status_code}, content-type={content_type or 'unknown'}, "
+                f"location={response.headers.get('location')!r}, body={preview!r})"
+            )
+        payload = response.json()
+        if not isinstance(payload, dict) or not payload.get("access_token"):
+            raise RuntimeError("MySpeedPuzzling token response contains no access_token")
+        return payload
 
 async def refresh_access_token(refresh_token):
-    return await _reference_form_post({
-        "grant_type":"refresh_token",
-        "refresh_token":refresh_token,
-        "client_id":MSP_CLIENT_ID,
-        "client_secret":MSP_CLIENT_SECRET,
-    },"refresh-token exchange")
+    data = {
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+        "client_id": MSP_CLIENT_ID,
+        "client_secret": MSP_CLIENT_SECRET,
+    }
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "NicolePuzzleCoach/6.7.6",
+    }
+    async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
+        response = await client.post(MSP_TOKEN_URL, data=data, headers=headers)
+        response.raise_for_status()
+        content_type = (response.headers.get("content-type") or "").lower()
+        if "json" not in content_type:
+            preview = response.text[:240].replace("\n", " ").replace("\r", " ")
+            raise RuntimeError(
+                "MySpeedPuzzling refresh endpoint returned non-JSON "
+                f"(HTTP {response.status_code}, content-type={content_type or 'unknown'}, "
+                f"location={response.headers.get('location')!r}, body={preview!r})"
+            )
+        payload = response.json()
+        if not isinstance(payload, dict) or not payload.get("access_token"):
+            raise RuntimeError("MySpeedPuzzling refresh response contains no access_token")
+        return payload
 
 async def api_get(token, path, params=None):
     async with httpx.AsyncClient(timeout=30) as client:
@@ -606,31 +596,3 @@ async def get_puzzle_insights(puzzle_id):
             "prediction_range_from_seconds":range_from,"prediction_range_to_seconds":range_to,"cached":False}
     _PUZZLE_INSIGHTS_CACHE[pid]={"ts":now,"data":result}
     return result
-
-
-async def oauth_endpoint_probe():
-    """
-    Safe probe using the exact request framing of the official demo.
-    No credentials, code, secret, or token are sent.
-    """
-    encoded=urlencode({"grant_type":"authorization_code"})
-    headers={"Content-Type":"application/x-www-form-urlencoded"}
-    async with httpx.AsyncClient(timeout=20,follow_redirects=False) as client:
-        response=await client.post(
-            MSP_CANONICAL_TOKEN_URL,
-            content=encoded.encode("utf-8"),
-            headers=headers,
-        )
-    ctype=(response.headers.get("content-type") or "").lower()
-    location=response.headers.get("location")
-    body=(response.text or "").strip()
-    is_html="<html" in body.lower() or "<!doctype" in body.lower()
-    return {
-        "url":MSP_CANONICAL_TOKEN_URL,
-        "request_framing":"official-demo-compatible",
-        "status_code":response.status_code,
-        "content_type":ctype,
-        "location":location,
-        "looks_like_html":is_html,
-        "body_preview":("HTML response" if is_html else re.sub(r"[\r\n\t]+"," ",body)[:180]),
-    }

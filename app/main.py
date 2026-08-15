@@ -15,7 +15,7 @@ from app.myspeedpuzzling import (
     build_authorize_url, exchange_code, refresh_access_token,
     get_profile, get_results, get_statistics, get_collections, get_library,
     get_competitions, get_competition, upcoming_competitions,
-    detect_participation, get_my_confirmed_competitions, get_swiss_motivation_ranking, get_puzzle_insights, oauth_endpoint_probe
+    detect_participation, get_my_confirmed_competitions, get_swiss_motivation_ranking, get_puzzle_insights
 )
 from app.coach import (
     performance_summary, owned_vs_history, tournament_readiness,
@@ -27,7 +27,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.7.8",
+    version="6.7.6",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -99,10 +99,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.7.8","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.7.6","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.7.8"}
+def health(): return {"status":"ok","version":"6.7.6"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -114,7 +114,7 @@ def coach_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     return {
-        "version":"6.7.8",
+        "version":"6.7.6",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None,
         "oauth_configured":configured
@@ -131,11 +131,6 @@ def manual_summary(db:Session=Depends(get_db)):
 def countdown(db:Session=Depends(get_db)):
     return tournament_countdown(_tournament_dicts(db.query(Tournament).all()))
 
-
-@app.get("/auth/myspeedpuzzling/token-probe")
-async def myspeedpuzzling_token_probe():
-    return await oauth_endpoint_probe()
-
 @app.get("/auth/myspeedpuzzling/login")
 def login(request:Request):
     if not MSP_CLIENT_ID or MSP_CLIENT_ID=="pending":
@@ -147,31 +142,21 @@ def login(request:Request):
 
 @app.get("/auth/myspeedpuzzling/callback")
 async def callback(request:Request,code:str|None=None,state:str|None=None,db:Session=Depends(get_db)):
-    expected_state=request.session.get("oauth_state")
-    if not code or not state or state!=expected_state:
-        return HTMLResponse(
-            "<h2>MySpeedPuzzling Verbindung fehlgeschlagen</h2>"
-            "<p>OAuth-State ungültig oder abgelaufen. Bitte die Verbindung neu starten.</p>"
-            "<p><a href='/auth/myspeedpuzzling/login'>Neu verbinden</a></p>",
-            status_code=400,
-        )
-
+    if not code or state!=request.session.get("oauth_state"):
+        raise HTTPException(400,"Invalid OAuth callback")
+    redirect_uri=f"{APP_BASE_URL}/auth/myspeedpuzzling/callback"
     try:
-        token=await exchange_code(code,f"{APP_BASE_URL}/auth/myspeedpuzzling/callback")
+        token=await exchange_code(code,redirect_uri)
     except Exception as exc:
-        # The exception is deliberately sanitized in myspeedpuzzling.py:
-        # no auth code, client secret, access token, or refresh token is included.
-        import html
-        message=html.escape(str(exc))
+        # Keep the failure readable in the browser instead of returning a generic 500.
+        safe = str(exc).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         return HTMLResponse(
             "<h2>MySpeedPuzzling Token-Austausch fehlgeschlagen</h2>"
-            f"<p><strong>Diagnose:</strong> {message}</p>"
-            "<p>Der Login bei MySpeedPuzzling war erfolgreich, aber der Server "
-            "konnte den Authorization-Code nicht gegen ein API-Token tauschen.</p>"
+            f"<p><b>Diagnose:</b> {safe}</p>"
+            "<p>Der Login war erfolgreich, aber der Token-Endpunkt hat kein gültiges OAuth-JSON geliefert.</p>"
             "<p><a href='/auth/myspeedpuzzling/login'>Neue Verbindung starten</a></p>",
             status_code=502,
         )
-
     payload=encrypt_text(json.dumps(token))
     row=db.query(OAuthToken).filter(OAuthToken.owner_key=="nicole").first()
     if row:
@@ -179,12 +164,7 @@ async def callback(request:Request,code:str|None=None,state:str|None=None,db:Ses
     else:
         db.add(OAuthToken(owner_key="nicole",encrypted_payload=payload))
     db.commit()
-    request.session.pop("oauth_state",None)
-    return HTMLResponse(
-        "<h2>MySpeedPuzzling verbunden ✅</h2>"
-        "<p>Neue Access- und Refresh-Token wurden gespeichert.</p>"
-        "<p><a href='/sync'>Jetzt Daten synchronisieren</a></p>"
-    )
+    return HTMLResponse("<h2>MySpeedPuzzling verbunden ✅</h2><p><a href='/sync'>Daten synchronisieren</a></p>")
 
 @app.get("/sync")
 async def sync(db:Session=Depends(get_db)):
