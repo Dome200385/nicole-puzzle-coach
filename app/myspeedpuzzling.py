@@ -29,7 +29,7 @@ async def exchange_code(code, redirect_uri):
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "NicolePuzzleCoach/6.7.6",
+        "User-Agent": "NicolePuzzleCoach/6.7.7",
     }
     async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
         response = await client.post(MSP_TOKEN_URL, data=data, headers=headers)
@@ -57,7 +57,7 @@ async def refresh_access_token(refresh_token):
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "NicolePuzzleCoach/6.7.6",
+        "User-Agent": "NicolePuzzleCoach/6.7.7",
     }
     async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
         response = await client.post(MSP_TOKEN_URL, data=data, headers=headers)
@@ -76,10 +76,13 @@ async def refresh_access_token(refresh_token):
         return payload
 
 async def api_get(token, path, params=None):
+    # Official MSP PATs use `Authorization: Token msp_pat_...`; OAuth access
+    # tokens continue to use the Bearer scheme.
+    auth_scheme = "Token" if str(token).startswith("msp_pat_") else "Bearer"
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.get(
             MSP_API_BASE + path,
-            headers={"Authorization": f"Bearer {token}"},
+            headers={"Authorization": f"{auth_scheme} {token}"},
             params=params,
         )
         response.raise_for_status()

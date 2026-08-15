@@ -300,7 +300,7 @@ function renderActiveTraining(){
 }
 
 async function loadAll(){renderUnavailable();
- try{let st=await getj('/coach/status');systemKpi.textContent='OK';systemText.textContent=`Backend V${st.version} · Datenbank ok`;systemBadge.textContent='🟢 System bereit';mspKpi.textContent=st.has_myspeedpuzzling_data?'LIVE':(st.oauth_configured?'READY':'WAIT');mspText.textContent=st.has_myspeedpuzzling_data?'Daten synchronisiert':'Verbindung möglich'}catch(e){systemBadge.textContent='🔴 Fehler'}
+ try{let st=await getj('/coach/status');systemKpi.textContent='OK';systemText.textContent=`Backend V${st.version} · Datenbank ok`;systemBadge.textContent='🟢 System bereit';mspKpi.textContent=st.has_myspeedpuzzling_data?'LIVE':(st.pat_configured?'PAT':(st.oauth_configured?'READY':'WAIT'));mspText.textContent=st.has_myspeedpuzzling_data?(st.pat_configured?'MySpeedPuzzling PAT verbunden · Daten synchronisiert':'Daten synchronisiert'):(st.pat_configured?'MySpeedPuzzling PAT verbunden · /sync starten':'Verbindung möglich')}catch(e){systemBadge.textContent='🔴 Fehler'}
 
  try{
    let a=await getj('/coach/msp-training-summary');
