@@ -490,3 +490,77 @@ async def get_swiss_motivation_ranking(token, cache=True):
     }
     _SWISS_RANK_CACHE.update({"ts": now, "data": result})
     return result
+
+
+# --- V6.7.4: public MySpeedPuzzling puzzle insights -------------------------
+_PUZZLE_INSIGHTS_CACHE={}
+_PUZZLE_INSIGHTS_CACHE_SECONDS=6*60*60
+
+def _parse_prediction_seconds(text):
+    if not text:
+        return None
+    value=str(text).lower().replace("~"," ").strip()
+    h=re.search(r'(\d+)\s*h',value)
+    m=re.search(r'(\d+)\s*min',value)
+    s=re.search(r'(\d+)\s*s(?:ec)?',value)
+    total=0
+    if h: total+=int(h.group(1))*3600
+    if m: total+=int(m.group(1))*60
+    if s: total+=int(s.group(1))
+    if total:
+        return total
+    mm=re.search(r'(\d{1,2}):(\d{2}):(\d{2})',value)
+    if mm:
+        a,b,c=map(int,mm.groups()); return a*3600+b*60+c
+    return None
+
+async def get_puzzle_insights(puzzle_id):
+    if not puzzle_id:
+        return {"available":False,"reason":"missing_puzzle_id"}
+    pid=str(puzzle_id)
+    now=time.time()
+    cached=_PUZZLE_INSIGHTS_CACHE.get(pid)
+    if cached and now-cached["ts"]<_PUZZLE_INSIGHTS_CACHE_SECONDS:
+        out=dict(cached["data"]); out["cached"]=True; return out
+
+    url=f"{_MSP_WEB_BASE}/en/puzzle/{pid}"
+    try:
+        async with httpx.AsyncClient(timeout=20,follow_redirects=True) as client:
+            r=await client.get(url,headers={"Accept":"text/html,application/xhtml+xml","User-Agent":"NicolePuzzleCoach/6.7.4"})
+            r.raise_for_status()
+            text=r.text
+    except Exception as exc:
+        return {"available":False,"url":url,"reason":str(exc)}
+
+    plain=_clean_html_text(text) if '_clean_html_text' in globals() else re.sub(r'\s+',' ',re.sub(r'<[^>]+>',' ',text))
+    difficulty_label=None
+    difficulty_percent=None
+    dm=re.search(r'Difficulty\s+([A-Za-z][A-Za-z ]{1,30}?)\s+(\d+(?:\.\d+)?)%\s+(harder|easier)\s+than\s+average',plain,re.I)
+    if dm:
+        difficulty_label=dm.group(1).strip()
+        difficulty_percent=float(dm.group(2))
+        if dm.group(3).lower()=="easier":
+            difficulty_percent=-difficulty_percent
+    else:
+        dm2=re.search(r'Difficulty\s+(Easy|Average|Moderate|Challenging|Hard|Very Hard)',plain,re.I)
+        if dm2: difficulty_label=dm2.group(1).strip()
+
+    prediction_text=None
+    prediction_seconds=None
+    pm=re.search(r'(?:Time\s+Prediction|Prediction)\s*~?\s*((?:\d+\s*h\s*)?\d+\s*min(?:\s*\d+\s*s)?)',plain,re.I)
+    if pm:
+        prediction_text=pm.group(1).strip()
+        prediction_seconds=_parse_prediction_seconds(prediction_text)
+
+    range_from=None; range_to=None
+    rm=re.search(r'Range\s*:\s*((?:\d+\s*h\s*)?\d+\s*min)\s*[-–]\s*((?:\d+\s*h\s*)?\d+\s*min)',plain,re.I)
+    if rm:
+        range_from=_parse_prediction_seconds(rm.group(1))
+        range_to=_parse_prediction_seconds(rm.group(2))
+
+    result={"available":bool(difficulty_label or difficulty_percent is not None or prediction_seconds),
+            "url":url,"difficulty_label":difficulty_label,"difficulty_percent":difficulty_percent,
+            "prediction_text":prediction_text,"prediction_seconds":prediction_seconds,
+            "prediction_range_from_seconds":range_from,"prediction_range_to_seconds":range_to,"cached":False}
+    _PUZZLE_INSIGHTS_CACHE[pid]={"ts":now,"data":result}
+    return result

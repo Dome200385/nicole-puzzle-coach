@@ -74,7 +74,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="item" style="margin-top:10px"><strong>📅 Plan für die aktuelle Trainingswoche</strong><div id="wmWeeklyPlan" class="list" style="margin-top:8px"></div></div>
 </section>
 
-<section class="card full simHero" id="wmSimulationCard"><h2>🏁 WM-Simulation <span class="pill">V6.7.3</span></h2>
+<section class="card full simHero" id="wmSimulationCard"><h2>🏁 WM-Simulation <span class="pill">V6.7.4</span></h2>
 <div class="small">Eigenständige WM-Simulation mit einem <strong>anderen Puzzle als im normalen Wochenplan</strong>. Ausgeliehene Puzzles bleiben ausgeschlossen.</div>
 <div id="wmSimSuggestion" class="item" style="margin-top:10px">Simulations-Puzzle wird gewählt…</div>
 <div id="wmSimActive" class="item activeTraining" style="display:none;margin-top:10px">
@@ -158,6 +158,18 @@ function pct(v){if(v==null)return'–';return `${v>0?'+':''}${v}%`}
 function puzzleImg(p){
   if(!p||!p.image_url)return '';
   return `<img class="puzzleImg" src="${p.image_url}" alt="${p.name||'Puzzle'}" loading="lazy" onerror="this.style.display='none'">`;
+}
+
+function puzzleInsightHtml(p){
+  let i=p?.msp_insights||{};
+  let bits=[];
+  if(i.difficulty_label){
+    let pct=i.difficulty_percent!=null?` (${i.difficulty_percent>0?'+':''}${i.difficulty_percent}% ggü. Ø)`:'';
+    bits.push(`Difficulty: ${i.difficulty_label}${pct}`);
+  }
+  if(i.prediction_text)bits.push(`MSP Prediction: ~${i.prediction_text}`);
+  if(p?.personal_prediction)bits.push(`Nicole Prediction: ${p.personal_prediction}${p.prediction_basis==='first_try'?' · First Try':' · bekannt'}`);
+  return bits.length?`<div class="small" style="margin-top:5px"><strong>MSP:</strong> ${bits.join(' · ')}</div>`:'';
 }
 function goalTargetSeconds(text){
   if(!text)return null;
@@ -318,7 +330,7 @@ async function loadAll(){renderUnavailable();
    wmRecommendation.textContent=w.recommendation;
    let np=w.next_puzzle||{};
    wmNextPuzzle.innerHTML=np.available
-     ? `<div class="puzzleRow">${puzzleImg(np)}<div class="puzzleInfo"><strong>${np.name}</strong>${np.manufacturer?' · '+np.manufacturer:''}${np.pieces?' · '+np.pieces+' Teile':''}<br><span class="small">${np.reason}</span><br><span class="pill">Bibliothek: ${np.library_candidates} passende 500er</span><span class="pill">${np.previous_solo_solves||0} bisherige Solo-Läufe</span>${np.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${np.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}${np.wm_fit?`<span class="pill wmFit">WM-Fit ${np.wm_fit.score}/100</span><div class="fitReason">${np.wm_fit.summary||''}</div>`:''}${np.wm_suitability?`<span class="pill ${np.wm_suitability.level==='hoch'||np.wm_suitability.level==='gut'?'wmGood':''}">${np.wm_suitability.label}</span>`:''}${np.competition_risk?.score>=80?`<div class="small riskHigh" style="padding:7px;border-radius:8px;margin-top:7px">⚠️ ${np.competition_risk.reason}</div>`:''}<br><button class="skipBtn" onclick='skipPuzzle(${JSON.stringify(np)})'>Skip – aktuell ausgeliehen</button></div></div>`
+     ? `<div class="puzzleRow">${puzzleImg(np)}<div class="puzzleInfo"><strong>${np.name}</strong>${np.manufacturer?' · '+np.manufacturer:''}${np.pieces?' · '+np.pieces+' Teile':''}<br><span class="small">${np.reason}</span><br><span class="pill">Bibliothek: ${np.library_candidates} passende 500er</span><span class="pill">${np.previous_solo_solves||0} bisherige Solo-Läufe</span>${np.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${np.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}${np.wm_fit?`<span class="pill wmFit">WM-Fit ${np.wm_fit.score}/100</span><div class="fitReason">${np.wm_fit.summary||''}</div>`:''}${puzzleInsightHtml(np)}${np.wm_suitability?`<span class="pill ${np.wm_suitability.level==='hoch'||np.wm_suitability.level==='gut'?'wmGood':''}">${np.wm_suitability.label}</span>`:''}${np.competition_risk?.score>=80?`<div class="small riskHigh" style="padding:7px;border-radius:8px;margin-top:7px">⚠️ ${np.competition_risk.reason}</div>`:''}<br><button class="skipBtn" onclick='skipPuzzle(${JSON.stringify(np)})'>Skip – aktuell ausgeliehen</button></div></div>`
      : `<span class="small">${np.reason||'Keine eindeutige Bibliotheks-Empfehlung verfügbar.'}</span><br><span class="pill">Bibliotheks-Puzzles erkannt: ${np.library_total||0}</span>`;
    wmLoad7.textContent=w.training_load_7?w.training_load_7.units.toFixed(1):'–'; wmLoad7Info.textContent=w.training_load_7?`${w.training_load_7.sessions} Einheiten · 500er-Äquivalente`:'–';
    wmLoad14.textContent=w.training_load_14?w.training_load_14.units.toFixed(1):'–'; wmLoad14Info.textContent=w.training_load_14?`${w.training_load_14.sessions} Einheiten · 500er-Äquivalente`:'–';
@@ -336,7 +348,7 @@ async function loadAll(){renderUnavailable();
    wmWeeklyPlan.innerHTML=(w.weekly_plan||[]).map((s,i)=>{
      let p=s.puzzle||{};
      let puzzleLine=p.available
-       ? `<div class="puzzleRow" style="margin-top:9px">${puzzleImg(p)}<div class="puzzleInfo"><strong>🧩 ${p.name}</strong>${p.manufacturer?' · '+p.manufacturer:''}${p.pieces?' · '+p.pieces+' Teile':''}<div class="small">${p.reason||''}</div><span class="pill">${p.previous_solo_solves||0} bisherige Solo-Läufe</span>${p.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${p.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}${p.wm_fit?`<span class="pill wmFit">WM-Fit ${p.wm_fit.score}/100</span><div class="fitReason">${p.wm_fit.summary||''}</div>`:''}${p.wm_suitability?`<span class="pill ${p.wm_suitability.level==='hoch'||p.wm_suitability.level==='gut'?'wmGood':''}">${p.wm_suitability.label}</span>`:''}${p.competition_risk?.score>=80?`<div class="small riskHigh" style="padding:7px;border-radius:8px;margin-top:7px">⚠️ ${p.competition_risk.reason}</div>`:''}<br><button class="skipBtn" style="margin-top:8px" onclick='skipPuzzle(${JSON.stringify(p)})'>Skip – ausgeliehen</button> <button class="primary" style="margin-top:8px" onclick='startTraining(${JSON.stringify(s.session)},${JSON.stringify(p)},${JSON.stringify(s.goal)})'>Training starten</button></div></div>`
+       ? `<div class="puzzleRow" style="margin-top:9px">${puzzleImg(p)}<div class="puzzleInfo"><strong>🧩 ${p.name}</strong>${p.manufacturer?' · '+p.manufacturer:''}${p.pieces?' · '+p.pieces+' Teile':''}<div class="small">${p.reason||''}</div><span class="pill">${p.previous_solo_solves||0} bisherige Solo-Läufe</span>${p.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${p.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}${p.wm_fit?`<span class="pill wmFit">WM-Fit ${p.wm_fit.score}/100</span><div class="fitReason">${p.wm_fit.summary||''}</div>`:''}${puzzleInsightHtml(p)}${p.wm_suitability?`<span class="pill ${p.wm_suitability.level==='hoch'||p.wm_suitability.level==='gut'?'wmGood':''}">${p.wm_suitability.label}</span>`:''}${p.competition_risk?.score>=80?`<div class="small riskHigh" style="padding:7px;border-radius:8px;margin-top:7px">⚠️ ${p.competition_risk.reason}</div>`:''}<br><button class="skipBtn" style="margin-top:8px" onclick='skipPuzzle(${JSON.stringify(p)})'>Skip – ausgeliehen</button> <button class="primary" style="margin-top:8px" onclick='startTraining(${JSON.stringify(s.session)},${JSON.stringify(p)},${JSON.stringify(s.goal)})'>Training starten</button></div></div>`
        : (p.not_required?`<div class="small" style="margin-top:7px">🧩 ${p.reason}</div>`:`<div class="small" style="margin-top:7px">🧩 ${p.reason||'Kein Bibliotheks-Puzzle verfügbar.'}</div>`);
      return `<div class="item"><strong>${i+1}. ${s.session}</strong><div class="small">${s.goal}</div><span class="pill">${s.intensity}</span>${puzzleLine}</div>`;
    }).join('')||'<div class="small">Kein Trainingsplan verfügbar.</div>';
@@ -346,7 +358,7 @@ async function loadAll(){renderUnavailable();
    let realSec=(simCandidate && Number(simCandidate.solo_count||0)>0)?repeatSec:firstTrySec;
    let stretchSec=w.wm_goal_stretch_seconds||goalTargetSeconds(w.wm_goal_stretch||'');
    if(simCandidate){
-     wmSimSuggestion.innerHTML=`<div class="puzzleRow">${puzzleImg(simCandidate)}<div class="puzzleInfo"><strong>🧩 ${simCandidate.name}</strong>${simCandidate.manufacturer?' · '+simCandidate.manufacturer:''}${simCandidate.pieces?' · '+simCandidate.pieces+' Teile':''}<div class="small">WM-Fit ${simCandidate.wm_fit?.score||'–'}/100 · First Try ${w.wm_goal_first_try||w.wm_goal_realistic||'–'} · bekannt ${w.wm_goal_repeat||w.wm_goal_realistic||'–'} · Stretch ${w.wm_goal_stretch||'–'}</div><div class="small">Dieses Puzzle ist bewusst nicht im normalen Wochenplan enthalten und nicht als ausgeliehen markiert.</div><button class="primary" style="margin-top:8px" onclick='startWMSimulation(${JSON.stringify(simCandidate)},${realSec||'null'},${realSec||'null'},${stretchSec||'null'})'>WM-Simulation starten</button></div></div>`;
+     wmSimSuggestion.innerHTML=`<div class="puzzleRow">${puzzleImg(simCandidate)}<div class="puzzleInfo"><strong>🧩 ${simCandidate.name}</strong>${simCandidate.manufacturer?' · '+simCandidate.manufacturer:''}${simCandidate.pieces?' · '+simCandidate.pieces+' Teile':''}<div class="small">WM-Fit ${simCandidate.wm_fit?.score||'–'}/100 · Basis First Try ${w.wm_goal_first_try||w.wm_goal_realistic||'–'} · bekannt ${w.wm_goal_repeat||w.wm_goal_realistic||'–'} · Puzzle-Prediction ${simCandidate.personal_prediction||'–'} · Stretch ${w.wm_goal_stretch||'–'}</div><div class="small">Dieses Puzzle ist bewusst nicht im normalen Wochenplan enthalten und nicht als ausgeliehen markiert.</div><button class="primary" style="margin-top:8px" onclick='startWMSimulation(${JSON.stringify(simCandidate)},${realSec||'null'},${realSec||'null'},${stretchSec||'null'})'>WM-Simulation starten</button></div></div>`;
    }else{
      wmSimSuggestion.innerHTML='<div class="small">Aktuell kein zusätzliches verfügbares 500er-Puzzle für eine separate WM-Simulation gefunden.</div>';
    }

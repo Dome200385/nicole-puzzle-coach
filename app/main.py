@@ -15,7 +15,7 @@ from app.myspeedpuzzling import (
     build_authorize_url, exchange_code, refresh_access_token,
     get_profile, get_results, get_statistics, get_collections, get_library,
     get_competitions, get_competition, upcoming_competitions,
-    detect_participation, get_my_confirmed_competitions, get_swiss_motivation_ranking
+    detect_participation, get_my_confirmed_competitions, get_swiss_motivation_ranking, get_puzzle_insights
 )
 from app.coach import (
     performance_summary, owned_vs_history, tournament_readiness,
@@ -27,7 +27,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.7.3",
+    version="6.7.4",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -99,10 +99,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.7.3","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.7.4","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.7.3"}
+def health(): return {"status":"ok","version":"6.7.4"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -114,7 +114,7 @@ def coach_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     return {
-        "version":"6.7.3",
+        "version":"6.7.4",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None,
         "oauth_configured":configured
@@ -266,6 +266,56 @@ async def participation_check(limit:int=12,db:Session=Depends(get_db)):
     except Exception as exc:
         raise HTTPException(502,f"Participation check failed: {exc}")
 
+
+def _fmt_seconds(value):
+    if value is None:
+        return None
+    value=int(round(value)); h=value//3600; m=(value%3600)//60; s=value%60
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
+def _difficulty_factor(insights):
+    pct=(insights or {}).get("difficulty_percent")
+    if pct is None:
+        return 1.0
+    return max(0.85,min(1.20,1.0+float(pct)/100.0))
+
+def _personal_puzzle_prediction(base_seconds, insights):
+    if not base_seconds:
+        return None
+    difficulty_adjusted=base_seconds*_difficulty_factor(insights)
+    msp_pred=(insights or {}).get("prediction_seconds")
+    if msp_pred:
+        relative=max(0.75,min(1.30,msp_pred/3600.0))
+        aggregate_adjusted=base_seconds*relative
+        blended=difficulty_adjusted*0.80+aggregate_adjusted*0.20
+    else:
+        blended=difficulty_adjusted
+    return round(max(base_seconds*0.80,min(base_seconds*1.30,blended)))
+
+async def _enrich_plan_puzzle_predictions(plan):
+    targets=[]
+    for key in ("next_puzzle","simulation_puzzle"):
+        p=plan.get(key) or {}
+        if p.get("available"): targets.append(p)
+    for item in plan.get("weekly_plan",[]):
+        p=item.get("puzzle") or {}
+        if p.get("available"): targets.append(p)
+    seen={}
+    for puzzle in targets:
+        pid=puzzle.get("id")
+        if not pid: continue
+        if str(pid) not in seen:
+            seen[str(pid)]=await get_puzzle_insights(pid)
+        insights=seen[str(pid)]
+        puzzle["msp_insights"]=insights
+        first_try=(puzzle.get("previous_solo_solves") or 0)==0
+        base=plan.get("wm_goal_first_try_seconds") if first_try else plan.get("wm_goal_repeat_seconds")
+        predicted=_personal_puzzle_prediction(base,insights)
+        puzzle["personal_prediction_seconds"]=predicted
+        puzzle["personal_prediction"]=_fmt_seconds(predicted) if predicted else None
+        puzzle["prediction_basis"]="first_try" if first_try else "known"
+    return plan
+
 @app.get("/coach/wm-plan")
 async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
     s=_latest_snapshot(db)
@@ -278,7 +328,8 @@ async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
     excluded=[]
     if exclude_puzzle_ids:
         excluded=[x.strip() for x in exclude_puzzle_ids.split(",") if x.strip()]
-    return build_wm_plan(rows, comps, library_payload=payload["collections"], target_pieces=500, excluded_puzzle_ids=excluded)
+    plan=build_wm_plan(rows, comps, library_payload=payload["collections"], target_pieces=500, excluded_puzzle_ids=excluded)
+    return await _enrich_plan_puzzle_predictions(plan)
 
 
 @app.get("/coach/training-feedback")
