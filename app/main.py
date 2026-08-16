@@ -28,7 +28,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.7.7",
+    version="6.7.8",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -39,11 +39,17 @@ def _latest_snapshot(db):
     ).order_by(SyncSnapshot.id.desc()).first()
 
 def _snapshot_payload(s):
+    statistics=json.loads(s.statistics_json)
+    confirmed=[]
+    if isinstance(statistics,dict) and statistics.get("_npc_wrapper_version")==1:
+        confirmed=statistics.get("confirmed_competitions") or []
+        statistics=statistics.get("msp_statistics") or {}
     return {
         "profile": json.loads(s.profile_json),
         "results": json.loads(s.results_json),
-        "statistics": json.loads(s.statistics_json),
-        "collections": json.loads(s.collections_json)
+        "statistics": statistics,
+        "collections": json.loads(s.collections_json),
+        "confirmed_competitions": confirmed,
     }
 
 def _training_dicts(rows):
@@ -115,10 +121,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.7.7","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.7.8","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.7.7"}
+def health(): return {"status":"ok","version":"6.7.8"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -131,7 +137,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.7.7",
+        "version":"6.7.8",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None,
         "myspeedpuzzling_connected":pat_configured or configured,
@@ -188,22 +194,40 @@ async def callback(request:Request,code:str|None=None,state:str|None=None,db:Ses
 
 @app.get("/sync")
 async def sync(db:Session=Depends(get_db)):
-    token=await _valid_access_token(db)
-    profile=await get_profile(token)
-    results=await get_results(token)
-    statistics=await get_statistics(token)
-    collections=await get_library(token)
-    snap=SyncSnapshot(
-        owner_key="nicole",
-        profile_json=json.dumps(profile),
-        results_json=json.dumps(results),
-        statistics_json=json.dumps(statistics),
-        collections_json=json.dumps(collections)
-    )
-    db.add(snap)
-    db.commit()
-    db.refresh(snap)
-    return {"status":"synced","snapshot_id":snap.id,"dashboard":"/dashboard"}
+    previous=_latest_snapshot(db)
+    try:
+        token=await _valid_access_token(db)
+        profile=await get_profile(token)
+        results=await get_results(token)
+        statistics=await get_statistics(token)
+        collections=await get_library(token)
+        confirmed=[]
+        try:
+            confirmed=await get_my_confirmed_competitions(token,limit=30)
+        except Exception:
+            confirmed=[]
+        stored_statistics={
+            "_npc_wrapper_version":1,
+            "msp_statistics":statistics,
+            "confirmed_competitions":confirmed,
+        }
+        snap=SyncSnapshot(
+            owner_key="nicole",
+            profile_json=json.dumps(profile),
+            results_json=json.dumps(results),
+            statistics_json=json.dumps(stored_statistics),
+            collections_json=json.dumps(collections)
+        )
+        db.add(snap); db.commit(); db.refresh(snap)
+        return {"status":"synced","data_mode":"live","snapshot_id":snap.id,"dashboard":"/dashboard"}
+    except Exception as exc:
+        if previous:
+            return {
+                "status":"stale","data_mode":"snapshot","snapshot_id":previous.id,"dashboard":"/dashboard",
+                "warning":"MySpeedPuzzling aktuell nicht erreichbar. Letzter erfolgreicher Datenstand bleibt aktiv.",
+                "live_error":str(exc)
+            }
+        raise
 
 @app.get("/msp/library")
 async def msp_library(db:Session=Depends(get_db)):
@@ -374,13 +398,33 @@ async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
         raise HTTPException(404,"Noch keine MySpeedPuzzling-Daten synchronisiert")
     payload=_snapshot_payload(s)
     rows=normalize_results(payload["results"])
-    token=await _valid_access_token(db)
-    comps=await get_my_confirmed_competitions(token, limit=30)
     excluded=[]
     if exclude_puzzle_ids:
         excluded=[x.strip() for x in exclude_puzzle_ids.split(",") if x.strip()]
-    plan=build_wm_plan(rows, comps, library_payload=payload["collections"], target_pieces=500, excluded_puzzle_ids=excluded)
-    return await _enrich_plan_puzzle_predictions(plan)
+
+    comps=payload.get("confirmed_competitions") or []
+    data_mode="snapshot"
+    live_warning=None
+    try:
+        token=await _valid_access_token(db)
+        fresh=await get_my_confirmed_competitions(token,limit=30)
+        if fresh: comps=fresh
+        data_mode="live"
+    except Exception as exc:
+        live_warning=f"MySpeedPuzzling Live-Zugriff derzeit nicht möglich: {exc}"
+
+    plan=build_wm_plan(rows,comps,library_payload=payload["collections"],target_pieces=500,excluded_puzzle_ids=excluded)
+    try:
+        plan=await _enrich_plan_puzzle_predictions(plan)
+    except Exception as exc:
+        if not live_warning:
+            live_warning=f"Live-Puzzle-Insights derzeit nicht möglich: {exc}"
+
+    plan["data_mode"]=data_mode
+    plan["snapshot_id"]=s.id
+    plan["live_warning"]=live_warning
+    plan["resilient"]=True
+    return plan
 
 
 @app.get("/coach/training-feedback")
@@ -471,16 +515,16 @@ async def training_feedback(
 
 @app.get("/coach/swiss-ranking")
 async def swiss_ranking(db:Session=Depends(get_db)):
-    token=await _valid_access_token(db)
     try:
-        return await get_swiss_motivation_ranking(token)
+        token=await _valid_access_token(db)
+        result=await get_swiss_motivation_ranking(token)
+        result["data_mode"]="live"
+        return result
     except Exception as exc:
         return {
             "title":"Schweizer Motivationsranking",
-            "subtitle":"Vergleichsgruppe derzeit nicht verfügbar – kein Einfluss auf den WM-Coach.",
-            "players":[],
-            "count":0,
-            "error":str(exc),
+            "subtitle":"Live-Vergleich derzeit nicht verfügbar. Der WM-Coach arbeitet weiter mit dem letzten synchronisierten Trainingsstand.",
+            "players":[],"count":0,"data_mode":"unavailable","error":str(exc)
         }
 
 
