@@ -136,7 +136,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <section class="card full"><h2>📝 Zusätzliche manuelle Trainings</h2><div id="manualTrainings" class="list"></div></section>
 
 <section class="card full"><h2>🧠 Tournament Intelligence</h2>
-<div class="small">V6.7.8 ergänzt Resilient Sync: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
+<div class="small">V6.7.9 ergänzt Legacy-Fallback + Resilient Sync: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
 <div style="margin-top:12px"><a class="btn secondary" href="/docs" target="_blank">API-Dokumentation</a> <a class="btn secondary" href="/msp/my-competitions?refresh=true" target="_blank">Anmeldungen neu prüfen</a> <a class="btn secondary" href="/sync" target="_blank">MySpeedPuzzling neu synchronisieren</a> <a class="btn secondary" href="/msp/library" target="_blank">Puzzle-Bibliothek prüfen</a></div>
 </section>
 </div></div>
@@ -300,7 +300,7 @@ function renderActiveTraining(){
 }
 
 async function loadAll(){renderUnavailable();
- try{let st=await getj('/coach/status');systemKpi.textContent='OK';systemText.textContent=`Backend V${st.version} · Datenbank ok`;systemBadge.textContent='🟢 System bereit';mspKpi.textContent=st.has_myspeedpuzzling_data?'DATA':(st.pat_configured?'PAT':(st.oauth_configured?'READY':'WAIT'));mspText.textContent=st.has_myspeedpuzzling_data?`Letzter Datenstand verfügbar · Snapshot #${st.latest_snapshot_id||'–'}`:(st.pat_configured?'PAT eingerichtet · noch kein Snapshot':'Verbindung möglich')}catch(e){systemBadge.textContent='🔴 Fehler'}
+ try{let st=await getj('/coach/status');systemKpi.textContent='OK';systemText.textContent=`Backend V${st.version} · Datenbank ok`;systemBadge.textContent='🟢 System bereit';mspKpi.textContent=st.data_source==='legacy'?'LEGACY':(st.has_myspeedpuzzling_data?'DATA':(st.pat_configured?'PAT':(st.oauth_configured?'READY':'WAIT')));mspText.textContent=st.data_source==='legacy'?'Historische DB-Daten aktiv':(st.has_myspeedpuzzling_data?`Letzter Datenstand verfügbar · Snapshot #${st.latest_snapshot_id||'–'}`:(st.pat_configured?'PAT eingerichtet · noch kein Snapshot':'Verbindung möglich'))}catch(e){systemBadge.textContent='🔴 Fehler'}
 
  try{
    let a=await getj('/coach/msp-training-summary');
@@ -322,6 +322,11 @@ async function loadAll(){renderUnavailable();
      resilientText.innerHTML=`MySpeedPuzzling ist von Render aktuell nicht live erreichbar. Der Coach verwendet Snapshot <strong>#${w.snapshot_id||'–'}</strong>. Trainingsdaten, WM-Ziele und Wochenplan bleiben nutzbar.${w.live_warning?`<br>${w.live_warning}`:''}`;
      mspKpi.textContent='CACHE';
      mspText.textContent=`Letzter erfolgreicher Datenstand · Snapshot #${w.snapshot_id||'–'}`;
+   }else if(w.data_mode==='legacy'){
+     resilientBanner.style.display='block';
+     resilientText.innerHTML=`MySpeedPuzzling ist aktuell nicht live erreichbar und es existiert kein verwertbarer Snapshot. Der Coach rekonstruiert die Vorbereitung aus <strong>${w.legacy_result_count||0} historischen Trainingsdatensätzen</strong>. Puzzle-Bibliothek und Live-Turniere können dabei eingeschränkt sein.${w.live_warning?`<br>${w.live_warning}`:''}`;
+     mspKpi.textContent='LEGACY';
+     mspText.textContent='Historische DB-Daten aktiv';
    }else{
      resilientBanner.style.display='none';
      mspKpi.textContent='LIVE';

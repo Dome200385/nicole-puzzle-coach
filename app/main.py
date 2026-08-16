@@ -28,10 +28,104 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.7.8",
+    version="6.7.9",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
+
+
+def _legacy_payload_from_db(db):
+    """
+    Reconstruct a coach payload from pre-snapshot/legacy persisted data.
+    This is intentionally best-effort and only uses data already in our DB.
+    """
+    payload={"profile":{}, "results":[], "statistics":{}, "collections":{}, "confirmed_competitions":[]}
+
+    # Training sessions are the most reliable legacy fallback for recent
+    # personal training history. Convert them into normalize_results-compatible
+    # rows where possible.
+    try:
+        sessions=db.query(TrainingSession).order_by(TrainingSession.id.asc()).all()
+    except Exception:
+        sessions=[]
+
+    legacy_results=[]
+    for s in sessions:
+        try:
+            pieces=getattr(s,"pieces",None) or getattr(s,"piece_count",None)
+            seconds=getattr(s,"seconds",None)
+            if seconds is None:
+                seconds=getattr(s,"time_seconds",None)
+            if seconds is None:
+                mins=getattr(s,"minutes",None)
+                if mins is not None:
+                    seconds=int(float(mins)*60)
+            name=getattr(s,"puzzle_name",None) or getattr(s,"name",None) or "Manuelles Training"
+            manufacturer=getattr(s,"manufacturer",None)
+            mode=(getattr(s,"mode",None) or getattr(s,"category",None) or "solo").lower()
+            finished=getattr(s,"date",None) or getattr(s,"created_at",None)
+            if hasattr(finished,"isoformat"):
+                finished=finished.isoformat()
+            row={
+                "puzzle_name":name,
+                "manufacturer":manufacturer,
+                "pieces":int(pieces) if pieces else None,
+                "seconds":int(seconds) if seconds else None,
+                "mode":"solo" if "solo" in mode else mode,
+                "finished_at":finished,
+                "source":"legacy_training_session",
+            }
+            if row["seconds"] and row["pieces"]:
+                legacy_results.append(row)
+        except Exception:
+            continue
+
+    payload["results"]=legacy_results
+
+    # Legacy tournament rows can still provide confirmed upcoming competitions.
+    try:
+        tournaments=db.query(Tournament).order_by(Tournament.id.asc()).all()
+    except Exception:
+        tournaments=[]
+
+    comps=[]
+    for t in tournaments:
+        try:
+            date_from=getattr(t,"date",None) or getattr(t,"date_from",None)
+            date_to=getattr(t,"date_to",None)
+            if hasattr(date_from,"isoformat"): date_from=date_from.isoformat()
+            if hasattr(date_to,"isoformat"): date_to=date_to.isoformat()
+            comps.append({
+                "id":str(getattr(t,"id","legacy")),
+                "name":getattr(t,"name",None) or getattr(t,"title",None) or "Turnier",
+                "date_from":date_from,
+                "date_to":date_to,
+                "location":getattr(t,"location",None) or getattr(t,"place",None),
+                "country_code":getattr(t,"country_code",None),
+                "registered":True,
+                "registration_source":"legacy_db",
+            })
+        except Exception:
+            continue
+    payload["confirmed_competitions"]=comps
+
+    return payload
+
+
+def _best_available_payload(db):
+    """
+    Prefer latest real SyncSnapshot.
+    If none exists, reconstruct from legacy DB rows.
+    """
+    snap=_latest_snapshot(db)
+    if snap:
+        return _snapshot_payload(snap), "snapshot", snap.id
+
+    legacy=_legacy_payload_from_db(db)
+    if legacy.get("results") or legacy.get("confirmed_competitions"):
+        return legacy, "legacy", None
+
+    return None, "none", None
 
 def _latest_snapshot(db):
     return db.query(SyncSnapshot).filter(
@@ -121,10 +215,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.7.8","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.7.9","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.7.8"}
+def health(): return {"status":"ok","version":"6.7.9"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -137,7 +231,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.7.8",
+        "version":"6.7.9",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None,
         "myspeedpuzzling_connected":pat_configured or configured,
@@ -195,6 +289,7 @@ async def callback(request:Request,code:str|None=None,state:str|None=None,db:Ses
 @app.get("/sync")
 async def sync(db:Session=Depends(get_db)):
     previous=_latest_snapshot(db)
+    legacy=_legacy_payload_from_db(db) if not previous else None
     try:
         token=await _valid_access_token(db)
         profile=await get_profile(token)
@@ -224,7 +319,13 @@ async def sync(db:Session=Depends(get_db)):
         if previous:
             return {
                 "status":"stale","data_mode":"snapshot","snapshot_id":previous.id,"dashboard":"/dashboard",
-                "warning":"MySpeedPuzzling aktuell nicht erreichbar. Letzter erfolgreicher Datenstand bleibt aktiv.",
+                "warning":"MySpeedPuzzling aktuell nicht erreichbar. Letzter erfolgreicher Snapshot bleibt aktiv.",
+                "live_error":str(exc)
+            }
+        if legacy and (legacy.get("results") or legacy.get("confirmed_competitions")):
+            return {
+                "status":"stale","data_mode":"legacy","snapshot_id":None,"dashboard":"/dashboard",
+                "warning":"MySpeedPuzzling aktuell nicht erreichbar. Historische Datenbankdaten werden verwendet.",
                 "live_error":str(exc)
             }
         raise
@@ -393,18 +494,19 @@ async def _enrich_plan_puzzle_predictions(plan):
 
 @app.get("/coach/wm-plan")
 async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
-    s=_latest_snapshot(db)
-    if not s:
-        raise HTTPException(404,"Noch keine MySpeedPuzzling-Daten synchronisiert")
-    payload=_snapshot_payload(s)
+    payload,source,snapshot_id=_best_available_payload(db)
+    if not payload:
+        raise HTTPException(404,"Noch keine verwertbaren Trainingsdaten vorhanden")
+
     rows=normalize_results(payload["results"])
     excluded=[]
     if exclude_puzzle_ids:
         excluded=[x.strip() for x in exclude_puzzle_ids.split(",") if x.strip()]
 
     comps=payload.get("confirmed_competitions") or []
-    data_mode="snapshot"
+    data_mode="snapshot" if source=="snapshot" else "legacy"
     live_warning=None
+
     try:
         token=await _valid_access_token(db)
         fresh=await get_my_confirmed_competitions(token,limit=30)
@@ -413,17 +515,28 @@ async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
     except Exception as exc:
         live_warning=f"MySpeedPuzzling Live-Zugriff derzeit nicht möglich: {exc}"
 
-    plan=build_wm_plan(rows,comps,library_payload=payload["collections"],target_pieces=500,excluded_puzzle_ids=excluded)
-    try:
-        plan=await _enrich_plan_puzzle_predictions(plan)
-    except Exception as exc:
-        if not live_warning:
-            live_warning=f"Live-Puzzle-Insights derzeit nicht möglich: {exc}"
+    plan=build_wm_plan(
+        rows,
+        comps,
+        library_payload=payload.get("collections") or {},
+        target_pieces=500,
+        excluded_puzzle_ids=excluded
+    )
+
+    # Puzzle enrichment only if a real library is available.
+    if payload.get("collections"):
+        try:
+            plan=await _enrich_plan_puzzle_predictions(plan)
+        except Exception as exc:
+            if not live_warning:
+                live_warning=f"Live-Puzzle-Insights derzeit nicht möglich: {exc}"
 
     plan["data_mode"]=data_mode
-    plan["snapshot_id"]=s.id
+    plan["data_source"]=source
+    plan["snapshot_id"]=snapshot_id
     plan["live_warning"]=live_warning
     plan["resilient"]=True
+    plan["legacy_result_count"]=len(rows) if source=="legacy" else None
     return plan
 
 
