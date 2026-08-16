@@ -28,7 +28,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.7.12",
+    version="6.8.0",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -277,10 +277,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.7.12","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.8.0","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.7.12"}
+def health(): return {"status":"ok","version":"6.8.0"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -295,7 +295,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.7.12",
+        "version":"6.8.0",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -529,33 +529,30 @@ def _fmt_seconds(value):
     value=int(round(value)); h=value//3600; m=(value%3600)//60; s=value%60
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
-def _difficulty_factor(insights):
-    pct=(insights or {}).get("difficulty_percent")
-    if pct is None:
-        return 1.0
-    return max(0.85,min(1.20,1.0+float(pct)/100.0))
+def _msp_only_prediction(insights):
+    """Return only prediction values supplied by MySpeedPuzzling.
 
-def _personal_puzzle_prediction(base_seconds, insights):
-    if not base_seconds:
-        return None
+    No Nicole/WM goal, form, manufacturer, history or local difficulty factor is
+    allowed to alter a concrete puzzle prediction.
+    """
     insights=insights or {}
-    pct=insights.get("difficulty_percent")
-    if pct is None:
-        difficulty_factor=1.0
-    else:
-        difficulty_factor=1.0+(float(pct)/100.0)*0.40
-        difficulty_factor=max(0.92,min(1.10,difficulty_factor))
-    personal_adjusted=base_seconds*difficulty_factor
-    msp_pred=insights.get("prediction_seconds")
-    if msp_pred:
-        aggregate_relative=max(0.85,min(1.15,msp_pred/3600.0))
-        aggregate_adjusted=base_seconds*aggregate_relative
-        blended=personal_adjusted*0.85+aggregate_adjusted*0.15
-    else:
-        blended=personal_adjusted
-    predicted=round(max(base_seconds*0.90,min(base_seconds*1.15,blended)))
-    half_width=max(90,round(predicted*0.04))
-    return {"seconds":predicted,"corridor_from_seconds":max(1,predicted-half_width),"corridor_to_seconds":predicted+half_width,"difficulty_factor":round(difficulty_factor,3),"msp_anchor_used":bool(msp_pred)}
+    seconds=insights.get("prediction_seconds")
+    text=insights.get("prediction_text")
+    range_from=insights.get("prediction_range_from_seconds")
+    range_to=insights.get("prediction_range_to_seconds")
+    if not text and seconds:
+        text=_fmt_seconds(seconds)
+    if not (text or seconds):
+        return None
+    return {
+        "seconds":seconds,
+        "text":text,
+        "range_from_seconds":range_from,
+        "range_to_seconds":range_to,
+        "range_from":_fmt_seconds(range_from) if range_from else None,
+        "range_to":_fmt_seconds(range_to) if range_to else None,
+        "source":"myspeedpuzzling",
+    }
 
 async def _enrich_plan_puzzle_predictions(plan):
     targets=[]
@@ -573,22 +570,23 @@ async def _enrich_plan_puzzle_predictions(plan):
             seen[str(pid)]=await get_puzzle_insights(pid)
         insights=seen[str(pid)]
         puzzle["msp_insights"]=insights
-        first_try=(puzzle.get("previous_solo_solves") or 0)==0
-        base=plan.get("wm_goal_first_try_seconds") if first_try else plan.get("wm_goal_repeat_seconds")
-        prediction=_personal_puzzle_prediction(base,insights)
+        prediction=_msp_only_prediction(insights)
         if prediction:
-            puzzle["personal_prediction_seconds"]=prediction["seconds"]
-            puzzle["personal_prediction"]=_fmt_seconds(prediction["seconds"])
-            puzzle["prediction_corridor_from_seconds"]=prediction["corridor_from_seconds"]
-            puzzle["prediction_corridor_to_seconds"]=prediction["corridor_to_seconds"]
-            puzzle["prediction_corridor_from"]=_fmt_seconds(prediction["corridor_from_seconds"])
-            puzzle["prediction_corridor_to"]=_fmt_seconds(prediction["corridor_to_seconds"])
-            puzzle["prediction_difficulty_factor"]=prediction["difficulty_factor"]
-            puzzle["prediction_msp_anchor_used"]=prediction["msp_anchor_used"]
+            puzzle["msp_prediction_seconds"]=prediction["seconds"]
+            puzzle["msp_prediction"]=prediction["text"]
+            puzzle["msp_prediction_range_from_seconds"]=prediction["range_from_seconds"]
+            puzzle["msp_prediction_range_to_seconds"]=prediction["range_to_seconds"]
+            puzzle["msp_prediction_range_from"]=prediction["range_from"]
+            puzzle["msp_prediction_range_to"]=prediction["range_to"]
+            puzzle["prediction_source"]="myspeedpuzzling"
         else:
-            puzzle["personal_prediction_seconds"]=None
-            puzzle["personal_prediction"]=None
-        puzzle["prediction_basis"]="first_try" if first_try else "known"
+            puzzle["msp_prediction_seconds"]=None
+            puzzle["msp_prediction"]=None
+            puzzle["msp_prediction_range_from_seconds"]=None
+            puzzle["msp_prediction_range_to_seconds"]=None
+            puzzle["msp_prediction_range_from"]=None
+            puzzle["msp_prediction_range_to"]=None
+            puzzle["prediction_source"]="myspeedpuzzling_unavailable"
     return plan
 
 @app.get("/coach/wm-plan")

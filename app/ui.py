@@ -79,7 +79,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="item" style="margin-top:10px"><strong>📅 Plan für die aktuelle Trainingswoche</strong><div id="wmWeeklyPlan" class="list" style="margin-top:8px"></div></div>
 </section>
 
-<section class="card full simHero" id="wmSimulationCard"><h2>🏁 WM-Simulation <span class="pill">V6.7.12</span></h2>
+<section class="card full simHero" id="wmSimulationCard"><h2>🏁 WM-Simulation <span class="pill">V6.8.0</span></h2>
 <div class="small">Eigenständige WM-Simulation mit einem <strong>anderen Puzzle als im normalen Wochenplan</strong>. Ausgeliehene Puzzles bleiben ausgeschlossen.</div>
 <div id="wmSimSuggestion" class="item" style="margin-top:10px">Simulations-Puzzle wird gewählt…</div>
 <div id="wmSimActive" class="item activeTraining" style="display:none;margin-top:10px">
@@ -141,7 +141,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <section class="card full"><h2>📝 Zusätzliche manuelle Trainings</h2><div id="manualTrainings" class="list"></div></section>
 
 <section class="card full"><h2>🧠 Tournament Intelligence</h2>
-<div class="small">V6.7.12 Frontend Snapshot Recovery + lokale Turnier-Fallbacks: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
+<div class="small">V6.8.0 MSP-only Puzzle Predictions + Frontend Snapshot Recovery: konkrete Puzzle-Prognosen stammen ausschliesslich aus MySpeedPuzzling; WM-Ziele und Coach-Logik bleiben unverändert. Lokale Turnier-Fallbacks: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
 <div style="margin-top:12px"><a class="btn secondary" href="/docs" target="_blank">API-Dokumentation</a> <a class="btn secondary" href="/msp/my-competitions?refresh=true" target="_blank">Anmeldungen neu prüfen</a> <a class="btn secondary" href="/sync" target="_blank">MySpeedPuzzling neu synchronisieren</a> <a class="btn secondary" href="/msp/library" target="_blank">Puzzle-Bibliothek prüfen</a></div>
 </section>
 </div></div>
@@ -169,12 +169,14 @@ function puzzleInsightHtml(p){
   let i=p?.msp_insights||{},bits=[];
   if(i.difficulty_label){let pct=i.difficulty_percent!=null?` (${i.difficulty_percent>0?'+':''}${i.difficulty_percent}% ggü. Ø)`:'';
     bits.push(`Difficulty: ${i.difficulty_label}${pct}`);}
-  if(i.prediction_text)bits.push(`MSP Prediction: ~${i.prediction_text}`);
   let details=bits.length?`<div class="small" style="margin-top:5px"><strong>MSP:</strong> ${bits.join(' · ')}</div>`:'';
-  let personal='';
-  if(p?.personal_prediction){let basis=p.prediction_basis==='first_try'?'First Try':'bekannt';let corridor=(p.prediction_corridor_from&&p.prediction_corridor_to)?` · Zielkorridor ${p.prediction_corridor_from}–${p.prediction_corridor_to}`:'';
-    personal=`<div class="small" style="margin-top:4px"><strong>Nicole Prediction:</strong> ${p.personal_prediction} · ${basis}${corridor}</div>`;}
-  return details+personal;
+  let prediction='';
+  if(p?.msp_prediction){let corridor=(p.msp_prediction_range_from&&p.msp_prediction_range_to)?` · Bereich ${p.msp_prediction_range_from}–${p.msp_prediction_range_to}`:'';
+    prediction=`<div class="small" style="margin-top:4px"><strong>MSP Prediction:</strong> ${p.msp_prediction}${corridor}</div>`;
+  } else {
+    prediction=`<div class="small" style="margin-top:4px"><strong>MSP Prediction:</strong> derzeit nicht verfügbar</div>`;
+  }
+  return details+prediction;
 }
 function goalTargetSeconds(text){
   if(!text)return null;
@@ -385,7 +387,7 @@ async function loadAll(){renderUnavailable();
    let realSec=(simCandidate && Number(simCandidate.previous_solo_solves||0)>0)?repeatSec:firstTrySec;
    let stretchSec=w.wm_goal_stretch_seconds||goalTargetSeconds(w.wm_goal_stretch||'');
    if(simCandidate){
-     wmSimSuggestion.innerHTML=`<div class="puzzleRow">${puzzleImg(simCandidate)}<div class="puzzleInfo"><strong>🧩 ${simCandidate.name}</strong>${simCandidate.manufacturer?' · '+simCandidate.manufacturer:''}${simCandidate.pieces?' · '+simCandidate.pieces+' Teile':''}<div class="small">WM-Fit ${simCandidate.wm_fit?.score||'–'}/100 · Basis First Try ${w.wm_goal_first_try||w.wm_goal_realistic||'–'} · bekannt ${w.wm_goal_repeat||w.wm_goal_realistic||'–'} · Puzzle-Prediction ${simCandidate.personal_prediction||'–'}${simCandidate.prediction_corridor_from&&simCandidate.prediction_corridor_to?` · Zielkorridor ${simCandidate.prediction_corridor_from}–${simCandidate.prediction_corridor_to}`:''} · Stretch ${w.wm_goal_stretch||'–'}</div><div class="small">Dieses Puzzle ist bewusst nicht im normalen Wochenplan enthalten und nicht als ausgeliehen markiert.</div><button class="primary" style="margin-top:8px" onclick='startWMSimulation(${JSON.stringify(simCandidate)},${realSec||'null'},${realSec||'null'},${stretchSec||'null'})'>WM-Simulation starten</button></div></div>`;
+     wmSimSuggestion.innerHTML=`<div class="puzzleRow">${puzzleImg(simCandidate)}<div class="puzzleInfo"><strong>🧩 ${simCandidate.name}</strong>${simCandidate.manufacturer?' · '+simCandidate.manufacturer:''}${simCandidate.pieces?' · '+simCandidate.pieces+' Teile':''}<div class="small">WM-Fit ${simCandidate.wm_fit?.score||'–'}/100 · Basis First Try ${w.wm_goal_first_try||w.wm_goal_realistic||'–'} · bekannt ${w.wm_goal_repeat||w.wm_goal_realistic||'–'} · MSP Prediction ${simCandidate.msp_prediction||'derzeit nicht verfügbar'}${simCandidate.msp_prediction_range_from&&simCandidate.msp_prediction_range_to?` · Bereich ${simCandidate.msp_prediction_range_from}–${simCandidate.msp_prediction_range_to}`:''} · Stretch ${w.wm_goal_stretch||'–'}</div><div class="small">Dieses Puzzle ist bewusst nicht im normalen Wochenplan enthalten und nicht als ausgeliehen markiert.</div><button class="primary" style="margin-top:8px" onclick='startWMSimulation(${JSON.stringify(simCandidate)},${realSec||'null'},${realSec||'null'},${stretchSec||'null'})'>WM-Simulation starten</button></div></div>`;
    }else{
      wmSimSuggestion.innerHTML='<div class="small">Aktuell kein zusätzliches verfügbares 500er-Puzzle für eine separate WM-Simulation gefunden.</div>';
    }
