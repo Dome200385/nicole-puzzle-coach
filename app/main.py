@@ -28,7 +28,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.7.10",
+    version="6.7.11",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -110,6 +110,68 @@ def _legacy_payload_from_db(db):
     payload["confirmed_competitions"]=comps
 
     return payload
+
+
+
+def _local_confirmed_competitions():
+    """
+    Stable local fallback for known upcoming competitions.
+    Used only when MySpeedPuzzling live competition data is unavailable.
+    """
+    return [
+        {
+            "id":"local-wjpc-2026",
+            "name":"World Jigsaw Puzzle Championship 2026",
+            "slug":"world-jigsaw-puzzle-championship-2026",
+            "location":"Valladolid",
+            "country_code":"es",
+            "is_online":False,
+            "date_from":"2026-09-16T09:00:00+02:00",
+            "date_to":"2026-09-20T20:00:00+02:00",
+            "status":"upcoming",
+            "registered":True,
+            "registration_source":"local_fallback",
+        },
+        {
+            "id":"local-swiss-2026",
+            "name":"Swiss Puzzle Championship 2026",
+            "slug":"swiss-puzzle-championship-2026",
+            "location":"Winterthur",
+            "country_code":"ch",
+            "is_online":False,
+            "date_from":"2026-10-10T09:00:00+02:00",
+            "date_to":"2026-10-11T20:00:00+02:00",
+            "status":"upcoming",
+            "registered":True,
+            "registration_source":"local_fallback",
+        },
+    ]
+
+
+def _merge_competitions(primary, fallback):
+    """
+    Merge without duplicating the same event. Primary wins.
+    """
+    def _key(c):
+        return (
+            str(c.get("slug") or "").strip().lower()
+            or str(c.get("name") or "").strip().lower()
+        )
+
+    out=[]
+    seen=set()
+    for source in (primary or [], fallback or []):
+        for comp in source:
+            if not isinstance(comp,dict):
+                continue
+            key=_key(comp)
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            out.append(comp)
+
+    out.sort(key=lambda c: str(c.get("date_from") or "9999"))
+    return out
 
 
 def _best_available_payload(db):
@@ -215,10 +277,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.7.10","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.7.11","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.7.10"}
+def health(): return {"status":"ok","version":"6.7.11"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -233,7 +295,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.7.10",
+        "version":"6.7.11",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -253,7 +315,40 @@ def manual_summary(db:Session=Depends(get_db)):
 
 @app.get("/coach/countdown")
 def countdown(db:Session=Depends(get_db)):
-    return tournament_countdown(_tournament_dicts(db.query(Tournament).all()))
+    db_rows=_tournament_dicts(db.query(Tournament).all())
+    local=[
+        {
+            "id":c["id"],
+            "name":c["name"],
+            "date":c["date_from"],
+            "location":c.get("location"),
+            "mode":"solo",
+            "manufacturer":"Ravensburger",
+            "piece_count":500,
+            "time_limit_minutes":None,
+            "priority":"high",
+            "international":c.get("country_code")!="ch",
+            "notes":"lokaler Fallback",
+        }
+        for c in _local_confirmed_competitions()
+    ]
+    merged=_merge_competitions(
+        [{"name":x.get("name"),"date_from":x.get("date"),**x} for x in db_rows],
+        [{"name":x.get("name"),"date_from":x.get("date"),**x} for x in local],
+    )
+    rows=[]
+    for x in merged:
+        y=dict(x)
+        y["date"]=x.get("date") or x.get("date_from")
+        rows.append(y)
+    return tournament_countdown(rows)
+
+@app.get("/coach/local-competitions")
+def local_competitions():
+    return {
+        "source":"local_fallback",
+        "competitions":_local_confirmed_competitions()
+    }
 
 @app.get("/auth/myspeedpuzzling/login")
 def login(request:Request):
@@ -507,7 +602,10 @@ async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
     if exclude_puzzle_ids:
         excluded=[x.strip() for x in exclude_puzzle_ids.split(",") if x.strip()]
 
-    comps=payload.get("confirmed_competitions") or []
+    comps=_merge_competitions(
+        payload.get("confirmed_competitions") or [],
+        _local_confirmed_competitions()
+    )
     data_mode="snapshot" if source=="snapshot" else "legacy"
     live_warning=None
 
@@ -515,7 +613,8 @@ async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
         token=await _valid_access_token(db)
         fresh=await get_my_confirmed_competitions(token,limit=30)
         if fresh:
-            comps=fresh.get("competitions",[]) if isinstance(fresh,dict) else fresh
+            fresh_list=fresh.get("competitions",[]) if isinstance(fresh,dict) else fresh
+            comps=_merge_competitions(fresh_list,_local_confirmed_competitions())
         data_mode="live"
     except Exception as exc:
         live_warning=f"MySpeedPuzzling Live-Zugriff derzeit nicht möglich: {exc}"

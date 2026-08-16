@@ -74,7 +74,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="item" style="margin-top:10px"><strong>📅 Plan für die aktuelle Trainingswoche</strong><div id="wmWeeklyPlan" class="list" style="margin-top:8px"></div></div>
 </section>
 
-<section class="card full simHero" id="wmSimulationCard"><h2>🏁 WM-Simulation <span class="pill">V6.7.10</span></h2>
+<section class="card full simHero" id="wmSimulationCard"><h2>🏁 WM-Simulation <span class="pill">V6.7.11</span></h2>
 <div class="small">Eigenständige WM-Simulation mit einem <strong>anderen Puzzle als im normalen Wochenplan</strong>. Ausgeliehene Puzzles bleiben ausgeschlossen.</div>
 <div id="wmSimSuggestion" class="item" style="margin-top:10px">Simulations-Puzzle wird gewählt…</div>
 <div id="wmSimActive" class="item activeTraining" style="display:none;margin-top:10px">
@@ -136,7 +136,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <section class="card full"><h2>📝 Zusätzliche manuelle Trainings</h2><div id="manualTrainings" class="list"></div></section>
 
 <section class="card full"><h2>🧠 Tournament Intelligence</h2>
-<div class="small">V6.7.10 behebt Snapshot-WM-Plan + Resilient Sync: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
+<div class="small">V6.7.11 ergänzt lokale Turnier-Fallbacks + Resilient Sync: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
 <div style="margin-top:12px"><a class="btn secondary" href="/docs" target="_blank">API-Dokumentation</a> <a class="btn secondary" href="/msp/my-competitions?refresh=true" target="_blank">Anmeldungen neu prüfen</a> <a class="btn secondary" href="/sync" target="_blank">MySpeedPuzzling neu synchronisieren</a> <a class="btn secondary" href="/msp/library" target="_blank">Puzzle-Bibliothek prüfen</a></div>
 </section>
 </div></div>
@@ -319,7 +319,7 @@ async function loadAll(){renderUnavailable();
    let ex=unavailableIds(); let w=await getj('/coach/wm-plan'+(ex.length?'?exclude_puzzle_ids='+encodeURIComponent(ex.join(',')):''));
    if(w.data_mode==='snapshot'){
      resilientBanner.style.display='block';
-     resilientText.innerHTML=`MySpeedPuzzling ist von Render aktuell nicht live erreichbar. Der Coach verwendet Snapshot <strong>#${w.snapshot_id||'–'}</strong>. Trainingsdaten, WM-Ziele und Wochenplan bleiben nutzbar.${w.live_warning?`<br>${w.live_warning}`:''}`;
+     resilientText.innerHTML=`MySpeedPuzzling ist von Render aktuell nicht live erreichbar. Der Coach verwendet Snapshot <strong>#${w.snapshot_id||'–'}</strong>. Trainingsdaten, WM-Ziele und Wochenplan bleiben nutzbar. Bekannte Turnierdaten werden lokal ergänzt.${w.live_warning?`<br>${w.live_warning}`:''}`;
      mspKpi.textContent='CACHE';
      mspText.textContent=`Letzter erfolgreicher Datenstand · Snapshot #${w.snapshot_id||'–'}`;
    }else if(w.data_mode==='legacy'){
