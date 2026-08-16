@@ -28,7 +28,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.7.9",
+    version="6.7.10",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -215,10 +215,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.7.9","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.7.10","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.7.9"}
+def health(): return {"status":"ok","version":"6.7.10"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -228,12 +228,16 @@ def db_health(db:Session=Depends(get_db)):
 @app.get("/coach/status")
 def coach_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
+    legacy=_legacy_payload_from_db(db) if not snap else None
+    has_legacy=bool(legacy and (legacy.get("results") or legacy.get("confirmed_competitions")))
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.7.9",
+        "version":"6.7.10",
         "database":"ok",
-        "has_myspeedpuzzling_data":snap is not None,
+        "has_myspeedpuzzling_data":snap is not None or has_legacy,
+        "latest_snapshot_id":snap.id if snap else None,
+        "data_source":"snapshot" if snap else ("legacy" if has_legacy else "none"),
         "myspeedpuzzling_connected":pat_configured or configured,
         "myspeedpuzzling_auth_mode":"pat" if pat_configured else ("oauth" if configured else "none"),
         "pat_configured":pat_configured,
@@ -510,14 +514,16 @@ async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
     try:
         token=await _valid_access_token(db)
         fresh=await get_my_confirmed_competitions(token,limit=30)
-        if fresh: comps=fresh
+        if fresh:
+            comps=fresh.get("competitions",[]) if isinstance(fresh,dict) else fresh
         data_mode="live"
     except Exception as exc:
         live_warning=f"MySpeedPuzzling Live-Zugriff derzeit nicht möglich: {exc}"
 
+    competition_payload = comps if isinstance(comps,dict) else {"competitions": comps}
     plan=build_wm_plan(
         rows,
-        comps,
+        competition_payload,
         library_payload=payload.get("collections") or {},
         target_pieces=500,
         excluded_puzzle_ids=excluded
