@@ -16,7 +16,8 @@ from app.myspeedpuzzling import (
     build_authorize_url, exchange_code, refresh_access_token,
     get_profile, get_results, get_statistics, get_collections, get_library,
     get_competitions, get_competition, upcoming_competitions,
-    detect_participation, get_my_confirmed_competitions, get_swiss_motivation_ranking, get_puzzle_insights
+    detect_participation, get_my_confirmed_competitions, get_swiss_motivation_ranking, get_puzzle_insights,
+    enrich_library_with_msp_insights, clear_api_cache, api_cache_status
 )
 from app.coach import (
     performance_summary, owned_vs_history, tournament_readiness,
@@ -28,7 +29,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.8.1",
+    version="6.8.2",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -197,7 +198,7 @@ def _latest_snapshot(db):
 def _snapshot_payload(s):
     statistics=json.loads(s.statistics_json)
     confirmed=[]
-    if isinstance(statistics,dict) and statistics.get("_npc_wrapper_version")==1:
+    if isinstance(statistics,dict) and statistics.get("_npc_wrapper_version") in (1,2):
         confirmed=statistics.get("confirmed_competitions") or []
         statistics=statistics.get("msp_statistics") or {}
     return {
@@ -277,10 +278,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.8.1","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.8.2","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.8.1"}
+def health(): return {"status":"ok","version":"6.8.2"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -295,7 +296,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.8.1",
+        "version":"6.8.2",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -391,19 +392,34 @@ async def sync(db:Session=Depends(get_db)):
     legacy=_legacy_payload_from_db(db) if not previous else None
     try:
         token=await _valid_access_token(db)
-        profile=await get_profile(token)
-        results=await get_results(token)
-        statistics=await get_statistics(token)
-        collections=await get_library(token)
+
+        # Explicit /sync means "refresh now": bypass the short-lived API cache
+        # exactly once. All normal dashboard reads remain cached.
+        clear_api_cache()
+
+        profile=await get_profile(token, cache=False)
+        results=await get_results(token, cache=False)
+        statistics=await get_statistics(token, cache=False)
+        collections=await get_library(token, cache=False)
+
+        # Normalize MSP-provided prediction/difficulty fields already present
+        # in the official library payload. No values are invented.
+        collections=enrich_library_with_msp_insights(collections)
+
         confirmed=[]
         try:
-            confirmed=await get_my_confirmed_competitions(token,limit=30)
+            confirmed_payload=await get_my_confirmed_competitions(token,limit=30,cache=False)
+            confirmed=(confirmed_payload or {}).get("competitions",[]) if isinstance(confirmed_payload,dict) else []
         except Exception:
+            # Local tournament fallback remains responsible for continuity.
             confirmed=[]
+
         stored_statistics={
-            "_npc_wrapper_version":1,
+            "_npc_wrapper_version":2,
             "msp_statistics":statistics,
             "confirmed_competitions":confirmed,
+            "sync_source":"official_api",
+            "api_only":True,
         }
         snap=SyncSnapshot(
             owner_key="nicole",
@@ -413,7 +429,14 @@ async def sync(db:Session=Depends(get_db)):
             collections_json=json.dumps(collections)
         )
         db.add(snap); db.commit(); db.refresh(snap)
-        return {"status":"synced","data_mode":"live","snapshot_id":snap.id,"dashboard":"/dashboard"}
+        return {
+            "status":"synced",
+            "data_mode":"live",
+            "api_only":True,
+            "snapshot_id":snap.id,
+            "results_count":len(normalize_results(results)),
+            "dashboard":"/dashboard"
+        }
     except Exception as exc:
         if previous:
             return {
@@ -439,6 +462,18 @@ async def msp_api_test(db:Session=Depends(get_db)):
         return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.1","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
     except Exception as exc:
         return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.1","error":str(exc)}
+
+@app.get("/msp/sync-status")
+def msp_sync_status(db:Session=Depends(get_db)):
+    snap=_latest_snapshot(db)
+    return {
+        "version":"6.8.2",
+        "snapshot_id":snap.id if snap else None,
+        "synced_at":snap.synced_at if snap else None,
+        "data_available":snap is not None,
+        "api_cache":api_cache_status(),
+        "api_only":True,
+    }
 
 @app.get("/msp/library")
 async def msp_library(db:Session=Depends(get_db)):

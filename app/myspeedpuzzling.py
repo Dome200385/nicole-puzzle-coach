@@ -9,7 +9,7 @@ from app.config import (
     MSP_CLIENT_ID, MSP_CLIENT_SECRET, MSP_SCOPES
 )
 
-MSP_USER_AGENT = "NicolePuzzleCoach/6.8.1"
+MSP_USER_AGENT = "NicolePuzzleCoach/6.8.2"
 _API_CACHE = {}
 _API_CACHE_DEFAULT_SECONDS = 5 * 60
 _API_403_BLOCKED_UNTIL = 0.0
@@ -25,6 +25,17 @@ def _cache_ttl(path):
     if path.startswith("/me/results"): return 5 * 60
     if path.startswith("/competitions"): return 15 * 60
     return _API_CACHE_DEFAULT_SECONDS
+
+def clear_api_cache():
+    _API_CACHE.clear()
+
+def api_cache_status():
+    return {
+        "entries": len(_API_CACHE),
+        "blocked_until": _API_403_BLOCKED_UNTIL,
+        "user_agent": MSP_USER_AGENT,
+    }
+
 
 def build_authorize_url(redirect_uri, state):
     return MSP_AUTHORIZE_URL + "?" + urlencode({
@@ -119,14 +130,14 @@ async def api_get(token, path, params=None, cache=True):
     if cache: _API_CACHE[key]={"ts":time.time(),"data":data}
     return data
 
-async def get_profile(token):
-    return await api_get(token, "/me")
+async def get_profile(token, cache=True):
+    return await api_get(token, "/me", cache=cache)
 
-async def get_statistics(token):
-    return await api_get(token, "/me/statistics")
+async def get_statistics(token, cache=True):
+    return await api_get(token, "/me/statistics", cache=cache)
 
-async def get_collections(token):
-    return await api_get(token, "/me/collections")
+async def get_collections(token, cache=True):
+    return await api_get(token, "/me/collections", cache=cache)
 
 async def get_collection_items(token, collection_id):
     return await api_get(token, f"/me/collections/{collection_id}/items")
@@ -359,3 +370,29 @@ def extract_puzzle_insights_from_api_payload(payload):
 async def get_puzzle_insights(puzzle_id, api_payload=None):
     if api_payload is not None: return extract_puzzle_insights_from_api_payload(api_payload)
     return {"available":False,"puzzle_id":str(puzzle_id) if puzzle_id else None,"difficulty_label":None,"difficulty_percent":None,"prediction_text":None,"prediction_seconds":None,"prediction_range_from_seconds":None,"prediction_range_to_seconds":None,"cached":False,"source":"official_api_only","reason":"Prediction/difficulty not present in current official API payload."}
+
+
+def enrich_library_with_msp_insights(payload):
+    """
+    Walk an official MySpeedPuzzling library/collections payload and attach a
+    normalized `msp_insights` object to each puzzle dict when prediction or
+    difficulty values are already present in the API payload.
+
+    This does not call HTML pages and does not invent any values.
+    """
+    def walk(obj):
+        if isinstance(obj,dict):
+            looks_like_puzzle = any(k in obj for k in ("pieces","piece_count")) and any(
+                k in obj for k in ("name","title","puzzle_name")
+            )
+            if looks_like_puzzle:
+                insights=extract_puzzle_insights_from_api_payload(obj)
+                if insights.get("available"):
+                    obj["msp_insights"]=insights
+            for value in list(obj.values()):
+                walk(value)
+        elif isinstance(obj,list):
+            for value in obj:
+                walk(value)
+    walk(payload)
+    return payload
