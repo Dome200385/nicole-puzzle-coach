@@ -1,5 +1,6 @@
 import json
 import secrets
+import os
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlalchemy.orm import Session
@@ -15,7 +16,7 @@ from app.myspeedpuzzling import (
     build_authorize_url, exchange_code, refresh_access_token,
     get_profile, get_results, get_statistics, get_collections, get_library,
     get_competitions, get_competition, upcoming_competitions,
-    detect_participation, get_my_confirmed_competitions, get_swiss_motivation_ranking
+    detect_participation, get_my_confirmed_competitions, get_swiss_motivation_ranking, get_puzzle_insights
 )
 from app.coach import (
     performance_summary, owned_vs_history, tournament_readiness,
@@ -27,10 +28,166 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.7.0",
+    version="6.8.1",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
+
+
+def _legacy_payload_from_db(db):
+    """
+    Reconstruct a coach payload from pre-snapshot/legacy persisted data.
+    This is intentionally best-effort and only uses data already in our DB.
+    """
+    payload={"profile":{}, "results":[], "statistics":{}, "collections":{}, "confirmed_competitions":[]}
+
+    # Training sessions are the most reliable legacy fallback for recent
+    # personal training history. Convert them into normalize_results-compatible
+    # rows where possible.
+    try:
+        sessions=db.query(TrainingSession).order_by(TrainingSession.id.asc()).all()
+    except Exception:
+        sessions=[]
+
+    legacy_results=[]
+    for s in sessions:
+        try:
+            pieces=getattr(s,"pieces",None) or getattr(s,"piece_count",None)
+            seconds=getattr(s,"seconds",None)
+            if seconds is None:
+                seconds=getattr(s,"time_seconds",None)
+            if seconds is None:
+                mins=getattr(s,"minutes",None)
+                if mins is not None:
+                    seconds=int(float(mins)*60)
+            name=getattr(s,"puzzle_name",None) or getattr(s,"name",None) or "Manuelles Training"
+            manufacturer=getattr(s,"manufacturer",None)
+            mode=(getattr(s,"mode",None) or getattr(s,"category",None) or "solo").lower()
+            finished=getattr(s,"date",None) or getattr(s,"created_at",None)
+            if hasattr(finished,"isoformat"):
+                finished=finished.isoformat()
+            row={
+                "puzzle_name":name,
+                "manufacturer":manufacturer,
+                "pieces":int(pieces) if pieces else None,
+                "seconds":int(seconds) if seconds else None,
+                "mode":"solo" if "solo" in mode else mode,
+                "finished_at":finished,
+                "source":"legacy_training_session",
+            }
+            if row["seconds"] and row["pieces"]:
+                legacy_results.append(row)
+        except Exception:
+            continue
+
+    payload["results"]=legacy_results
+
+    # Legacy tournament rows can still provide confirmed upcoming competitions.
+    try:
+        tournaments=db.query(Tournament).order_by(Tournament.id.asc()).all()
+    except Exception:
+        tournaments=[]
+
+    comps=[]
+    for t in tournaments:
+        try:
+            date_from=getattr(t,"date",None) or getattr(t,"date_from",None)
+            date_to=getattr(t,"date_to",None)
+            if hasattr(date_from,"isoformat"): date_from=date_from.isoformat()
+            if hasattr(date_to,"isoformat"): date_to=date_to.isoformat()
+            comps.append({
+                "id":str(getattr(t,"id","legacy")),
+                "name":getattr(t,"name",None) or getattr(t,"title",None) or "Turnier",
+                "date_from":date_from,
+                "date_to":date_to,
+                "location":getattr(t,"location",None) or getattr(t,"place",None),
+                "country_code":getattr(t,"country_code",None),
+                "registered":True,
+                "registration_source":"legacy_db",
+            })
+        except Exception:
+            continue
+    payload["confirmed_competitions"]=comps
+
+    return payload
+
+
+
+def _local_confirmed_competitions():
+    """
+    Stable local fallback for known upcoming competitions.
+    Used only when MySpeedPuzzling live competition data is unavailable.
+    """
+    return [
+        {
+            "id":"local-wjpc-2026",
+            "name":"World Jigsaw Puzzle Championship 2026",
+            "slug":"world-jigsaw-puzzle-championship-2026",
+            "location":"Valladolid",
+            "country_code":"es",
+            "is_online":False,
+            "date_from":"2026-09-16T09:00:00+02:00",
+            "date_to":"2026-09-20T20:00:00+02:00",
+            "status":"upcoming",
+            "registered":True,
+            "registration_source":"local_fallback",
+        },
+        {
+            "id":"local-swiss-2026",
+            "name":"Swiss Puzzle Championship 2026",
+            "slug":"swiss-puzzle-championship-2026",
+            "location":"Winterthur",
+            "country_code":"ch",
+            "is_online":False,
+            "date_from":"2026-10-10T09:00:00+02:00",
+            "date_to":"2026-10-11T20:00:00+02:00",
+            "status":"upcoming",
+            "registered":True,
+            "registration_source":"local_fallback",
+        },
+    ]
+
+
+def _merge_competitions(primary, fallback):
+    """
+    Merge without duplicating the same event. Primary wins.
+    """
+    def _key(c):
+        return (
+            str(c.get("slug") or "").strip().lower()
+            or str(c.get("name") or "").strip().lower()
+        )
+
+    out=[]
+    seen=set()
+    for source in (primary or [], fallback or []):
+        for comp in source:
+            if not isinstance(comp,dict):
+                continue
+            key=_key(comp)
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            out.append(comp)
+
+    out.sort(key=lambda c: str(c.get("date_from") or "9999"))
+    return out
+
+
+def _best_available_payload(db):
+    """
+    Prefer latest real SyncSnapshot.
+    If none exists, reconstruct from legacy DB rows.
+    """
+    snap=_latest_snapshot(db)
+    if snap:
+        return _snapshot_payload(snap), "snapshot", snap.id
+
+    legacy=_legacy_payload_from_db(db)
+    if legacy.get("results") or legacy.get("confirmed_competitions"):
+        return legacy, "legacy", None
+
+    return None, "none", None
 
 def _latest_snapshot(db):
     return db.query(SyncSnapshot).filter(
@@ -38,11 +195,17 @@ def _latest_snapshot(db):
     ).order_by(SyncSnapshot.id.desc()).first()
 
 def _snapshot_payload(s):
+    statistics=json.loads(s.statistics_json)
+    confirmed=[]
+    if isinstance(statistics,dict) and statistics.get("_npc_wrapper_version")==1:
+        confirmed=statistics.get("confirmed_competitions") or []
+        statistics=statistics.get("msp_statistics") or {}
     return {
         "profile": json.loads(s.profile_json),
         "results": json.loads(s.results_json),
-        "statistics": json.loads(s.statistics_json),
-        "collections": json.loads(s.collections_json)
+        "statistics": statistics,
+        "collections": json.loads(s.collections_json),
+        "confirmed_competitions": confirmed,
     }
 
 def _training_dicts(rows):
@@ -62,6 +225,10 @@ def _tournament_dicts(rows):
         "international":r.international,"notes":r.notes
     } for r in rows]
 
+def _pat_token():
+    token=(os.getenv("MSP_PERSONAL_ACCESS_TOKEN") or os.getenv("MSP_PAT") or "").strip()
+    return token if token.startswith("msp_pat_") else None
+
 def _load_token_row(db):
     row=db.query(OAuthToken).filter(OAuthToken.owner_key=="nicole").first()
     if not row:
@@ -69,6 +236,17 @@ def _load_token_row(db):
     return row
 
 async def _valid_access_token(db):
+    # For this single-user coach, the official MySpeedPuzzling Personal Access
+    # Token is preferred. It avoids the OAuth token exchange that can be
+    # challenged by CrowdSec on server-to-server requests.
+    pat=_pat_token()
+    if pat:
+        try:
+            await get_profile(pat)
+            return pat
+        except Exception as exc:
+            raise HTTPException(401,f"MySpeedPuzzling PAT ungültig oder nicht erreichbar: {exc}")
+
     row=_load_token_row(db)
     token=json.loads(decrypt_text(row.encrypted_payload))
     access=token.get("access_token")
@@ -99,10 +277,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.7.0","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.8.1","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.7.0"}
+def health(): return {"status":"ok","version":"6.8.1"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -112,11 +290,19 @@ def db_health(db:Session=Depends(get_db)):
 @app.get("/coach/status")
 def coach_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
+    legacy=_legacy_payload_from_db(db) if not snap else None
+    has_legacy=bool(legacy and (legacy.get("results") or legacy.get("confirmed_competitions")))
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
+    pat_configured=bool(_pat_token())
     return {
-        "version":"6.7.0",
+        "version":"6.8.1",
         "database":"ok",
-        "has_myspeedpuzzling_data":snap is not None,
+        "has_myspeedpuzzling_data":snap is not None or has_legacy,
+        "latest_snapshot_id":snap.id if snap else None,
+        "data_source":"snapshot" if snap else ("legacy" if has_legacy else "none"),
+        "myspeedpuzzling_connected":pat_configured or configured,
+        "myspeedpuzzling_auth_mode":"pat" if pat_configured else ("oauth" if configured else "none"),
+        "pat_configured":pat_configured,
         "oauth_configured":configured
     }
 
@@ -129,7 +315,40 @@ def manual_summary(db:Session=Depends(get_db)):
 
 @app.get("/coach/countdown")
 def countdown(db:Session=Depends(get_db)):
-    return tournament_countdown(_tournament_dicts(db.query(Tournament).all()))
+    db_rows=_tournament_dicts(db.query(Tournament).all())
+    local=[
+        {
+            "id":c["id"],
+            "name":c["name"],
+            "date":c["date_from"],
+            "location":c.get("location"),
+            "mode":"solo",
+            "manufacturer":"Ravensburger",
+            "piece_count":500,
+            "time_limit_minutes":None,
+            "priority":"high",
+            "international":c.get("country_code")!="ch",
+            "notes":"lokaler Fallback",
+        }
+        for c in _local_confirmed_competitions()
+    ]
+    merged=_merge_competitions(
+        [{"name":x.get("name"),"date_from":x.get("date"),**x} for x in db_rows],
+        [{"name":x.get("name"),"date_from":x.get("date"),**x} for x in local],
+    )
+    rows=[]
+    for x in merged:
+        y=dict(x)
+        y["date"]=x.get("date") or x.get("date_from")
+        rows.append(y)
+    return tournament_countdown(rows)
+
+@app.get("/coach/local-competitions")
+def local_competitions():
+    return {
+        "source":"local_fallback",
+        "competitions":_local_confirmed_competitions()
+    }
 
 @app.get("/auth/myspeedpuzzling/login")
 def login(request:Request):
@@ -144,7 +363,19 @@ def login(request:Request):
 async def callback(request:Request,code:str|None=None,state:str|None=None,db:Session=Depends(get_db)):
     if not code or state!=request.session.get("oauth_state"):
         raise HTTPException(400,"Invalid OAuth callback")
-    token=await exchange_code(code,f"{APP_BASE_URL}/auth/myspeedpuzzling/callback")
+    redirect_uri=f"{APP_BASE_URL}/auth/myspeedpuzzling/callback"
+    try:
+        token=await exchange_code(code,redirect_uri)
+    except Exception as exc:
+        # Keep the failure readable in the browser instead of returning a generic 500.
+        safe = str(exc).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        return HTMLResponse(
+            "<h2>MySpeedPuzzling Token-Austausch fehlgeschlagen</h2>"
+            f"<p><b>Diagnose:</b> {safe}</p>"
+            "<p>Der Login war erfolgreich, aber der Token-Endpunkt hat kein gültiges OAuth-JSON geliefert.</p>"
+            "<p><a href='/auth/myspeedpuzzling/login'>Neue Verbindung starten</a></p>",
+            status_code=502,
+        )
     payload=encrypt_text(json.dumps(token))
     row=db.query(OAuthToken).filter(OAuthToken.owner_key=="nicole").first()
     if row:
@@ -156,22 +387,58 @@ async def callback(request:Request,code:str|None=None,state:str|None=None,db:Ses
 
 @app.get("/sync")
 async def sync(db:Session=Depends(get_db)):
-    token=await _valid_access_token(db)
-    profile=await get_profile(token)
-    results=await get_results(token)
-    statistics=await get_statistics(token)
-    collections=await get_library(token)
-    snap=SyncSnapshot(
-        owner_key="nicole",
-        profile_json=json.dumps(profile),
-        results_json=json.dumps(results),
-        statistics_json=json.dumps(statistics),
-        collections_json=json.dumps(collections)
-    )
-    db.add(snap)
-    db.commit()
-    db.refresh(snap)
-    return {"status":"synced","snapshot_id":snap.id,"dashboard":"/dashboard"}
+    previous=_latest_snapshot(db)
+    legacy=_legacy_payload_from_db(db) if not previous else None
+    try:
+        token=await _valid_access_token(db)
+        profile=await get_profile(token)
+        results=await get_results(token)
+        statistics=await get_statistics(token)
+        collections=await get_library(token)
+        confirmed=[]
+        try:
+            confirmed=await get_my_confirmed_competitions(token,limit=30)
+        except Exception:
+            confirmed=[]
+        stored_statistics={
+            "_npc_wrapper_version":1,
+            "msp_statistics":statistics,
+            "confirmed_competitions":confirmed,
+        }
+        snap=SyncSnapshot(
+            owner_key="nicole",
+            profile_json=json.dumps(profile),
+            results_json=json.dumps(results),
+            statistics_json=json.dumps(stored_statistics),
+            collections_json=json.dumps(collections)
+        )
+        db.add(snap); db.commit(); db.refresh(snap)
+        return {"status":"synced","data_mode":"live","snapshot_id":snap.id,"dashboard":"/dashboard"}
+    except Exception as exc:
+        if previous:
+            return {
+                "status":"stale","data_mode":"snapshot","snapshot_id":previous.id,"dashboard":"/dashboard",
+                "warning":"MySpeedPuzzling aktuell nicht erreichbar. Letzter erfolgreicher Snapshot bleibt aktiv.",
+                "live_error":str(exc)
+            }
+        if legacy and (legacy.get("results") or legacy.get("confirmed_competitions")):
+            return {
+                "status":"stale","data_mode":"legacy","snapshot_id":None,"dashboard":"/dashboard",
+                "warning":"MySpeedPuzzling aktuell nicht erreichbar. Historische Datenbankdaten werden verwendet.",
+                "live_error":str(exc)
+            }
+        raise
+
+@app.get("/msp/api-test")
+async def msp_api_test(db:Session=Depends(get_db)):
+    token=_pat_token()
+    if not token:
+        return {"ok":False,"mode":"pat","reason":"MSP_PERSONAL_ACCESS_TOKEN not configured"}
+    try:
+        profile=await get_profile(token)
+        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.1","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
+    except Exception as exc:
+        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.1","error":str(exc)}
 
 @app.get("/msp/library")
 async def msp_library(db:Session=Depends(get_db)):
@@ -266,19 +533,125 @@ async def participation_check(limit:int=12,db:Session=Depends(get_db)):
     except Exception as exc:
         raise HTTPException(502,f"Participation check failed: {exc}")
 
+
+def _fmt_seconds(value):
+    if value is None:
+        return None
+    value=int(round(value)); h=value//3600; m=(value%3600)//60; s=value%60
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
+def _msp_only_prediction(insights):
+    """Return only prediction values supplied by MySpeedPuzzling.
+
+    No Nicole/WM goal, form, manufacturer, history or local difficulty factor is
+    allowed to alter a concrete puzzle prediction.
+    """
+    insights=insights or {}
+    seconds=insights.get("prediction_seconds")
+    text=insights.get("prediction_text")
+    range_from=insights.get("prediction_range_from_seconds")
+    range_to=insights.get("prediction_range_to_seconds")
+    if not text and seconds:
+        text=_fmt_seconds(seconds)
+    if not (text or seconds):
+        return None
+    return {
+        "seconds":seconds,
+        "text":text,
+        "range_from_seconds":range_from,
+        "range_to_seconds":range_to,
+        "range_from":_fmt_seconds(range_from) if range_from else None,
+        "range_to":_fmt_seconds(range_to) if range_to else None,
+        "source":"myspeedpuzzling",
+    }
+
+async def _enrich_plan_puzzle_predictions(plan):
+    targets=[]
+    for key in ("next_puzzle","simulation_puzzle"):
+        p=plan.get(key) or {}
+        if p.get("available"): targets.append(p)
+    for item in plan.get("weekly_plan",[]):
+        p=item.get("puzzle") or {}
+        if p.get("available"): targets.append(p)
+    seen={}
+    for puzzle in targets:
+        pid=puzzle.get("id")
+        if not pid: continue
+        if str(pid) not in seen:
+            seen[str(pid)]=await get_puzzle_insights(pid, api_payload=puzzle)
+        insights=seen[str(pid)]
+        puzzle["msp_insights"]=insights
+        prediction=_msp_only_prediction(insights)
+        if prediction:
+            puzzle["msp_prediction_seconds"]=prediction["seconds"]
+            puzzle["msp_prediction"]=prediction["text"]
+            puzzle["msp_prediction_range_from_seconds"]=prediction["range_from_seconds"]
+            puzzle["msp_prediction_range_to_seconds"]=prediction["range_to_seconds"]
+            puzzle["msp_prediction_range_from"]=prediction["range_from"]
+            puzzle["msp_prediction_range_to"]=prediction["range_to"]
+            puzzle["prediction_source"]="myspeedpuzzling"
+        else:
+            puzzle["msp_prediction_seconds"]=None
+            puzzle["msp_prediction"]=None
+            puzzle["msp_prediction_range_from_seconds"]=None
+            puzzle["msp_prediction_range_to_seconds"]=None
+            puzzle["msp_prediction_range_from"]=None
+            puzzle["msp_prediction_range_to"]=None
+            puzzle["prediction_source"]="myspeedpuzzling_unavailable"
+    return plan
+
 @app.get("/coach/wm-plan")
 async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
-    s=_latest_snapshot(db)
-    if not s:
-        raise HTTPException(404,"Noch keine MySpeedPuzzling-Daten synchronisiert")
-    payload=_snapshot_payload(s)
+    payload,source,snapshot_id=_best_available_payload(db)
+    if not payload:
+        raise HTTPException(404,"Noch keine verwertbaren Trainingsdaten vorhanden")
+
     rows=normalize_results(payload["results"])
-    token=await _valid_access_token(db)
-    comps=await get_my_confirmed_competitions(token, limit=30)
     excluded=[]
     if exclude_puzzle_ids:
         excluded=[x.strip() for x in exclude_puzzle_ids.split(",") if x.strip()]
-    return build_wm_plan(rows, comps, library_payload=payload["collections"], target_pieces=500, excluded_puzzle_ids=excluded)
+
+    comps=_merge_competitions(
+        payload.get("confirmed_competitions") or [],
+        _local_confirmed_competitions()
+    )
+    data_mode="snapshot" if source=="snapshot" else "legacy"
+    live_warning=None
+
+    try:
+        token=await _valid_access_token(db)
+        fresh=await get_my_confirmed_competitions(token,limit=30)
+        if fresh:
+            fresh_list=fresh.get("competitions",[]) if isinstance(fresh,dict) else fresh
+            comps=_merge_competitions(fresh_list,_local_confirmed_competitions())
+        data_mode="live"
+    except Exception as exc:
+        live_warning=f"MySpeedPuzzling Live-Zugriff derzeit nicht möglich: {exc}"
+
+    competition_payload = comps if isinstance(comps,dict) else {"competitions": comps}
+    plan=build_wm_plan(
+        rows,
+        competition_payload,
+        library_payload=payload.get("collections") or {},
+        target_pieces=500,
+        excluded_puzzle_ids=excluded
+    )
+
+    # Puzzle enrichment only if a real library is available.
+    if payload.get("collections"):
+        try:
+            plan=await _enrich_plan_puzzle_predictions(plan)
+        except Exception as exc:
+            if not live_warning:
+                live_warning=f"Live-Puzzle-Insights derzeit nicht möglich: {exc}"
+
+    plan["data_mode"]=data_mode
+    plan["data_source"]=source
+    plan["snapshot_id"]=snapshot_id
+    plan["live_warning"]=live_warning
+    plan["resilient"]=True
+    plan["legacy_result_count"]=len(rows) if source=="legacy" else None
+    return plan
 
 
 @app.get("/coach/training-feedback")
@@ -369,16 +742,16 @@ async def training_feedback(
 
 @app.get("/coach/swiss-ranking")
 async def swiss_ranking(db:Session=Depends(get_db)):
-    token=await _valid_access_token(db)
     try:
-        return await get_swiss_motivation_ranking(token)
+        token=await _valid_access_token(db)
+        result=await get_swiss_motivation_ranking(token)
+        result["data_mode"]="live"
+        return result
     except Exception as exc:
         return {
             "title":"Schweizer Motivationsranking",
-            "subtitle":"Vergleichsgruppe derzeit nicht verfügbar – kein Einfluss auf den WM-Coach.",
-            "players":[],
-            "count":0,
-            "error":str(exc),
+            "subtitle":"Live-Vergleich derzeit nicht verfügbar. Der WM-Coach arbeitet weiter mit dem letzten synchronisierten Trainingsstand.",
+            "players":[],"count":0,"data_mode":"unavailable","error":str(exc)
         }
 
 
