@@ -9,6 +9,23 @@ from app.config import (
     MSP_CLIENT_ID, MSP_CLIENT_SECRET, MSP_SCOPES
 )
 
+MSP_USER_AGENT = "NicolePuzzleCoach/6.8.1"
+_API_CACHE = {}
+_API_CACHE_DEFAULT_SECONDS = 5 * 60
+_API_403_BLOCKED_UNTIL = 0.0
+_API_403_COOLDOWN_SECONDS = 15 * 60
+
+def _cache_key(path, params):
+    items=tuple(sorted((str(k),str(v)) for k,v in (params or {}).items()))
+    return (str(path),items)
+
+def _cache_ttl(path):
+    if path == "/me": return 15 * 60
+    if path.startswith("/me/collections"): return 15 * 60
+    if path.startswith("/me/results"): return 5 * 60
+    if path.startswith("/competitions"): return 15 * 60
+    return _API_CACHE_DEFAULT_SECONDS
+
 def build_authorize_url(redirect_uri, state):
     return MSP_AUTHORIZE_URL + "?" + urlencode({
         "client_id": MSP_CLIENT_ID,
@@ -29,7 +46,7 @@ async def exchange_code(code, redirect_uri):
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "NicolePuzzleCoach/6.7.7",
+        "User-Agent": MSP_USER_AGENT,
     }
     async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
         response = await client.post(MSP_TOKEN_URL, data=data, headers=headers)
@@ -57,7 +74,7 @@ async def refresh_access_token(refresh_token):
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "NicolePuzzleCoach/6.7.7",
+        "User-Agent": MSP_USER_AGENT,
     }
     async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
         response = await client.post(MSP_TOKEN_URL, data=data, headers=headers)
@@ -75,18 +92,32 @@ async def refresh_access_token(refresh_token):
             raise RuntimeError("MySpeedPuzzling refresh response contains no access_token")
         return payload
 
-async def api_get(token, path, params=None):
-    # Official MSP PATs use `Authorization: Token msp_pat_...`; OAuth access
-    # tokens continue to use the Bearer scheme.
+async def api_get(token, path, params=None, cache=True):
+    global _API_403_BLOCKED_UNTIL
+    now=time.time()
+    key=_cache_key(path,params)
+    cached=_API_CACHE.get(key)
+    if cache and cached and now-cached["ts"] < _cache_ttl(path):
+        return cached["data"]
+    if now < _API_403_BLOCKED_UNTIL:
+        wait=max(1,int(_API_403_BLOCKED_UNTIL-now))
+        raise RuntimeError(f"MySpeedPuzzling API 403 cooldown active ({wait}s remaining)")
     auth_scheme = "Token" if str(token).startswith("msp_pat_") else "Bearer"
-    async with httpx.AsyncClient(timeout=30) as client:
-        response = await client.get(
-            MSP_API_BASE + path,
-            headers={"Authorization": f"{auth_scheme} {token}"},
-            params=params,
-        )
-        response.raise_for_status()
-        return response.json()
+    headers={"Authorization":f"{auth_scheme} {token}","Accept":"application/json","User-Agent":MSP_USER_AGENT}
+    async with httpx.AsyncClient(timeout=30,follow_redirects=False) as client:
+        response=await client.get(MSP_API_BASE+path,headers=headers,params=params)
+    if response.status_code == 403:
+        _API_403_BLOCKED_UNTIL=time.time()+_API_403_COOLDOWN_SECONDS
+        try: detail=response.json()
+        except Exception: detail={"detail":"403 Forbidden"}
+        raise RuntimeError(f"MySpeedPuzzling API 403: {detail}")
+    response.raise_for_status()
+    ctype=(response.headers.get("content-type") or "").lower()
+    if "json" not in ctype:
+        raise RuntimeError(f"MySpeedPuzzling API returned non-JSON for {path}: HTTP {response.status_code}, content-type={ctype or 'unknown'}")
+    data=response.json()
+    if cache: _API_CACHE[key]={"ts":time.time(),"data":data}
+    return data
 
 async def get_profile(token):
     return await api_get(token, "/me")
@@ -248,354 +279,83 @@ def detect_participation(detail):
     }
 
 
-# --- V5.3: confirmed personal tournament detection ----------------------------
+# --- V6.8.1: confirmed tournaments — official API only ----------------------
 
-_MSP_WEB_BASE = "https://myspeedpuzzling.com"
-_MY_COMP_CACHE = {"ts": 0.0, "player_id": None, "data": None}
-_MY_COMP_CACHE_SECONDS = 30 * 60
-
-def _event_slug(row):
-    slug = row.get("slug")
-    if slug:
-        return str(slug).strip("/")
-
-    # Some Competition API versions expose the MySpeedPuzzling path as "url".
-    for key in ("url", "link"):
-        value = row.get(key)
-        if not value:
-            continue
-        m = re.search(r"/(?:en/)?events/([^/?#]+)", str(value))
-        if m:
-            return m.group(1)
-
-    # Last-resort slugification of the name. This is only used when the API
-    # does not expose its canonical event slug.
-    name = (row.get("name") or "").lower().strip()
-    name = re.sub(r"[^a-z0-9]+", "-", name).strip("-")
-    return name or None
-
-async def _is_player_connected_participant(client, competition, player_id):
-    slug = _event_slug(competition)
-    if not slug or not player_id:
-        return False, {"reason": "missing_slug_or_player_id"}
-
-    url = f"{_MSP_WEB_BASE}/en/events/{slug}"
-    try:
-        response = await client.get(
-            url,
-            headers={
-                "Accept": "text/html,application/xhtml+xml",
-                "User-Agent": "NicolePuzzleCoach/5.3 (+personal tournament sync)",
-            },
-            follow_redirects=True,
-        )
-        response.raise_for_status()
-        html = response.text
-    except Exception as exc:
-        return False, {"url": url, "error": str(exc)}
-
-    # The participant list links every connected participant to their unique
-    # player-profile UUID. We match the authenticated Nicole profile UUID,
-    # not merely the display name.
-    patterns = (
-        f"/en/player-profile/{player_id}",
-        f"/player-profile/{player_id}",
-        player_id,
-    )
-    detected = any(p in html for p in patterns)
-
-    return detected, {
-        "url": str(response.url),
-        "player_id_match": detected,
-        "source": "connected_participants_html",
-    }
+_MY_COMP_CACHE={"ts":0.0,"player_id":None,"data":None}
+_MY_COMP_CACHE_SECONDS=30*60
 
 async def get_my_confirmed_competitions(token, limit=30, cache=True):
-    profile = await get_profile(token)
-    player_id = profile.get("id") if isinstance(profile, dict) else None
-    if not player_id:
-        return {
-            "player_id": None,
-            "competitions": [],
-            "checked": 0,
-            "error": "MySpeedPuzzling profile did not provide a player id.",
-        }
-
-    now = time.time()
-    if (
-        cache
-        and _MY_COMP_CACHE["data"] is not None
-        and _MY_COMP_CACHE["player_id"] == player_id
-        and now - _MY_COMP_CACHE["ts"] < _MY_COMP_CACHE_SECONDS
-    ):
-        cached = dict(_MY_COMP_CACHE["data"])
-        cached["cached"] = True
-        return cached
-
-    payload = await get_competitions(token, status="all", online=False)
-    candidates = upcoming_competitions(payload, limit=max(1, min(int(limit), 60)))
-
-    confirmed = []
-    checked = []
-    semaphore = asyncio.Semaphore(6)
-
-    async with httpx.AsyncClient(timeout=15) as client:
-        async def inspect(comp):
-            async with semaphore:
-                yes, info = await _is_player_connected_participant(
-                    client, comp, player_id
-                )
-                return comp, yes, info
-
-        results = await asyncio.gather(
-            *(inspect(comp) for comp in candidates),
-            return_exceptions=True
-        )
-
-    for result in results:
-        if isinstance(result, Exception):
-            checked.append({"error": str(result)})
+    profile=await get_profile(token)
+    player_id=profile.get("id") if isinstance(profile,dict) else None
+    now=time.time()
+    if cache and _MY_COMP_CACHE["data"] is not None and _MY_COMP_CACHE["player_id"]==player_id and now-_MY_COMP_CACHE["ts"]<_MY_COMP_CACHE_SECONDS:
+        out=dict(_MY_COMP_CACHE["data"]); out["cached"]=True; return out
+    payload=await get_competitions(token,status="all",online=False)
+    candidates=upcoming_competitions(payload,limit=max(1,min(int(limit),60)))
+    confirmed=[]; checked=[]
+    for comp in candidates:
+        cid=comp.get("id")
+        if not cid: continue
+        try:
+            detail=await get_competition(token,cid)
+            signal=detect_participation(detail)
+        except Exception as exc:
+            checked.append({"id":cid,"name":comp.get("name"),"error":str(exc)})
+            if "403" in str(exc) or "cooldown" in str(exc).lower(): break
             continue
-
-        comp, yes, info = result
-        checked.append({
-            "id": comp.get("id"),
-            "name": comp.get("name"),
-            "registered": yes,
-            "check": info,
-        })
-        if yes:
-            clean = {k: v for k, v in comp.items() if k != "raw"}
-            clean["registered"] = True
-            clean["registration_source"] = "connected_participants"
-            confirmed.append(clean)
-
-    result = {
-        "player_id": player_id,
-        "player_name": profile.get("name"),
-        "competitions": confirmed,
-        "count": len(confirmed),
-        "checked": len(candidates),
-        "cached": False,
-    }
-    _MY_COMP_CACHE.update({
-        "ts": now,
-        "player_id": player_id,
-        "data": result,
-    })
+        checked.append({"id":cid,"name":comp.get("name"),"registered":bool(signal.get("detected")),"participation":signal})
+        if signal.get("detected"):
+            clean={k:v for k,v in comp.items() if k!="raw"}; clean["registered"]=True; clean["registration_source"]="competition_api"; confirmed.append(clean)
+    result={"player_id":player_id,"player_name":profile.get("name") if isinstance(profile,dict) else None,"competitions":confirmed,"count":len(confirmed),"checked":len(checked),"cached":False,"source":"official_api"}
+    _MY_COMP_CACHE.update({"ts":now,"player_id":player_id,"data":result})
     return result
 
-
-# --- V6.2: Swiss motivational peer comparison -------------------------------
-
-_SWISS_RANK_CACHE = {"ts": 0.0, "data": None}
-_SWISS_RANK_CACHE_SECONDS = 60 * 60
-
-def _clean_html_text(value):
-    import html as _html
-    value = re.sub(r"<[^>]+>", " ", str(value or ""))
-    value = _html.unescape(value)
-    return re.sub(r"\s+", " ", value).strip()
-
-def _hms_to_seconds(value):
-    if not value:
-        return None
-    text = str(value).strip()
-    m = re.search(r"(\d{1,2}):(\d{2}):(\d{2})", text)
-    if not m:
-        return None
-    h, mi, sec = map(int, m.groups())
-    return h*3600 + mi*60 + sec
+# --- V6.8.1: Swiss motivational ranking — API only --------------------------
 
 async def get_swiss_motivation_ranking(token, cache=True):
-    """
-    Motivational peer group, NOT an official Swiss national ranking.
+    return {"title":"Schweizer Motivationsranking","subtitle":"Vorübergehend deaktiviert, bis die benötigten Vergleichsdaten über die offizielle MySpeedPuzzling API verfügbar sind.","players":[],"count":0,"nicole":None,"source":"official_api_only","available":False}
 
-    Source: connected participant section on the public Swiss Puzzle
-    Championship event page. Swiss profiles are detected by the CH flag in
-    the participant row. Ranking uses the public average solve time shown
-    beside those profiles. The parser is deliberately defensive because the
-    website HTML can change.
-    """
-    now = time.time()
-    if cache and _SWISS_RANK_CACHE["data"] is not None and now-_SWISS_RANK_CACHE["ts"] < _SWISS_RANK_CACHE_SECONDS:
-        out = dict(_SWISS_RANK_CACHE["data"])
-        out["cached"] = True
-        return out
+# --- V6.8.1: puzzle insights — official API payload only ---------------------
 
-    profile = await get_profile(token)
-    my_id = profile.get("id") if isinstance(profile, dict) else None
-    url = f"{_MSP_WEB_BASE}/en/events/swiss-championship-2026"
-
-    async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
-        response = await client.get(
-            url,
-            headers={
-                "Accept": "text/html,application/xhtml+xml",
-                "User-Agent": "NicolePuzzleCoach/6.2 (+Swiss motivational comparison)",
-            },
-        )
-        response.raise_for_status()
-        html = response.text
-
-    # Locate every player-profile occurrence and inspect its row-sized HTML
-    # neighborhood. This avoids assuming a specific Bootstrap/Turbo structure.
-    player_re = re.compile(
-        r'href=["\'](?:https?://[^"\']+)?/(?:en/)?player-profile/([0-9a-fA-F-]{20,})[^"\']*["\'][^>]*>(.*?)</a>',
-        re.I | re.S
-    )
-    rows = {}
-    for match in player_re.finditer(html):
-        pid = match.group(1)
-        start = max(0, match.start()-1800)
-        end = min(len(html), match.end()+1800)
-        chunk = html[start:end]
-
-        # Switzerland flag classes used by MySpeedPuzzling.
-        if not re.search(r'\bfi(?:\s+fi)?-ch\b|\bfi-ch\b', chunk, re.I):
-            continue
-
-        name = _clean_html_text(match.group(2))
-        if not name:
-            continue
-
-        avg_match = re.search(r'(?:Ø|Avg(?:erage)?)[^0-9]{0,30}(\d{1,2}:\d{2}:\d{2})', chunk, re.I)
-        top_match = re.search(r'(?:Top|Best)[^0-9]{0,30}(\d{1,2}:\d{2}:\d{2})', chunk, re.I)
-        solved_match = re.search(r'(?:Puzzle\s+solved|Solved)[^0-9]{0,30}(\d+)', chunk, re.I)
-
-        avg = avg_match.group(1) if avg_match else None
-        avg_seconds = _hms_to_seconds(avg)
-        if avg_seconds is None:
-            continue
-
-        candidate = {
-            "player_id": pid,
-            "name": name,
-            "country_code": "ch",
-            "average": avg,
-            "average_seconds": avg_seconds,
-            "top": top_match.group(1) if top_match else None,
-            "puzzles_solved": int(solved_match.group(1)) if solved_match else None,
-            "is_nicole": bool(my_id and str(pid) == str(my_id)),
-        }
-
-        # Same player can appear more than once in dynamic HTML; keep the
-        # candidate with the best-populated metadata.
-        old = rows.get(pid)
-        if not old or sum(v is not None for v in candidate.values()) > sum(v is not None for v in old.values()):
-            rows[pid] = candidate
-
-    ranking = sorted(rows.values(), key=lambda r: (r["average_seconds"], r["name"].lower()))
-    for i, row in enumerate(ranking, 1):
-        row["rank"] = i
-
-    nicole = next((r for r in ranking if r.get("is_nicole")), None)
-
-    gap_to_first = None
-    gap_to_next = None
-    target_average_seconds = None
-    motivation = None
-    if nicole and ranking:
-        first = ranking[0]
-        gap_to_first = max(0, nicole["average_seconds"] - first["average_seconds"])
-        if nicole["rank"] > 1:
-            ahead = ranking[nicole["rank"]-2]
-            gap_to_next = max(0, nicole["average_seconds"] - ahead["average_seconds"])
-            # Motivational target: beat the next place by 1 second, but never
-            # set an unrealistic target faster than current first place by more than 1s.
-            target_average_seconds = max(1, ahead["average_seconds"] - 1)
-            motivation = f"Noch {gap_to_next} Sekunden bis zum nächsten Platz."
-        else:
-            target_average_seconds = max(1, nicole["average_seconds"] - 15)
-            motivation = "Aktuell vorne in dieser Vergleichsgruppe – nächstes Ziel: Ø nochmals 15 Sekunden schneller."
-
-    result = {
-        "title": "Schweizer Motivationsranking",
-        "subtitle": "Vergleich der öffentlich verbundenen Schweizer Teilnehmer der Swiss Puzzle Championship – kein offizielles nationales Ranking.",
-        "metric": "Öffentlich angezeigte Durchschnittszeit",
-        "source_url": url,
-        "players": ranking,
-        "count": len(ranking),
-        "nicole": nicole,
-        "gap_to_first_seconds": gap_to_first,
-        "gap_to_next_seconds": gap_to_next,
-        "target_average_seconds": target_average_seconds,
-        "motivation": motivation,
-        "cached": False,
-    }
-    _SWISS_RANK_CACHE.update({"ts": now, "data": result})
-    return result
-
-
-# --- V6.7.4: public MySpeedPuzzling puzzle insights -------------------------
-_PUZZLE_INSIGHTS_CACHE={}
-_PUZZLE_INSIGHTS_CACHE_SECONDS=6*60*60
-
-def _parse_prediction_seconds(text):
-    if not text:
-        return None
-    value=str(text).lower().replace("~"," ").strip()
-    h=re.search(r'(\d+)\s*h',value)
-    m=re.search(r'(\d+)\s*min',value)
-    s=re.search(r'(\d+)\s*s(?:ec)?',value)
-    total=0
-    if h: total+=int(h.group(1))*3600
-    if m: total+=int(m.group(1))*60
-    if s: total+=int(s.group(1))
-    if total:
-        return total
-    mm=re.search(r'(\d{1,2}):(\d{2}):(\d{2})',value)
+def _prediction_seconds_from_value(value):
+    if value is None: return None
+    if isinstance(value,(int,float)): return int(round(value))
+    text=str(value).strip().lower()
+    if not text: return None
+    h=re.search(r'(\d+)\s*h',text); mi=re.search(r'(\d+)\s*min',text); sec=re.search(r'(\d+)\s*s(?:ec)?',text)
+    total=(int(h.group(1))*3600 if h else 0)+(int(mi.group(1))*60 if mi else 0)+(int(sec.group(1)) if sec else 0)
+    if total: return total
+    mm=re.search(r'(?:(\d+):)?(\d{1,2}):(\d{2})',text)
     if mm:
-        a,b,c=map(int,mm.groups()); return a*3600+b*60+c
+        a,b,c=mm.groups(); return (int(a)*3600 if a else 0)+int(b)*60+int(c)
     return None
 
-async def get_puzzle_insights(puzzle_id):
-    if not puzzle_id:
-        return {"available":False,"reason":"missing_puzzle_id"}
-    pid=str(puzzle_id)
-    now=time.time()
-    cached=_PUZZLE_INSIGHTS_CACHE.get(pid)
-    if cached and now-cached["ts"]<_PUZZLE_INSIGHTS_CACHE_SECONDS:
-        out=dict(cached["data"]); out["cached"]=True; return out
-
-    url=f"{_MSP_WEB_BASE}/en/puzzle/{pid}"
-    try:
-        async with httpx.AsyncClient(timeout=20,follow_redirects=True) as client:
-            r=await client.get(url,headers={"Accept":"text/html,application/xhtml+xml","User-Agent":"NicolePuzzleCoach/6.7.4"})
-            r.raise_for_status()
-            text=r.text
-    except Exception as exc:
-        return {"available":False,"url":url,"reason":str(exc)}
-
-    plain=_clean_html_text(text) if '_clean_html_text' in globals() else re.sub(r'\s+',' ',re.sub(r'<[^>]+>',' ',text))
-    difficulty_label=None
-    difficulty_percent=None
-    dm=re.search(r'Difficulty\s+([A-Za-z][A-Za-z ]{1,30}?)\s+(\d+(?:\.\d+)?)%\s+(harder|easier)\s+than\s+average',plain,re.I)
-    if dm:
-        difficulty_label=dm.group(1).strip()
-        difficulty_percent=float(dm.group(2))
-        if dm.group(3).lower()=="easier":
-            difficulty_percent=-difficulty_percent
-    else:
-        dm2=re.search(r'Difficulty\s+(Easy|Average|Moderate|Challenging|Hard|Very Hard)',plain,re.I)
-        if dm2: difficulty_label=dm2.group(1).strip()
-
+def extract_puzzle_insights_from_api_payload(payload):
+    if not isinstance(payload,dict): return {"available":False,"source":"official_api_payload"}
+    candidates=[payload]
+    for key in ("puzzle","statistics","stats","difficulty","prediction","metadata"):
+        value=payload.get(key)
+        if isinstance(value,dict): candidates.append(value)
+    def first(keys):
+        for obj in candidates:
+            for key in keys:
+                if key in obj and obj.get(key) is not None: return obj.get(key)
+        return None
+    difficulty_label=first(("difficulty_label","difficulty_name","difficulty_level","difficulty"))
+    if isinstance(difficulty_label,dict): difficulty_label=difficulty_label.get("label") or difficulty_label.get("name")
+    difficulty_percent=first(("difficulty_percent","difficulty_percentage","relative_difficulty_percent"))
+    try: difficulty_percent=float(difficulty_percent) if difficulty_percent is not None else None
+    except Exception: difficulty_percent=None
+    prediction_raw=first(("prediction_seconds","time_prediction_seconds","predicted_time_seconds","prediction","time_prediction","predicted_time"))
+    prediction_seconds=_prediction_seconds_from_value(prediction_raw)
     prediction_text=None
-    prediction_seconds=None
-    pm=re.search(r'(?:Time\s+Prediction|Prediction)\s*~?\s*((?:\d+\s*h\s*)?\d+\s*min(?:\s*\d+\s*s)?)',plain,re.I)
-    if pm:
-        prediction_text=pm.group(1).strip()
-        prediction_seconds=_parse_prediction_seconds(prediction_text)
+    if prediction_raw is not None and not isinstance(prediction_raw,(dict,list)): prediction_text=str(prediction_raw)
+    if prediction_seconds and (prediction_text is None or prediction_text.isdigit()):
+        mm=prediction_seconds//60; ss=prediction_seconds%60; prediction_text=f"{mm}:{ss:02d}"
+    rf=_prediction_seconds_from_value(first(("prediction_range_from_seconds","prediction_min_seconds","predicted_time_min_seconds")))
+    rt=_prediction_seconds_from_value(first(("prediction_range_to_seconds","prediction_max_seconds","predicted_time_max_seconds")))
+    return {"available":bool(difficulty_label or difficulty_percent is not None or prediction_seconds),"difficulty_label":difficulty_label,"difficulty_percent":difficulty_percent,"prediction_text":prediction_text,"prediction_seconds":prediction_seconds,"prediction_range_from_seconds":rf,"prediction_range_to_seconds":rt,"cached":False,"source":"official_api_payload"}
 
-    range_from=None; range_to=None
-    rm=re.search(r'Range\s*:\s*((?:\d+\s*h\s*)?\d+\s*min)\s*[-–]\s*((?:\d+\s*h\s*)?\d+\s*min)',plain,re.I)
-    if rm:
-        range_from=_parse_prediction_seconds(rm.group(1))
-        range_to=_parse_prediction_seconds(rm.group(2))
-
-    result={"available":bool(difficulty_label or difficulty_percent is not None or prediction_seconds),
-            "url":url,"difficulty_label":difficulty_label,"difficulty_percent":difficulty_percent,
-            "prediction_text":prediction_text,"prediction_seconds":prediction_seconds,
-            "prediction_range_from_seconds":range_from,"prediction_range_to_seconds":range_to,"cached":False}
-    _PUZZLE_INSIGHTS_CACHE[pid]={"ts":now,"data":result}
-    return result
+async def get_puzzle_insights(puzzle_id, api_payload=None):
+    if api_payload is not None: return extract_puzzle_insights_from_api_payload(api_payload)
+    return {"available":False,"puzzle_id":str(puzzle_id) if puzzle_id else None,"difficulty_label":None,"difficulty_percent":None,"prediction_text":None,"prediction_seconds":None,"prediction_range_from_seconds":None,"prediction_range_to_seconds":None,"cached":False,"source":"official_api_only","reason":"Prediction/difficulty not present in current official API payload."}

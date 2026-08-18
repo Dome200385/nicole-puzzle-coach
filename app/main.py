@@ -28,7 +28,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.8.0",
+    version="6.8.1",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -277,10 +277,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.8.0","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.8.1","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.8.0"}
+def health(): return {"status":"ok","version":"6.8.1"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -295,7 +295,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.8.0",
+        "version":"6.8.1",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -428,6 +428,17 @@ async def sync(db:Session=Depends(get_db)):
                 "live_error":str(exc)
             }
         raise
+
+@app.get("/msp/api-test")
+async def msp_api_test(db:Session=Depends(get_db)):
+    token=_pat_token()
+    if not token:
+        return {"ok":False,"mode":"pat","reason":"MSP_PERSONAL_ACCESS_TOKEN not configured"}
+    try:
+        profile=await get_profile(token)
+        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.1","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
+    except Exception as exc:
+        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.1","error":str(exc)}
 
 @app.get("/msp/library")
 async def msp_library(db:Session=Depends(get_db)):
@@ -567,7 +578,7 @@ async def _enrich_plan_puzzle_predictions(plan):
         pid=puzzle.get("id")
         if not pid: continue
         if str(pid) not in seen:
-            seen[str(pid)]=await get_puzzle_insights(pid)
+            seen[str(pid)]=await get_puzzle_insights(pid, api_payload=puzzle)
         insights=seen[str(pid)]
         puzzle["msp_insights"]=insights
         prediction=_msp_only_prediction(insights)
