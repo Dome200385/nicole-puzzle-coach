@@ -9,7 +9,7 @@ from app.config import (
     MSP_CLIENT_ID, MSP_CLIENT_SECRET, MSP_SCOPES
 )
 
-MSP_USER_AGENT = "NicolePuzzleCoach/6.8.2"
+MSP_USER_AGENT = "NicolePuzzleCoach/6.8.3"
 _API_CACHE = {}
 _API_CACHE_DEFAULT_SECONDS = 5 * 60
 _API_403_BLOCKED_UNTIL = 0.0
@@ -139,15 +139,15 @@ async def get_statistics(token, cache=True):
 async def get_collections(token, cache=True):
     return await api_get(token, "/me/collections", cache=cache)
 
-async def get_collection_items(token, collection_id):
-    return await api_get(token, f"/me/collections/{collection_id}/items")
+async def get_collection_items(token, collection_id, cache=True):
+    return await api_get(token, f"/me/collections/{collection_id}/items", cache=cache)
 
-async def get_library(token):
+async def get_library(token, cache=True):
     """
     Load the user's MySpeedPuzzling collections AND their puzzle items.
     /me/collections alone only returns collection metadata.
     """
-    collections_payload = await get_collections(token)
+    collections_payload = await get_collections(token, cache=cache)
     collections = (
         collections_payload.get("collections", [])
         if isinstance(collections_payload, dict) else []
@@ -164,7 +164,7 @@ async def get_library(token):
             enriched.append(entry)
             continue
         try:
-            entry["items_payload"] = await get_collection_items(token, cid)
+            entry["items_payload"] = await get_collection_items(token, cid, cache=cache)
         except Exception as exc:
             entry["items_payload"] = {"error": str(exc)}
             errors.append({"collection_id": cid, "error": str(exc)})
@@ -177,26 +177,26 @@ async def get_library(token):
         "item_fetch_errors": errors,
     }
 
-async def get_results(token):
+async def get_results(token, cache=True):
     out = {}
     for mode in ("solo", "duo", "team"):
         try:
-            out[mode] = await api_get(token, "/me/results", {"type": mode})
+            out[mode] = await api_get(token, "/me/results", {"type": mode}, cache=cache)
         except Exception as exc:
             out[mode] = {"error": str(exc)}
     return out
 
-async def get_competitions(token, status="all", online=False, country=None):
+async def get_competitions(token, status="all", online=False, country=None, cache=True):
     params = {
         "status": status,
         "online": str(bool(online)).lower(),
     }
     if country:
         params["country"] = country
-    return await api_get(token, "/competitions", params)
+    return await api_get(token, "/competitions", params, cache=cache)
 
-async def get_competition(token, competition_id):
-    return await api_get(token, f"/competitions/{competition_id}")
+async def get_competition(token, competition_id, cache=True):
+    return await api_get(token, f"/competitions/{competition_id}", cache=cache)
 
 def _parse_dt(value):
     if not value:
@@ -301,14 +301,14 @@ async def get_my_confirmed_competitions(token, limit=30, cache=True):
     now=time.time()
     if cache and _MY_COMP_CACHE["data"] is not None and _MY_COMP_CACHE["player_id"]==player_id and now-_MY_COMP_CACHE["ts"]<_MY_COMP_CACHE_SECONDS:
         out=dict(_MY_COMP_CACHE["data"]); out["cached"]=True; return out
-    payload=await get_competitions(token,status="all",online=False)
+    payload=await get_competitions(token,status="all",online=False,cache=cache)
     candidates=upcoming_competitions(payload,limit=max(1,min(int(limit),60)))
     confirmed=[]; checked=[]
     for comp in candidates:
         cid=comp.get("id")
         if not cid: continue
         try:
-            detail=await get_competition(token,cid)
+            detail=await get_competition(token,cid,cache=cache)
             signal=detect_participation(detail)
         except Exception as exc:
             checked.append({"id":cid,"name":comp.get("name"),"error":str(exc)})
