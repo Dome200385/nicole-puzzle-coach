@@ -17,7 +17,7 @@ from app.myspeedpuzzling import (
     get_profile, get_results, get_statistics, get_collections, get_library,
     get_competitions, get_competition, upcoming_competitions,
     detect_participation, get_my_confirmed_competitions, get_swiss_motivation_ranking, get_puzzle_insights,
-    enrich_library_with_msp_insights, clear_api_cache, api_cache_status
+    enrich_library_with_msp_insights, clear_api_cache, api_cache_status, debug_prediction_fields, extract_puzzle_insights_from_api_payload
 )
 from app.coach import (
     performance_summary, owned_vs_history, tournament_readiness,
@@ -29,7 +29,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.8.3",
+    version="6.8.4",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -278,10 +278,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.8.3","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.8.4","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.8.3"}
+def health(): return {"status":"ok","version":"6.8.4"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -296,7 +296,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.8.3",
+        "version":"6.8.4",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -467,11 +467,89 @@ async def msp_api_test(db:Session=Depends(get_db)):
 def msp_sync_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     return {
-        "version":"6.8.3",
+        "version":"6.8.4",
         "snapshot_id":snap.id if snap else None,
         "synced_at":snap.synced_at if snap else None,
         "data_available":snap is not None,
         "api_cache":api_cache_status(),
+        "api_only":True,
+    }
+
+@app.get("/msp/prediction-debug")
+def prediction_debug(
+    puzzle_id:str|None=None,
+    puzzle_name:str|None=None,
+    db:Session=Depends(get_db)
+):
+    """
+    Diagnose official API fields present in the latest synced library payload.
+    Does not call HTML pages and does not expose tokens.
+    """
+    snap=_latest_snapshot(db)
+    if not snap:
+        raise HTTPException(404,"Noch kein Snapshot")
+    payload=_snapshot_payload(snap)
+    library=payload.get("collections") or {}
+    wanted_name=(puzzle_name or "").strip().lower()
+    wanted_id=str(puzzle_id).strip() if puzzle_id else None
+    matches=[]
+
+    def walk(obj,path="$",depth=0):
+        if depth>10 or len(matches)>=20:
+            return
+        if isinstance(obj,dict):
+            oid=obj.get("id") or obj.get("puzzle_id") or obj.get("uuid")
+            name=obj.get("name") or obj.get("title") or obj.get("puzzle_name")
+            id_match=bool(wanted_id and oid is not None and str(oid)==wanted_id)
+            name_match=bool(wanted_name and name and wanted_name in str(name).lower())
+            if id_match or name_match:
+                matches.append({
+                    "path":path,
+                    "id":oid,
+                    "name":name,
+                    "prediction_fields":debug_prediction_fields(obj),
+                    "normalized":extract_puzzle_insights_from_api_payload(obj),
+                })
+            for k,v in obj.items():
+                if isinstance(v,(dict,list)):
+                    walk(v,f"{path}.{k}",depth+1)
+        elif isinstance(obj,list):
+            for i,v in enumerate(obj[:1000]):
+                if isinstance(v,(dict,list)):
+                    walk(v,f"{path}[{i}]",depth+1)
+
+    # If no explicit puzzle is supplied, return first few puzzle-shaped items.
+    if not wanted_id and not wanted_name:
+        def sample(obj,path="$",depth=0):
+            if depth>10 or len(matches)>=5:
+                return
+            if isinstance(obj,dict):
+                name=obj.get("name") or obj.get("title") or obj.get("puzzle_name")
+                pieces=obj.get("pieces") or obj.get("piece_count")
+                if name and pieces:
+                    matches.append({
+                        "path":path,
+                        "id":obj.get("id") or obj.get("puzzle_id"),
+                        "name":name,
+                        "prediction_fields":debug_prediction_fields(obj),
+                        "normalized":extract_puzzle_insights_from_api_payload(obj),
+                    })
+                for k,v in obj.items():
+                    if isinstance(v,(dict,list)):
+                        sample(v,f"{path}.{k}",depth+1)
+            elif isinstance(obj,list):
+                for i,v in enumerate(obj[:1000]):
+                    if isinstance(v,(dict,list)):
+                        sample(v,f"{path}[{i}]",depth+1)
+        sample(library)
+    else:
+        walk(library)
+
+    return {
+        "snapshot_id":snap.id,
+        "query":{"puzzle_id":puzzle_id,"puzzle_name":puzzle_name},
+        "matches":matches,
+        "count":len(matches),
         "api_only":True,
     }
 
@@ -525,18 +603,36 @@ async def my_competitions(
     db:Session=Depends(get_db)
 ):
     """
-    Returns only future competitions where Nicole's unique MySpeedPuzzling
-    player ID is present in the event's Connected participants list.
+    API-first tournament list with stable local fallback.
+    Live API-confirmed registrations win; known local confirmed tournaments are
+    retained whenever the API returns none or incomplete participation data.
     """
-    token=await _valid_access_token(db)
+    api_list=[]
+    api_meta={}
     try:
-        return await get_my_confirmed_competitions(
+        token=await _valid_access_token(db)
+        result=await get_my_confirmed_competitions(
             token,
             limit=max(1,min(limit,60)),
             cache=not refresh
         )
+        if isinstance(result,dict):
+            api_list=result.get("competitions") or []
+            api_meta={k:v for k,v in result.items() if k!="competitions"}
+        elif isinstance(result,list):
+            api_list=result
     except Exception as exc:
-        raise HTTPException(502,f"My tournament check failed: {exc}")
+        api_meta={"api_error":str(exc)}
+
+    merged=_merge_competitions(api_list,_local_confirmed_competitions())
+    return {
+        **api_meta,
+        "competitions":merged,
+        "count":len(merged),
+        "api_count":len(api_list),
+        "local_fallback_count":len(_local_confirmed_competitions()),
+        "source":"api_plus_local_fallback",
+    }
 
 @app.get("/msp/participation-check")
 async def participation_check(limit:int=12,db:Session=Depends(get_db)):

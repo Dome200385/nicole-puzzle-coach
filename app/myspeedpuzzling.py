@@ -9,7 +9,7 @@ from app.config import (
     MSP_CLIENT_ID, MSP_CLIENT_SECRET, MSP_SCOPES
 )
 
-MSP_USER_AGENT = "NicolePuzzleCoach/6.8.3"
+MSP_USER_AGENT = "NicolePuzzleCoach/6.8.4"
 _API_CACHE = {}
 _API_CACHE_DEFAULT_SECONDS = 5 * 60
 _API_403_BLOCKED_UNTIL = 0.0
@@ -342,30 +342,171 @@ def _prediction_seconds_from_value(value):
     return None
 
 def extract_puzzle_insights_from_api_payload(payload):
-    if not isinstance(payload,dict): return {"available":False,"source":"official_api_payload"}
-    candidates=[payload]
-    for key in ("puzzle","statistics","stats","difficulty","prediction","metadata"):
-        value=payload.get(key)
-        if isinstance(value,dict): candidates.append(value)
-    def first(keys):
-        for obj in candidates:
-            for key in keys:
-                if key in obj and obj.get(key) is not None: return obj.get(key)
-        return None
-    difficulty_label=first(("difficulty_label","difficulty_name","difficulty_level","difficulty"))
-    if isinstance(difficulty_label,dict): difficulty_label=difficulty_label.get("label") or difficulty_label.get("name")
-    difficulty_percent=first(("difficulty_percent","difficulty_percentage","relative_difficulty_percent"))
-    try: difficulty_percent=float(difficulty_percent) if difficulty_percent is not None else None
-    except Exception: difficulty_percent=None
-    prediction_raw=first(("prediction_seconds","time_prediction_seconds","predicted_time_seconds","prediction","time_prediction","predicted_time"))
+    """
+    Extract MySpeedPuzzling prediction/difficulty values ONLY when they already
+    exist in the official API payload.
+
+    V6.8.4 scans nested API objects recursively because collection items can
+    wrap puzzle/statistics/prediction data several levels deep.
+    """
+    if not isinstance(payload,dict):
+        return {"available":False,"source":"official_api_payload"}
+
+    nodes=[]
+    def walk(obj,path="$",depth=0):
+        if depth>8:
+            return
+        if isinstance(obj,dict):
+            nodes.append((path,obj))
+            for k,v in obj.items():
+                if isinstance(v,(dict,list)):
+                    walk(v,f"{path}.{k}",depth+1)
+        elif isinstance(obj,list):
+            for i,v in enumerate(obj[:100]):
+                if isinstance(v,(dict,list)):
+                    walk(v,f"{path}[{i}]",depth+1)
+    walk(payload)
+
+    def first_value(keys):
+        wanted={str(k).lower() for k in keys}
+        for path,obj in nodes:
+            for key,value in obj.items():
+                if str(key).lower() in wanted and value is not None:
+                    return value,f"{path}.{key}"
+        return None,None
+
+    difficulty_raw,difficulty_path=first_value((
+        "difficulty_label","difficulty_name","difficulty_level","difficulty",
+        "puzzle_difficulty","difficulty_rating","difficulty_score"
+    ))
+    difficulty_label=None
+    difficulty_percent=None
+    if isinstance(difficulty_raw,dict):
+        difficulty_label=(
+            difficulty_raw.get("label") or difficulty_raw.get("name")
+            or difficulty_raw.get("level")
+        )
+        pct=(
+            difficulty_raw.get("percent") or difficulty_raw.get("percentage")
+            or difficulty_raw.get("percentile")
+        )
+        try:
+            difficulty_percent=float(pct) if pct is not None else None
+        except Exception:
+            difficulty_percent=None
+    elif isinstance(difficulty_raw,str):
+        difficulty_label=difficulty_raw
+
+    if difficulty_percent is None:
+        pct,pct_path=first_value((
+            "difficulty_percent","difficulty_percentage",
+            "relative_difficulty_percent","difficulty_percentile"
+        ))
+        try:
+            difficulty_percent=float(pct) if pct is not None else None
+        except Exception:
+            difficulty_percent=None
+    else:
+        pct_path=difficulty_path
+
+    prediction_raw,prediction_path=first_value((
+        "prediction_seconds",
+        "personal_prediction_seconds",
+        "player_prediction_seconds",
+        "my_prediction_seconds",
+        "predicted_time_seconds",
+        "time_prediction_seconds",
+        "estimated_time_seconds",
+        "estimated_solve_time_seconds",
+        "prediction",
+        "personal_prediction",
+        "player_prediction",
+        "predicted_time",
+        "time_prediction",
+        "estimated_time",
+        "estimated_solve_time",
+    ))
+
+    if isinstance(prediction_raw,dict):
+        nested=prediction_raw
+        prediction_raw=(
+            nested.get("seconds")
+            or nested.get("prediction_seconds")
+            or nested.get("time_seconds")
+            or nested.get("value")
+            or nested.get("time")
+        )
+
     prediction_seconds=_prediction_seconds_from_value(prediction_raw)
     prediction_text=None
-    if prediction_raw is not None and not isinstance(prediction_raw,(dict,list)): prediction_text=str(prediction_raw)
+    if prediction_raw is not None and not isinstance(prediction_raw,(dict,list)):
+        prediction_text=str(prediction_raw)
     if prediction_seconds and (prediction_text is None or prediction_text.isdigit()):
-        mm=prediction_seconds//60; ss=prediction_seconds%60; prediction_text=f"{mm}:{ss:02d}"
-    rf=_prediction_seconds_from_value(first(("prediction_range_from_seconds","prediction_min_seconds","predicted_time_min_seconds")))
-    rt=_prediction_seconds_from_value(first(("prediction_range_to_seconds","prediction_max_seconds","predicted_time_max_seconds")))
-    return {"available":bool(difficulty_label or difficulty_percent is not None or prediction_seconds),"difficulty_label":difficulty_label,"difficulty_percent":difficulty_percent,"prediction_text":prediction_text,"prediction_seconds":prediction_seconds,"prediction_range_from_seconds":rf,"prediction_range_to_seconds":rt,"cached":False,"source":"official_api_payload"}
+        mm=prediction_seconds//60
+        ss=prediction_seconds%60
+        prediction_text=f"{mm}:{ss:02d}"
+
+    rf_raw,rf_path=first_value((
+        "prediction_range_from_seconds","prediction_min_seconds",
+        "predicted_time_min_seconds","prediction_lower_seconds",
+        "estimated_time_min_seconds"
+    ))
+    rt_raw,rt_path=first_value((
+        "prediction_range_to_seconds","prediction_max_seconds",
+        "predicted_time_max_seconds","prediction_upper_seconds",
+        "estimated_time_max_seconds"
+    ))
+    rf=_prediction_seconds_from_value(rf_raw)
+    rt=_prediction_seconds_from_value(rt_raw)
+
+    available=bool(
+        prediction_seconds or prediction_text
+        or difficulty_label or difficulty_percent is not None
+    )
+    return {
+        "available":available,
+        "difficulty_label":difficulty_label,
+        "difficulty_percent":difficulty_percent,
+        "prediction_text":prediction_text,
+        "prediction_seconds":prediction_seconds,
+        "prediction_range_from_seconds":rf,
+        "prediction_range_to_seconds":rt,
+        "cached":False,
+        "source":"official_api_payload",
+        "prediction_source_path":prediction_path,
+        "difficulty_source_path":difficulty_path or pct_path,
+        "range_from_source_path":rf_path,
+        "range_to_source_path":rt_path,
+    }
+
+def debug_prediction_fields(payload):
+    """
+    Return only key names/paths that may describe prediction or difficulty.
+    Values are included only for scalar fields; no token/account data.
+    """
+    out=[]
+    needles=("predict","difficult","estimate","rating","percentile")
+    def walk(obj,path="$",depth=0):
+        if depth>8 or len(out)>=200:
+            return
+        if isinstance(obj,dict):
+            for k,v in obj.items():
+                p=f"{path}.{k}"
+                lk=str(k).lower()
+                if any(n in lk for n in needles):
+                    out.append({
+                        "path":p,
+                        "type":type(v).__name__,
+                        "value":v if isinstance(v,(str,int,float,bool,type(None))) else None
+                    })
+                if isinstance(v,(dict,list)):
+                    walk(v,p,depth+1)
+        elif isinstance(obj,list):
+            for i,v in enumerate(obj[:100]):
+                if isinstance(v,(dict,list)):
+                    walk(v,f"{path}[{i}]",depth+1)
+    walk(payload)
+    return out
 
 async def get_puzzle_insights(puzzle_id, api_payload=None):
     if api_payload is not None: return extract_puzzle_insights_from_api_payload(api_payload)
