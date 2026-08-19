@@ -9,7 +9,7 @@ from app.config import (
     MSP_CLIENT_ID, MSP_CLIENT_SECRET, MSP_SCOPES
 )
 
-MSP_USER_AGENT = "NicolePuzzleCoach/6.8.4"
+MSP_USER_AGENT = "NicolePuzzleCoach/6.8.5"
 _API_CACHE = {}
 _API_CACHE_DEFAULT_SECONDS = 5 * 60
 _API_403_BLOCKED_UNTIL = 0.0
@@ -352,6 +352,62 @@ def extract_puzzle_insights_from_api_payload(payload):
     if not isinstance(payload,dict):
         return {"available":False,"source":"official_api_payload"}
 
+    # V6.8.5: exact official MySpeedPuzzling Puzzle Insights schema.
+    # CollectionItemResponse now contains statistics, difficulty, prediction and solves.
+    # Prediction is self-only and members-only on /me/collections/{id}/items.
+    prediction_obj = payload.get("prediction")
+    difficulty_obj = payload.get("difficulty")
+    statistics_obj = payload.get("statistics")
+    solves_obj = payload.get("solves")
+    if isinstance(prediction_obj, dict) or isinstance(difficulty_obj, dict):
+        predicted = prediction_obj.get("predictedSeconds") if isinstance(prediction_obj, dict) else None
+        low = prediction_obj.get("rangeLowSeconds") if isinstance(prediction_obj, dict) else None
+        high = prediction_obj.get("rangeHighSeconds") if isinstance(prediction_obj, dict) else None
+        level = difficulty_obj.get("level") if isinstance(difficulty_obj, dict) else None
+        score = difficulty_obj.get("score") if isinstance(difficulty_obj, dict) else None
+        try:
+            predicted = int(predicted) if predicted is not None else None
+        except Exception:
+            predicted = None
+        try:
+            low = int(low) if low is not None else None
+        except Exception:
+            low = None
+        try:
+            high = int(high) if high is not None else None
+        except Exception:
+            high = None
+        try:
+            score = float(score) if score is not None else None
+        except Exception:
+            score = None
+        prediction_text = None
+        if predicted:
+            prediction_text = f"{predicted//60}:{predicted%60:02d}"
+        return {
+            "available": bool(predicted or level or score is not None),
+            "difficulty_label": level,
+            "difficulty_percent": score,
+            "difficulty_confidence": difficulty_obj.get("confidence") if isinstance(difficulty_obj, dict) else None,
+            "difficulty_sample_size": difficulty_obj.get("sampleSize") if isinstance(difficulty_obj, dict) else None,
+            "prediction_text": prediction_text,
+            "prediction_seconds": predicted,
+            "prediction_range_from_seconds": low,
+            "prediction_range_to_seconds": high,
+            "is_personalized": prediction_obj.get("isPersonalized") if isinstance(prediction_obj, dict) else None,
+            "personal_solve_count": prediction_obj.get("personalSolveCount") if isinstance(prediction_obj, dict) else None,
+            "predicted_attempt_number": prediction_obj.get("predictedAttemptNumber") if isinstance(prediction_obj, dict) else None,
+            "last_time_seconds": prediction_obj.get("lastTimeSeconds") if isinstance(prediction_obj, dict) else None,
+            "statistics": statistics_obj if isinstance(statistics_obj, dict) else None,
+            "solves": solves_obj if isinstance(solves_obj, dict) else None,
+            "cached": False,
+            "source": "myspeedpuzzling_official_puzzle_insights",
+            "prediction_source_path": "$.prediction" if isinstance(prediction_obj, dict) else None,
+            "difficulty_source_path": "$.difficulty" if isinstance(difficulty_obj, dict) else None,
+            "range_from_source_path": "$.prediction.rangeLowSeconds" if isinstance(prediction_obj, dict) else None,
+            "range_to_source_path": "$.prediction.rangeHighSeconds" if isinstance(prediction_obj, dict) else None,
+        }
+
     nodes=[]
     def walk(obj,path="$",depth=0):
         if depth>8:
@@ -410,7 +466,7 @@ def extract_puzzle_insights_from_api_payload(payload):
         pct_path=difficulty_path
 
     prediction_raw,prediction_path=first_value((
-        "prediction_seconds",
+        "predictedseconds", "prediction_seconds",
         "personal_prediction_seconds",
         "player_prediction_seconds",
         "my_prediction_seconds",
@@ -447,12 +503,12 @@ def extract_puzzle_insights_from_api_payload(payload):
         prediction_text=f"{mm}:{ss:02d}"
 
     rf_raw,rf_path=first_value((
-        "prediction_range_from_seconds","prediction_min_seconds",
+        "rangelowseconds", "prediction_range_from_seconds","prediction_min_seconds",
         "predicted_time_min_seconds","prediction_lower_seconds",
         "estimated_time_min_seconds"
     ))
     rt_raw,rt_path=first_value((
-        "prediction_range_to_seconds","prediction_max_seconds",
+        "rangehighseconds", "prediction_range_to_seconds","prediction_max_seconds",
         "predicted_time_max_seconds","prediction_upper_seconds",
         "estimated_time_max_seconds"
     ))
@@ -523,8 +579,8 @@ def enrich_library_with_msp_insights(payload):
     """
     def walk(obj):
         if isinstance(obj,dict):
-            looks_like_puzzle = any(k in obj for k in ("pieces","piece_count")) and any(
-                k in obj for k in ("name","title","puzzle_name")
+            looks_like_puzzle = any(k in obj for k in ("pieces","piece_count","piecesCount")) and any(
+                k in obj for k in ("name","title","puzzle_name","puzzleName")
             )
             if looks_like_puzzle:
                 insights=extract_puzzle_insights_from_api_payload(obj)

@@ -379,6 +379,15 @@ def _extract_library_puzzles(payload):
             return
 
         key = str(pid or (str(name).strip().lower(), str(manufacturer or "").strip().lower(), pieces))
+        # Preserve official MySpeedPuzzling Puzzle Insights from the collection
+        # item. Earlier versions normalized the puzzle but accidentally dropped
+        # prediction/difficulty before the recommendation engine saw it.
+        try:
+            from app.myspeedpuzzling import extract_puzzle_insights_from_api_payload
+            msp_insights = extract_puzzle_insights_from_api_payload(candidate)
+        except Exception:
+            msp_insights = {"available": False, "source": "official_api_payload"}
+
         found[key] = {
             "id": pid,
             "name": str(name).strip(),
@@ -390,6 +399,12 @@ def _extract_library_puzzles(payload):
             "in_library": True,
             "provenance": provenance,
             "competition_risk": competition_risk,
+            "msp_insights": msp_insights,
+            # Keep the official objects available to downstream diagnostics.
+            "prediction": candidate.get("prediction"),
+            "difficulty": candidate.get("difficulty"),
+            "statistics": candidate.get("statistics"),
+            "solves": candidate.get("solves"),
         }
 
     def walk(obj, collection_name=None):
