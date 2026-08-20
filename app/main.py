@@ -29,7 +29,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.8.13",
+    version="6.8.14",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -278,10 +278,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.8.13","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.8.14","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.8.13"}
+def health(): return {"status":"ok","version":"6.8.14"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -296,7 +296,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.8.13",
+        "version":"6.8.14",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -492,15 +492,15 @@ async def msp_api_test(db:Session=Depends(get_db)):
         return {"ok":False,"mode":"pat","reason":"MSP_PERSONAL_ACCESS_TOKEN not configured"}
     try:
         profile=await get_profile(token)
-        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.13","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
+        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.14","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
     except Exception as exc:
-        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.13","error":str(exc)}
+        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.14","error":str(exc)}
 
 @app.get("/msp/sync-status")
 def msp_sync_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     return {
-        "version":"6.8.13",
+        "version":"6.8.14",
         "snapshot_id":snap.id if snap else None,
         "synced_at":snap.synced_at if snap else None,
         "data_available":snap is not None,
@@ -883,6 +883,34 @@ async def _enrich_plan_puzzle_predictions(plan, token=None):
 
     return plan
 
+
+@app.get("/coach/unsolved-library")
+def unsolved_library(db:Session=Depends(get_db)):
+    payload,source,snapshot_id=_best_available_payload(db)
+    if not payload:return {"available":False,"items":[],"count":0,"message":"Noch keine synchronisierten MySpeedPuzzling-Daten vorhanden."}
+    try:
+        rows=normalize_results(payload.get("results") or {})
+        from app.wm_coach import _extract_library_puzzles,_history_for_puzzle
+        items=[]
+        for p in _extract_library_puzzles(payload.get("collections") or {}):
+            if not isinstance(p,dict):continue
+            hist=_history_for_puzzle(rows,p)
+            if any(r.get("mode")=="solo" for r in hist):continue
+            ins=p.get("msp_insights") or {}
+            diff=ins.get("difficulty") if isinstance(ins,dict) else {}
+            pred=ins.get("prediction") if isinstance(ins,dict) else {}
+            diff=diff if isinstance(diff,dict) else {}
+            pred=pred if isinstance(pred,dict) else {}
+            ps=pred.get("predicted_seconds") or pred.get("seconds") or p.get("predicted_seconds")
+            lo=pred.get("range_low_seconds") or pred.get("rangeLowSeconds") or p.get("prediction_range_low_seconds")
+            hi=pred.get("range_high_seconds") or pred.get("rangeHighSeconds") or p.get("prediction_range_high_seconds")
+            items.append({"id":p.get("id"),"name":p.get("name"),"manufacturer":p.get("manufacturer"),"pieces":p.get("pieces"),"image_url":p.get("image_url"),
+              "difficulty_label":diff.get("label") or diff.get("level") or p.get("difficulty_label"),"difficulty_percent":diff.get("percent") if diff.get("percent") is not None else p.get("difficulty_percent"),
+              "prediction":_fmt_seconds(int(ps)) if ps else None,"prediction_low":_fmt_seconds(int(lo)) if lo else None,"prediction_high":_fmt_seconds(int(hi)) if hi else None})
+        items.sort(key=lambda p:(int(p.get("pieces") or 99999),str(p.get("name") or "").lower()))
+        return {"available":bool(items),"items":items,"count":len(items),"snapshot_id":snapshot_id,"data_source":source,
+          "message":f"{len(items)} Puzzle in der Library haben noch kein Solo-Ergebnis." if items else "Alle Puzzle in der Library haben bereits ein Solo-Ergebnis."}
+    except Exception as exc:return {"available":False,"items":[],"count":0,"message":"Ungelöste Library derzeit nicht verfügbar.","error":str(exc)}
 
 @app.get("/coach/puzzle-progress")
 def puzzle_progress(limit:int=8, db:Session=Depends(get_db)):
