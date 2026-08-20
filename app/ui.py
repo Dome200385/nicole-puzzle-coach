@@ -68,7 +68,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="item" style="margin-top:10px"><strong>📅 Plan für die aktuelle Trainingswoche</strong><div id="wmWeeklyPlan" class="list" style="margin-top:8px"></div></div>
 </section>
 
-<section class="card full simHero" id="wmSimulationCard"><h2>🏁 WM-Simulation <span class="pill">V6.8.8</span></h2>
+<section class="card full simHero" id="wmSimulationCard"><h2>🏁 WM-Simulation <span class="pill">V6.8.9</span></h2>
 <div class="small">Eigenständige WM-Simulation mit einem <strong>anderen Puzzle als im normalen Wochenplan</strong>. Ausgeliehene Puzzles bleiben ausgeschlossen.</div>
 <div id="wmSimSuggestion" class="item" style="margin-top:10px">Simulations-Puzzle wird gewählt…</div>
 <div id="wmSimActive" class="item activeTraining" style="display:none;margin-top:10px">
@@ -130,7 +130,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <section class="card full"><h2>📝 Zusätzliche manuelle Trainings</h2><div id="manualTrainings" class="list"></div></section>
 
 <section class="card full"><h2>🧠 Tournament Intelligence</h2>
-<div class="small">V6.8.8 MSP-only Puzzle Predictions + Frontend Snapshot Recovery: konkrete Puzzle-Prognosen stammen ausschliesslich aus MySpeedPuzzling; WM-Ziele und Coach-Logik bleiben unverändert. Lokale Turnier-Fallbacks: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
+<div class="small">V6.8.9 MSP-only Puzzle Predictions + Frontend Snapshot Recovery: konkrete Puzzle-Prognosen stammen ausschliesslich aus MySpeedPuzzling; WM-Ziele und Coach-Logik bleiben unverändert. Lokale Turnier-Fallbacks: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
 <div style="margin-top:12px"><a class="btn secondary" href="/docs" target="_blank">API-Dokumentation</a> <a class="btn secondary" href="/msp/my-competitions?refresh=true" target="_blank">Anmeldungen neu prüfen</a> <a class="btn secondary" href="/sync" target="_blank">MySpeedPuzzling neu synchronisieren</a> <a class="btn secondary" href="/msp/library" target="_blank">Puzzle-Bibliothek prüfen</a></div>
 </section>
 </div></div>
@@ -303,6 +303,23 @@ function renderActiveTraining(){
   activeTrainingResult.textContent='Training läuft / Ergebnis noch nicht geprüft.';
 }
 
+
+async function loadMedianGapFocus(){
+  const el=document.getElementById('medianGapFocus');
+  if(!el)return;
+  el.textContent='Medianvergleich wird berechnet…';
+  try{
+    const mg=await getj('/coach/median-gap-focus');
+    if(mg.available){
+      el.innerHTML=`<div class="puzzleRow" style="margin-top:6px">${mg.image_url?`<img class="puzzleImg" src="${mg.image_url}" alt="${mg.name||'Puzzle'}" loading="lazy" onerror="this.style.display='none'">`:''}<div class="puzzleInfo"><strong>${mg.name||'Puzzle'}</strong>${mg.manufacturer?' · '+mg.manufacturer:''}<div class="small">Letzte Zeit <strong>${mg.last_time||'–'}</strong> · MSP-Median <strong>${mg.median||'–'}</strong> · Abstand <strong>${mg.gap||'–'}</strong></div><div class="small">${mg.message||''}</div></div></div>`;
+    }else{
+      el.textContent=mg.message||'Kein Median-Abstand verfügbar.';
+    }
+  }catch(e){
+    el.textContent='Medianvergleich derzeit nicht verfügbar.';
+  }
+}
+
 async function loadAll(){renderUnavailable();
  try{let st=await getj('/coach/status');systemKpi.textContent='OK';systemText.textContent=`Backend V${st.version} · Datenbank ok`;systemBadge.textContent='🟢 System bereit';mspKpi.textContent=st.data_source==='legacy'?'LEGACY':(st.has_myspeedpuzzling_data?'DATA':(st.pat_configured?'PAT':(st.oauth_configured?'READY':'WAIT')));mspText.textContent=st.data_source==='legacy'?'Historische DB-Daten aktiv':(st.has_myspeedpuzzling_data?`Letzter Datenstand verfügbar · Snapshot #${st.latest_snapshot_id||'–'}`:(st.pat_configured?'PAT eingerichtet · noch kein Snapshot':'Verbindung möglich'))}catch(e){systemBadge.textContent='🔴 Fehler'}
 
@@ -354,14 +371,6 @@ async function loadAll(){renderUnavailable();
    wmTrainingType.textContent=w.next_training?.type||'–';
    wmTrainingReason.textContent=w.next_training?`${w.next_training.intensity} · ${w.next_training.reason}`:'–';
    wmRecommendation.textContent=w.recommendation||'Trainingsplan aus vorhandenem Datenstand berechnet.';
-
-   if(document.getElementById('medianGapFocus')){
-     const mg=w.median_gap_focus||{};
-     if(mg.available){
-       medianGapFocus.innerHTML=`<div class="puzzleRow" style="margin-top:6px">${mg.image_url?`<img class="puzzleImg" src="${mg.image_url}" alt="${mg.name||'Puzzle'}" loading="lazy" onerror="this.style.display='none'">`:''}<div class="puzzleInfo"><strong>${mg.name||'Puzzle'}</strong>${mg.manufacturer?' · '+mg.manufacturer:''}<div class="small">Letzte Zeit <strong>${mg.last_time||'–'}</strong> · MSP-Median <strong>${mg.median||'–'}</strong> · Abstand <strong>${mg.gap||'–'}</strong></div><div class="small">${mg.message||''}</div></div></div>`;
-     }else{
-       medianGapFocus.textContent=mg.message||'Kein Median-Abstand verfügbar.';
-     }
    }
    let np=w.next_puzzle||{};
    wmNextPuzzle.innerHTML=np.available
@@ -443,6 +452,7 @@ async function loadAll(){renderUnavailable();
 }
 async function addTraining(){let b={date:sDate.value,puzzle_name:sPuzzle.value.trim(),manufacturer:sManufacturer.value||null,piece_count:sPieces.value?Number(sPieces.value):null,mode:sMode.value,duration_seconds:timeToSeconds(sDuration.value),target_seconds:timeToSeconds(sTarget.value),focus:sFocus.value||null,notes:sNotes.value||null};if(!b.date||!b.puzzle_name){alert('Datum und Puzzlename fehlen.');return}let r=await fetch('/training-sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});if(!r.ok){alert('Speichern fehlgeschlagen');return}location.reload()}
 sDate.valueAsDate=new Date();renderActiveTraining();renderActiveWMSim();renderWMSimHistory();loadAll();
+loadMedianGapFocus();
 </script></body></html>
 """
 

@@ -29,7 +29,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.8.8",
+    version="6.8.9",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -278,10 +278,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.8.8","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.8.9","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.8.8"}
+def health(): return {"status":"ok","version":"6.8.9"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -296,7 +296,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.8.8",
+        "version":"6.8.9",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -467,7 +467,7 @@ async def msp_api_test(db:Session=Depends(get_db)):
 def msp_sync_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     return {
-        "version":"6.8.8",
+        "version":"6.8.9",
         "snapshot_id":snap.id if snap else None,
         "synced_at":snap.synced_at if snap else None,
         "data_available":snap is not None,
@@ -851,6 +851,81 @@ async def _enrich_plan_puzzle_predictions(plan, token=None):
     return plan
 
 
+@app.get("/coach/median-gap-focus")
+def median_gap_focus(db:Session=Depends(get_db)):
+    """
+    Independent median benchmark endpoint.
+    It never blocks /coach/wm-plan or the main dashboard payload.
+    """
+    payload,source,snapshot_id=_best_available_payload(db)
+    if not payload:
+        return {
+            "available":False,
+            "message":"Noch keine synchronisierten MySpeedPuzzling-Daten vorhanden."
+        }
+
+    try:
+        rows=normalize_results(payload.get("results") or {})
+        from app.wm_coach import (
+            _extract_library_puzzles,
+            _history_for_puzzle,
+            _msp_median_training_signal,
+        )
+
+        library=_extract_library_puzzles(payload.get("collections") or {})
+        best=None
+
+        # Pure in-memory scan only. No network calls.
+        for puzzle in library:
+            if not isinstance(puzzle,dict):
+                continue
+            pieces=puzzle.get("pieces")
+            try:
+                if int(pieces or 0) != 500:
+                    continue
+            except Exception:
+                continue
+
+            hist=_history_for_puzzle(rows,puzzle)
+            sig=_msp_median_training_signal(puzzle,hist)
+            gap=sig.get("gap_seconds")
+            if not sig.get("needs_work") or gap is None:
+                continue
+
+            if best is None or gap > best["gap_seconds"]:
+                best={
+                    "available":True,
+                    "id":puzzle.get("id"),
+                    "name":puzzle.get("name"),
+                    "manufacturer":puzzle.get("manufacturer"),
+                    "image_url":puzzle.get("image_url"),
+                    "median":sig.get("median"),
+                    "last_time":sig.get("last"),
+                    "gap":sig.get("gap"),
+                    "gap_seconds":gap,
+                    "message":"Hier ist Nicole aktuell am weitesten vom MSP-Solo-Median entfernt.",
+                    "snapshot_id":snapshot_id,
+                    "data_source":source,
+                }
+
+        if best:
+            return best
+
+        return {
+            "available":False,
+            "snapshot_id":snapshot_id,
+            "data_source":source,
+            "message":"Aktuell kein 500er-Puzzle mit einer letzten Solo-Zeit über dem MSP-Median gefunden."
+        }
+    except Exception as exc:
+        return {
+            "available":False,
+            "snapshot_id":snapshot_id,
+            "data_source":source,
+            "message":"Medianvergleich derzeit nicht verfügbar.",
+            "error":str(exc),
+        }
+
 @app.get("/coach/wm-plan")
 async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
     payload,source,snapshot_id=_best_available_payload(db)
@@ -900,70 +975,6 @@ async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
         except Exception as exc:
             if not live_warning:
                 live_warning=f"Live-Puzzle-Insights derzeit nicht möglich: {exc}"
-
-    # Additional median-gap tile only; keep existing V6.8.6 structure intact.
-    median_candidates=[]
-    for p in [plan.get("next_puzzle"), plan.get("simulation_puzzle")]:
-        if isinstance(p,dict) and p.get("available") and p.get("median_training_required"):
-            median_candidates.append(p)
-    for item in plan.get("weekly_plan",[]):
-        p=item.get("puzzle") or {}
-        if p.get("available") and p.get("median_training_required"):
-            median_candidates.append(p)
-
-    # Also scan the full synced library so the tile is independent from the
-    # currently selected weekly puzzles.
-    try:
-        from app.wm_coach import _extract_library_puzzles, _history_for_puzzle, _msp_median_training_signal
-        library_puzzles=_extract_library_puzzles(payload.get("collections") or {})
-        for lp in library_puzzles:
-            hist=_history_for_puzzle(rows,lp)
-            sig=_msp_median_training_signal(lp,hist)
-            if sig.get("needs_work"):
-                entry=dict(lp)
-                entry["median_target"]=sig
-                entry["median_gap_seconds"]=sig.get("gap_seconds")
-                entry["median_gap"]=sig.get("gap")
-                entry["msp_median"]=sig.get("median")
-                entry["msp_last_time"]=sig.get("last")
-                median_candidates.append(entry)
-    except Exception:
-        pass
-
-    # De-duplicate by puzzle id/name and pick the largest positive gap.
-    unique={}
-    for p in median_candidates:
-        key=str(p.get("id") or p.get("name") or "")
-        gap=p.get("median_gap_seconds")
-        if gap is None:
-            mt=p.get("median_target") or {}
-            gap=mt.get("gap_seconds")
-        if not key or gap is None:
-            continue
-        prev=unique.get(key)
-        if prev is None or gap > prev.get("_gap", -1):
-            unique[key]={"puzzle":p,"_gap":gap}
-
-    if unique:
-        worst=max(unique.values(),key=lambda x:x["_gap"])["puzzle"]
-        mt=worst.get("median_target") or {}
-        plan["median_gap_focus"]={
-            "available":True,
-            "id":worst.get("id"),
-            "name":worst.get("name"),
-            "manufacturer":worst.get("manufacturer"),
-            "image_url":worst.get("image_url"),
-            "median":worst.get("msp_median") or mt.get("median"),
-            "last_time":worst.get("msp_last_time") or mt.get("last"),
-            "gap":worst.get("median_gap") or mt.get("gap"),
-            "gap_seconds":worst.get("median_gap_seconds") or mt.get("gap_seconds"),
-            "message":"Hier ist Nicole aktuell am weitesten vom MSP-Solo-Median entfernt."
-        }
-    else:
-        plan["median_gap_focus"]={
-            "available":False,
-            "message":"Aktuell kein Puzzle mit einer letzten Solo-Zeit über dem MSP-Median gefunden."
-        }
 
     plan["data_mode"]=data_mode
     plan["data_source"]=source
