@@ -9,7 +9,7 @@ from app.config import (
     MSP_CLIENT_ID, MSP_CLIENT_SECRET, MSP_SCOPES
 )
 
-MSP_USER_AGENT = "NicolePuzzleCoach/6.8.5"
+MSP_USER_AGENT = "NicolePuzzleCoach/6.8.6"
 _API_CACHE = {}
 _API_CACHE_DEFAULT_SECONDS = 5 * 60
 _API_403_BLOCKED_UNTIL = 0.0
@@ -175,6 +175,58 @@ async def get_library(token, cache=True):
         "player_id": collections_payload.get("player_id") if isinstance(collections_payload, dict) else None,
         "count": len(enriched),
         "item_fetch_errors": errors,
+    }
+
+async def get_predicted_time(token, puzzle_id, cache=True):
+    """Official MSP personalized prediction endpoint."""
+    return await api_get(
+        token,
+        f"/me/puzzles/{puzzle_id}/predicted-time",
+        cache=cache
+    )
+
+def normalize_predicted_time_response(payload):
+    """Normalize official MSP predicted-time JSON without deriving values."""
+    if not isinstance(payload, dict):
+        return {"available": False, "source": "myspeedpuzzling_predicted_time"}
+
+    def pick(*keys):
+        for key in keys:
+            if key in payload and payload.get(key) is not None:
+                return payload.get(key)
+        return None
+
+    def to_int(value):
+        try:
+            return int(value) if value is not None else None
+        except Exception:
+            return None
+
+    def to_float(value):
+        try:
+            return float(value) if value is not None else None
+        except Exception:
+            return None
+
+    predicted=to_int(pick("predicted_seconds","predictedSeconds"))
+    low=to_int(pick("range_low_seconds","rangeLowSeconds"))
+    high=to_int(pick("range_high_seconds","rangeHighSeconds"))
+
+    return {
+        "available": predicted is not None,
+        "puzzle_id": pick("puzzle_id","puzzleId"),
+        "prediction_seconds": predicted,
+        "prediction_text": f"{predicted//60}:{predicted%60:02d}" if predicted is not None else None,
+        "prediction_range_from_seconds": low,
+        "prediction_range_to_seconds": high,
+        "is_personalized": pick("is_personalized","isPersonalized"),
+        "personal_solve_count": to_int(pick("personal_solve_count","personalSolveCount")),
+        "predicted_attempt_number": to_int(pick("predicted_attempt_number","predictedAttemptNumber")),
+        "last_time_seconds": to_int(pick("last_time_seconds","lastTimeSeconds")),
+        "difficulty_label": pick("difficulty_level","difficultyLevel"),
+        "difficulty_percent": to_float(pick("difficulty_score","difficultyScore")),
+        "difficulty_confidence": pick("difficulty_confidence","difficultyConfidence"),
+        "source":"myspeedpuzzling_predicted_time",
     }
 
 async def get_results(token, cache=True):
@@ -360,9 +412,9 @@ def extract_puzzle_insights_from_api_payload(payload):
     statistics_obj = payload.get("statistics")
     solves_obj = payload.get("solves")
     if isinstance(prediction_obj, dict) or isinstance(difficulty_obj, dict):
-        predicted = prediction_obj.get("predictedSeconds") if isinstance(prediction_obj, dict) else None
-        low = prediction_obj.get("rangeLowSeconds") if isinstance(prediction_obj, dict) else None
-        high = prediction_obj.get("rangeHighSeconds") if isinstance(prediction_obj, dict) else None
+        predicted = prediction_obj.get("predicted_seconds", prediction_obj.get("predictedSeconds")) if isinstance(prediction_obj, dict) else None
+        low = prediction_obj.get("range_low_seconds", prediction_obj.get("rangeLowSeconds")) if isinstance(prediction_obj, dict) else None
+        high = prediction_obj.get("range_high_seconds", prediction_obj.get("rangeHighSeconds")) if isinstance(prediction_obj, dict) else None
         level = difficulty_obj.get("level") if isinstance(difficulty_obj, dict) else None
         score = difficulty_obj.get("score") if isinstance(difficulty_obj, dict) else None
         try:
@@ -389,23 +441,23 @@ def extract_puzzle_insights_from_api_payload(payload):
             "difficulty_label": level,
             "difficulty_percent": score,
             "difficulty_confidence": difficulty_obj.get("confidence") if isinstance(difficulty_obj, dict) else None,
-            "difficulty_sample_size": difficulty_obj.get("sampleSize") if isinstance(difficulty_obj, dict) else None,
+            "difficulty_sample_size": difficulty_obj.get("sample_size", difficulty_obj.get("sampleSize")) if isinstance(difficulty_obj, dict) else None,
             "prediction_text": prediction_text,
             "prediction_seconds": predicted,
             "prediction_range_from_seconds": low,
             "prediction_range_to_seconds": high,
-            "is_personalized": prediction_obj.get("isPersonalized") if isinstance(prediction_obj, dict) else None,
-            "personal_solve_count": prediction_obj.get("personalSolveCount") if isinstance(prediction_obj, dict) else None,
-            "predicted_attempt_number": prediction_obj.get("predictedAttemptNumber") if isinstance(prediction_obj, dict) else None,
-            "last_time_seconds": prediction_obj.get("lastTimeSeconds") if isinstance(prediction_obj, dict) else None,
+            "is_personalized": prediction_obj.get("is_personalized", prediction_obj.get("isPersonalized")) if isinstance(prediction_obj, dict) else None,
+            "personal_solve_count": prediction_obj.get("personal_solve_count", prediction_obj.get("personalSolveCount")) if isinstance(prediction_obj, dict) else None,
+            "predicted_attempt_number": prediction_obj.get("predicted_attempt_number", prediction_obj.get("predictedAttemptNumber")) if isinstance(prediction_obj, dict) else None,
+            "last_time_seconds": prediction_obj.get("last_time_seconds", prediction_obj.get("lastTimeSeconds")) if isinstance(prediction_obj, dict) else None,
             "statistics": statistics_obj if isinstance(statistics_obj, dict) else None,
             "solves": solves_obj if isinstance(solves_obj, dict) else None,
             "cached": False,
             "source": "myspeedpuzzling_official_puzzle_insights",
             "prediction_source_path": "$.prediction" if isinstance(prediction_obj, dict) else None,
             "difficulty_source_path": "$.difficulty" if isinstance(difficulty_obj, dict) else None,
-            "range_from_source_path": "$.prediction.rangeLowSeconds" if isinstance(prediction_obj, dict) else None,
-            "range_to_source_path": "$.prediction.rangeHighSeconds" if isinstance(prediction_obj, dict) else None,
+            "range_from_source_path": "$.prediction.range_low_seconds" if isinstance(prediction_obj, dict) else None,
+            "range_to_source_path": "$.prediction.range_high_seconds" if isinstance(prediction_obj, dict) else None,
         }
 
     nodes=[]
