@@ -448,6 +448,53 @@ def _history_for_puzzle(all_results, puzzle):
     )
     return rows
 
+def _msp_median_training_signal(puzzle, history=None):
+    """
+    Compare Nicole's latest personal Solo time with the official MSP Solo median.
+
+    Rule requested for the coach:
+    - if MSP median < Nicole's last time -> this puzzle needs continued work
+    - if Nicole is at/below median -> do not prioritize an immediate repeat
+
+    The median itself is never invented; it comes from MSP statistics.
+    """
+    history=history or []
+    insights=puzzle.get("msp_insights") or {}
+    statistics=insights.get("statistics") or puzzle.get("statistics") or {}
+    solves=insights.get("solves") or puzzle.get("solves") or {}
+
+    solo_stats=statistics.get("solo") if isinstance(statistics,dict) else {}
+    solo_solves=solves.get("solo") if isinstance(solves,dict) else {}
+
+    median_seconds=_as_int((solo_stats or {}).get("median_seconds"))
+    last_seconds=_as_int((solo_solves or {}).get("last_time_seconds"))
+
+    if last_seconds is None and history:
+        last_seconds=_as_int(history[0].get("seconds"))
+
+    needs_work=bool(
+        median_seconds is not None
+        and last_seconds is not None
+        and median_seconds < last_seconds
+    )
+    reached=bool(
+        median_seconds is not None
+        and last_seconds is not None
+        and last_seconds <= median_seconds
+    )
+    gap_seconds=(last_seconds-median_seconds) if needs_work else None
+
+    return {
+        "median_seconds":median_seconds,
+        "median":_fmt(median_seconds) if median_seconds is not None else None,
+        "last_seconds":last_seconds,
+        "last":_fmt(last_seconds) if last_seconds is not None else None,
+        "needs_work":needs_work,
+        "median_reached":reached,
+        "gap_seconds":gap_seconds,
+        "gap":_fmt(gap_seconds) if gap_seconds is not None else None,
+    }
+
 def _days_since_last_solve(rows):
     if not rows:
         return None
@@ -545,6 +592,20 @@ def _next_puzzle(library_payload, all_results, target_pieces, training_type, exc
         else:
             score -= risk.get("score", 0) * 1.5
 
+        # MSP median benchmark: if Nicole's latest time is slower than the
+        # official puzzle median, this puzzle gets a strong training priority.
+        median_signal=_msp_median_training_signal(puzzle,history)
+        if median_signal["needs_work"]:
+            score += 55
+            rationale += (
+                f" · Median-Ziel {median_signal['median']} noch nicht erreicht"
+                f" (letzte Zeit {median_signal['last']})"
+            )
+        elif median_signal["median_reached"]:
+            # Avoid recommending an immediate repeat when the median benchmark
+            # has already been reached, unless other training factors dominate.
+            score -= 28
+
         # Slight preference for Ravensburger because current 500er benchmark
         # data is dominated by Ravensburger, but never at the cost of inventing.
         manufacturer = str(puzzle.get("manufacturer") or "")
@@ -582,6 +643,10 @@ def _next_puzzle(library_payload, all_results, target_pieces, training_type, exc
         "library_candidates": len(candidates),
         "excluded_count": len({str(x) for x in (excluded_ids or []) if x}),
         "selection_score": round(score, 1),
+        "median_target": _msp_median_training_signal(puzzle,history),
+        "msp_insights": puzzle.get("msp_insights") or {},
+        "statistics": puzzle.get("statistics"),
+        "solves": puzzle.get("solves"),
     }
 
 
@@ -678,6 +743,16 @@ def _weekly_plan_with_puzzles(weekly_plan, library_payload, all_results, target_
             else:
                 score -= risk.get("score", 0) * 1.5
 
+            median_signal=_msp_median_training_signal(puzzle,history)
+            if median_signal["needs_work"]:
+                score += 55
+                reason += (
+                    f" · Median-Ziel {median_signal['median']} noch nicht erreicht"
+                    f" (letzte Zeit {median_signal['last']})"
+                )
+            elif median_signal["median_reached"]:
+                score -= 28
+
             if str(puzzle.get("manufacturer") or "").lower() == "ravensburger":
                 score += 4
             ranked.append((score, puzzle, history, reason))
@@ -703,6 +778,10 @@ def _weekly_plan_with_puzzles(weekly_plan, library_payload, all_results, target_
                 "days_since_last_solve": _days_since_last_solve(history),
                 "reason": reason,
                 "selection_score": round(score, 1),
+                "median_target": _msp_median_training_signal(puzzle,history),
+                "msp_insights": puzzle.get("msp_insights") or {},
+                "statistics": puzzle.get("statistics"),
+                "solves": puzzle.get("solves"),
             }
         else:
             row["puzzle"] = {

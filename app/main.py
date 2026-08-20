@@ -29,7 +29,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.8.6",
+    version="6.8.8",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -278,10 +278,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.8.6","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.8.8","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.8.6"}
+def health(): return {"status":"ok","version":"6.8.8"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -296,7 +296,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.8.6",
+        "version":"6.8.8",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -467,7 +467,7 @@ async def msp_api_test(db:Session=Depends(get_db)):
 def msp_sync_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     return {
-        "version":"6.8.6",
+        "version":"6.8.8",
         "snapshot_id":snap.id if snap else None,
         "synced_at":snap.synced_at if snap else None,
         "data_available":snap is not None,
@@ -713,8 +713,13 @@ def _msp_only_prediction(insights):
 
 async def _enrich_plan_puzzle_predictions(plan, token=None):
     """
-    Concrete puzzle prediction is exclusively MySpeedPuzzling.
-    Dedicated predicted-time endpoint has priority.
+    Enrich concrete training puzzles with official MSP prediction + median.
+
+    Concrete target policy:
+    - Personal expected time comes only from MSP predicted-time.
+    - MSP Solo median is shown as an additional benchmark.
+    - If Nicole's latest time is slower than the MSP median, the puzzle is
+      explicitly marked as needing continued work.
     """
     targets=[]
     for key in ("next_puzzle","simulation_puzzle"):
@@ -734,23 +739,30 @@ async def _enrich_plan_puzzle_predictions(plan, token=None):
         cache_key=str(pid)
 
         if cache_key not in seen:
-            insights=None
+            # Preserve statistics/solves already received in the official
+            # collection payload, then overlay the dedicated prediction.
+            base=puzzle.get("msp_insights") if isinstance(puzzle,dict) else None
+            insights=dict(base) if isinstance(base,dict) else {}
 
             if token:
                 try:
                     raw=await get_predicted_time(token,pid)
                     normalized=normalize_predicted_time_response(raw)
                     if normalized.get("available"):
-                        insights=normalized
+                        # Keep collection statistics/solves while dedicated
+                        # predicted-time values take priority.
+                        statistics=insights.get("statistics")
+                        solves=insights.get("solves")
+                        insights.update(normalized)
+                        if statistics is not None:
+                            insights["statistics"]=statistics
+                        if solves is not None:
+                            insights["solves"]=solves
                 except Exception:
-                    insights=None
+                    pass
 
-            if not insights:
-                stored=puzzle.get("msp_insights") if isinstance(puzzle,dict) else None
-                if isinstance(stored,dict) and stored.get("available"):
-                    insights=stored
-                else:
-                    insights=await get_puzzle_insights(pid,api_payload=puzzle)
+            if not insights.get("available"):
+                insights=await get_puzzle_insights(pid,api_payload=puzzle)
 
             seen[cache_key]=insights or {}
 
@@ -774,6 +786,68 @@ async def _enrich_plan_puzzle_predictions(plan, token=None):
             puzzle["msp_prediction_range_from"]=None
             puzzle["msp_prediction_range_to"]=None
             puzzle["prediction_source"]="myspeedpuzzling_unavailable"
+
+        # Official MSP median benchmark.
+        stats=insights.get("statistics") or puzzle.get("statistics") or {}
+        solves=insights.get("solves") or puzzle.get("solves") or {}
+        solo_stats=stats.get("solo") if isinstance(stats,dict) else {}
+        solo_solves=solves.get("solo") if isinstance(solves,dict) else {}
+
+        median_seconds=None
+        last_seconds=None
+        try:
+            if isinstance(solo_stats,dict) and solo_stats.get("median_seconds") is not None:
+                median_seconds=int(solo_stats.get("median_seconds"))
+        except Exception:
+            median_seconds=None
+        try:
+            if isinstance(solo_solves,dict) and solo_solves.get("last_time_seconds") is not None:
+                last_seconds=int(solo_solves.get("last_time_seconds"))
+        except Exception:
+            last_seconds=None
+
+        # Dedicated predicted-time also supplies last_time_seconds.
+        if last_seconds is None:
+            try:
+                if insights.get("last_time_seconds") is not None:
+                    last_seconds=int(insights.get("last_time_seconds"))
+            except Exception:
+                last_seconds=None
+
+        needs_median_work=bool(
+            median_seconds is not None and last_seconds is not None
+            and median_seconds < last_seconds
+        )
+
+        puzzle["msp_median_seconds"]=median_seconds
+        puzzle["msp_median"]=_fmt_seconds(median_seconds) if median_seconds is not None else None
+        puzzle["msp_last_time_seconds"]=last_seconds
+        puzzle["msp_last_time"]=_fmt_seconds(last_seconds) if last_seconds is not None else None
+        puzzle["median_training_required"]=needs_median_work
+        puzzle["median_gap_seconds"]=(last_seconds-median_seconds) if needs_median_work else None
+        puzzle["median_gap"]=_fmt_seconds(last_seconds-median_seconds) if needs_median_work else None
+
+        # Per-puzzle session target: the personal MSP prediction is the primary
+        # target; median is an explicit additional benchmark, never a hidden
+        # replacement for the personal prediction.
+        puzzle["training_target_seconds"]=puzzle.get("msp_prediction_seconds")
+        puzzle["training_target"]=puzzle.get("msp_prediction")
+        if puzzle.get("msp_prediction"):
+            target_text=f"MSP-Ziel {puzzle['msp_prediction']}"
+            if puzzle.get("msp_prediction_range_from") and puzzle.get("msp_prediction_range_to"):
+                target_text+=f" (Korridor {puzzle['msp_prediction_range_from']}–{puzzle['msp_prediction_range_to']})"
+        else:
+            target_text="MSP-Ziel derzeit nicht verfügbar"
+
+        if median_seconds is not None:
+            target_text+=f" · Median-Benchmark {_fmt_seconds(median_seconds)}"
+            if needs_median_work and last_seconds is not None:
+                target_text+=f" · weiter trainieren: letzte Zeit {_fmt_seconds(last_seconds)} liegt über Median"
+            elif last_seconds is not None and last_seconds <= median_seconds:
+                target_text+=f" · Median erreicht"
+
+        puzzle["training_target_text"]=target_text
+
     return plan
 
 
@@ -826,6 +900,70 @@ async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
         except Exception as exc:
             if not live_warning:
                 live_warning=f"Live-Puzzle-Insights derzeit nicht möglich: {exc}"
+
+    # Additional median-gap tile only; keep existing V6.8.6 structure intact.
+    median_candidates=[]
+    for p in [plan.get("next_puzzle"), plan.get("simulation_puzzle")]:
+        if isinstance(p,dict) and p.get("available") and p.get("median_training_required"):
+            median_candidates.append(p)
+    for item in plan.get("weekly_plan",[]):
+        p=item.get("puzzle") or {}
+        if p.get("available") and p.get("median_training_required"):
+            median_candidates.append(p)
+
+    # Also scan the full synced library so the tile is independent from the
+    # currently selected weekly puzzles.
+    try:
+        from app.wm_coach import _extract_library_puzzles, _history_for_puzzle, _msp_median_training_signal
+        library_puzzles=_extract_library_puzzles(payload.get("collections") or {})
+        for lp in library_puzzles:
+            hist=_history_for_puzzle(rows,lp)
+            sig=_msp_median_training_signal(lp,hist)
+            if sig.get("needs_work"):
+                entry=dict(lp)
+                entry["median_target"]=sig
+                entry["median_gap_seconds"]=sig.get("gap_seconds")
+                entry["median_gap"]=sig.get("gap")
+                entry["msp_median"]=sig.get("median")
+                entry["msp_last_time"]=sig.get("last")
+                median_candidates.append(entry)
+    except Exception:
+        pass
+
+    # De-duplicate by puzzle id/name and pick the largest positive gap.
+    unique={}
+    for p in median_candidates:
+        key=str(p.get("id") or p.get("name") or "")
+        gap=p.get("median_gap_seconds")
+        if gap is None:
+            mt=p.get("median_target") or {}
+            gap=mt.get("gap_seconds")
+        if not key or gap is None:
+            continue
+        prev=unique.get(key)
+        if prev is None or gap > prev.get("_gap", -1):
+            unique[key]={"puzzle":p,"_gap":gap}
+
+    if unique:
+        worst=max(unique.values(),key=lambda x:x["_gap"])["puzzle"]
+        mt=worst.get("median_target") or {}
+        plan["median_gap_focus"]={
+            "available":True,
+            "id":worst.get("id"),
+            "name":worst.get("name"),
+            "manufacturer":worst.get("manufacturer"),
+            "image_url":worst.get("image_url"),
+            "median":worst.get("msp_median") or mt.get("median"),
+            "last_time":worst.get("msp_last_time") or mt.get("last"),
+            "gap":worst.get("median_gap") or mt.get("gap"),
+            "gap_seconds":worst.get("median_gap_seconds") or mt.get("gap_seconds"),
+            "message":"Hier ist Nicole aktuell am weitesten vom MSP-Solo-Median entfernt."
+        }
+    else:
+        plan["median_gap_focus"]={
+            "available":False,
+            "message":"Aktuell kein Puzzle mit einer letzten Solo-Zeit über dem MSP-Median gefunden."
+        }
 
     plan["data_mode"]=data_mode
     plan["data_source"]=source
