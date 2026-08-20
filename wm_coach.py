@@ -379,6 +379,15 @@ def _extract_library_puzzles(payload):
             return
 
         key = str(pid or (str(name).strip().lower(), str(manufacturer or "").strip().lower(), pieces))
+        # Preserve official MySpeedPuzzling Puzzle Insights from the collection
+        # item. Earlier versions normalized the puzzle but accidentally dropped
+        # prediction/difficulty before the recommendation engine saw it.
+        try:
+            from app.myspeedpuzzling import extract_puzzle_insights_from_api_payload
+            msp_insights = extract_puzzle_insights_from_api_payload(candidate)
+        except Exception:
+            msp_insights = {"available": False, "source": "official_api_payload"}
+
         found[key] = {
             "id": pid,
             "name": str(name).strip(),
@@ -390,6 +399,12 @@ def _extract_library_puzzles(payload):
             "in_library": True,
             "provenance": provenance,
             "competition_risk": competition_risk,
+            "msp_insights": msp_insights,
+            # Keep the official objects available to downstream diagnostics.
+            "prediction": candidate.get("prediction"),
+            "difficulty": candidate.get("difficulty"),
+            "statistics": candidate.get("statistics"),
+            "solves": candidate.get("solves"),
         }
 
     def walk(obj, collection_name=None):
@@ -723,6 +738,19 @@ def build_wm_plan(all_results, my_competitions, library_payload=None, target_pie
     readiness=max(0,min(100,round(.35*consistency+.30*trend_score+.20*volume_score+.15*recency_score-load_penalty)))
     recent_days=_recent_training_days(rows,7); training=_training_type(phase,trend,consistency,avg5,avg10,recent_days); weekly=_weekly_plan(phase,target,_fmt(realistic),_fmt(stretch)); weekly=_weekly_plan_with_puzzles(weekly,library_payload or {},all_results,target_pieces,excluded_puzzle_ids)
     next_puzzle=_next_puzzle(library_payload or {},all_results,target_pieces,training['type'],excluded_puzzle_ids)
+    weekly_puzzle_ids=[
+        str(item.get('puzzle',{}).get('id'))
+        for item in weekly
+        if item.get('puzzle',{}).get('available') and item.get('puzzle',{}).get('id')
+    ]
+    sim_excluded=list({str(x) for x in (excluded_puzzle_ids or []) if x}.union(weekly_puzzle_ids))
+    simulation_puzzle=_next_puzzle(
+        library_payload or {},
+        all_results,
+        target_pieces,
+        'Turniersimulation',
+        sim_excluded,
+    )
     if training['type']=='Turniersimulation': base=f'500er Turniersimulation. Ziel {_fmt(realistic)} oder schneller; Stretch {_fmt(stretch)} nur bei sauberem Flow.'
     elif training['type']=='Speed-Run': base=f'500er Speed-Run. Zielbereich {_fmt(target)}–{_fmt(realistic)}.'
     elif training['type']=='Konstanztraining': base=f'Kontrollierter 500er. Ziel {_fmt(avg10)} oder schneller; Schwankungen reduzieren.'
@@ -730,6 +758,36 @@ def build_wm_plan(all_results, my_competitions, library_payload=None, target_pie
     elif training['type']=='Regeneration': base='Kein vollständiger Speed-Run mehr. Frische und Start-Routine priorisieren.'
     else: base=f'Kontrollierter 500er im Bereich {_fmt(target)}–{_fmt(target*1.06)}.'
     recommendation=('Nächstes Puzzle: '+next_puzzle['name']+'. '+base) if next_puzzle.get('available') else base+' '+next_puzzle['reason']
+    # V6.7.4: Current-level First-Try model.
+    # Estimate Nicole's personal first-try disadvantage from paired histories,
+    # then apply it to her CURRENT known-puzzle level.
+    by_name={}
+    for r in reversed(rows):
+        key=(r.get('puzzle_name') or '').strip().lower()
+        if key:
+            by_name.setdefault(key,[]).append(r)
+
+    paired_penalties=[]
+    first_try_samples=0
+    repeat_samples=0
+    for attempts in by_name.values():
+        valid=[r['seconds'] for r in attempts if isinstance(r.get('seconds'),(int,float))]
+        if not valid:
+            continue
+        first_try_samples += 1
+        if len(valid) >= 2:
+            repeat_samples += len(valid)-1
+            later_ref=median(valid[1:])
+            if later_ref and valid[0] > 0:
+                ratio=valid[0]/later_ref
+                if 0.90 <= ratio <= 1.60:
+                    paired_penalties.append(ratio)
+
+    repeat_target=max(realistic,target)
+    first_try_factor=median(paired_penalties) if len(paired_penalties)>=3 else 1.08
+    first_try_factor=max(1.04,min(1.18,first_try_factor))
+    first_try_target=repeat_target*first_try_factor
+
     pace100=avg10/5
     weakness='Konstanz' if consistency<80 else ('Tempo' if trend is not None and trend<0 else ('Belastungssteuerung' if load7['units']>5 else 'Turnierroutine'))
     progress_recent = [
@@ -740,4 +798,4 @@ def build_wm_plan(all_results, my_competitions, library_payload=None, target_pie
             'time': _fmt(r.get('seconds')),
         } for r in reversed(r10)
     ]
-    return {'target_pieces':target_pieces,'next_competition':next_comp,'days_until':days,'phase':phase,'count':len(rows),'best':_fmt(min(times)),'median':_fmt(median(times)),'average_all':_fmt(mean(times)),'recent5':_fmt(avg5),'recent10':_fmt(avg10),'recent20':_fmt(avg20),'trend10_percent':trend,'current_zone':{'from':_fmt(lo),'to':_fmt(hi)},'dynamic_target':_fmt(target),'dynamic_target_seconds':round(target),'wm_goal_realistic':_fmt(realistic),'wm_goal_realistic_seconds':round(realistic),'wm_goal_stretch':_fmt(stretch),'wm_goal_stretch_seconds':round(stretch),'recent10_seconds':round(avg10),'progress_recent':progress_recent,'consistency_500':consistency,'readiness_score':readiness,'next_training':training,'recent_training_days_7':recent_days,'weekly_plan':weekly,'recommendation':recommendation,'training_load_7':load7,'training_load_14':load14,'wm_pace_per_100':_fmt(pace100),'weakness_focus':weakness,'next_puzzle':next_puzzle,'readiness_explanation':'Kombiniert 500er-Konsistenz, Trend, Datenmenge, Aktualität und aktuelle Trainingsbelastung.','goal_explanation':'Realistisches WM-Ziel basiert auf den letzten 5/10 500er-Solozeiten; Stretch Goal bleibt durch die historische Bestzeit begrenzt.'}
+    return {'target_pieces':target_pieces,'next_competition':next_comp,'days_until':days,'phase':phase,'count':len(rows),'best':_fmt(min(times)),'median':_fmt(median(times)),'average_all':_fmt(mean(times)),'recent5':_fmt(avg5),'recent10':_fmt(avg10),'recent20':_fmt(avg20),'trend10_percent':trend,'current_zone':{'from':_fmt(lo),'to':_fmt(hi)},'dynamic_target':_fmt(target),'dynamic_target_seconds':round(target),'wm_goal_realistic':_fmt(realistic),'wm_goal_realistic_seconds':round(realistic),'wm_goal_first_try':_fmt(first_try_target),'wm_goal_first_try_seconds':round(first_try_target),'wm_goal_repeat':_fmt(repeat_target),'wm_goal_repeat_seconds':round(repeat_target),'wm_goal_first_try_samples':first_try_samples,'wm_goal_repeat_samples':repeat_samples,'wm_goal_first_try_factor':round(first_try_factor,3),'wm_goal_stretch':_fmt(stretch),'wm_goal_stretch_seconds':round(stretch),'recent10_seconds':round(avg10),'progress_recent':progress_recent,'consistency_500':consistency,'readiness_score':readiness,'next_training':training,'recent_training_days_7':recent_days,'weekly_plan':weekly,'recommendation':recommendation,'training_load_7':load7,'training_load_14':load14,'wm_pace_per_100':_fmt(pace100),'weakness_focus':weakness,'next_puzzle':next_puzzle,'simulation_puzzle':simulation_puzzle,'readiness_explanation':'Kombiniert 500er-Konsistenz, Trend, Datenmenge, Aktualität und aktuelle Trainingsbelastung.','goal_explanation':'Realistisches WM-Ziel basiert auf den letzten 5/10 500er-Solozeiten; Stretch Goal bleibt durch die historische Bestzeit begrenzt.'}

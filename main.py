@@ -16,7 +16,8 @@ from app.myspeedpuzzling import (
     build_authorize_url, exchange_code, refresh_access_token,
     get_profile, get_results, get_statistics, get_collections, get_library,
     get_competitions, get_competition, upcoming_competitions,
-    detect_participation, get_my_confirmed_competitions, get_swiss_motivation_ranking, get_puzzle_insights
+    detect_participation, get_my_confirmed_competitions, get_swiss_motivation_ranking, get_puzzle_insights,
+    enrich_library_with_msp_insights, clear_api_cache, api_cache_status, debug_prediction_fields, extract_puzzle_insights_from_api_payload, get_predicted_time, normalize_predicted_time_response
 )
 from app.coach import (
     performance_summary, owned_vs_history, tournament_readiness,
@@ -28,7 +29,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.8.1",
+    version="6.8.6",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -197,7 +198,7 @@ def _latest_snapshot(db):
 def _snapshot_payload(s):
     statistics=json.loads(s.statistics_json)
     confirmed=[]
-    if isinstance(statistics,dict) and statistics.get("_npc_wrapper_version")==1:
+    if isinstance(statistics,dict) and statistics.get("_npc_wrapper_version") in (1,2):
         confirmed=statistics.get("confirmed_competitions") or []
         statistics=statistics.get("msp_statistics") or {}
     return {
@@ -277,10 +278,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.8.1","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.8.6","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.8.1"}
+def health(): return {"status":"ok","version":"6.8.6"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -295,7 +296,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.8.1",
+        "version":"6.8.6",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -391,19 +392,34 @@ async def sync(db:Session=Depends(get_db)):
     legacy=_legacy_payload_from_db(db) if not previous else None
     try:
         token=await _valid_access_token(db)
-        profile=await get_profile(token)
-        results=await get_results(token)
-        statistics=await get_statistics(token)
-        collections=await get_library(token)
+
+        # Explicit /sync means "refresh now": bypass the short-lived API cache
+        # exactly once. All normal dashboard reads remain cached.
+        clear_api_cache()
+
+        profile=await get_profile(token, cache=False)
+        results=await get_results(token, cache=False)
+        statistics=await get_statistics(token, cache=False)
+        collections=await get_library(token, cache=False)
+
+        # Normalize MSP-provided prediction/difficulty fields already present
+        # in the official library payload. No values are invented.
+        collections=enrich_library_with_msp_insights(collections)
+
         confirmed=[]
         try:
-            confirmed=await get_my_confirmed_competitions(token,limit=30)
+            confirmed_payload=await get_my_confirmed_competitions(token,limit=30,cache=False)
+            confirmed=(confirmed_payload or {}).get("competitions",[]) if isinstance(confirmed_payload,dict) else []
         except Exception:
+            # Local tournament fallback remains responsible for continuity.
             confirmed=[]
+
         stored_statistics={
-            "_npc_wrapper_version":1,
+            "_npc_wrapper_version":2,
             "msp_statistics":statistics,
             "confirmed_competitions":confirmed,
+            "sync_source":"official_api",
+            "api_only":True,
         }
         snap=SyncSnapshot(
             owner_key="nicole",
@@ -413,7 +429,14 @@ async def sync(db:Session=Depends(get_db)):
             collections_json=json.dumps(collections)
         )
         db.add(snap); db.commit(); db.refresh(snap)
-        return {"status":"synced","data_mode":"live","snapshot_id":snap.id,"dashboard":"/dashboard"}
+        return {
+            "status":"synced",
+            "data_mode":"live",
+            "api_only":True,
+            "snapshot_id":snap.id,
+            "results_count":len(normalize_results(results)),
+            "dashboard":"/dashboard"
+        }
     except Exception as exc:
         if previous:
             return {
@@ -436,9 +459,116 @@ async def msp_api_test(db:Session=Depends(get_db)):
         return {"ok":False,"mode":"pat","reason":"MSP_PERSONAL_ACCESS_TOKEN not configured"}
     try:
         profile=await get_profile(token)
-        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.1","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
+        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.5","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
     except Exception as exc:
-        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.1","error":str(exc)}
+        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.5","error":str(exc)}
+
+@app.get("/msp/sync-status")
+def msp_sync_status(db:Session=Depends(get_db)):
+    snap=_latest_snapshot(db)
+    return {
+        "version":"6.8.6",
+        "snapshot_id":snap.id if snap else None,
+        "synced_at":snap.synced_at if snap else None,
+        "data_available":snap is not None,
+        "api_cache":api_cache_status(),
+        "api_only":True,
+    }
+
+@app.get("/msp/predicted-time/{puzzle_id}")
+async def msp_predicted_time(puzzle_id:str, db:Session=Depends(get_db)):
+    """Direct API-only diagnostic for the official MSP personal prediction."""
+    token=await _valid_access_token(db)
+    try:
+        raw=await get_predicted_time(token,puzzle_id,cache=False)
+        return {
+            "ok":True,
+            "api_only":True,
+            "source":"MySpeedPuzzling",
+            "endpoint":f"/api/v1/me/puzzles/{puzzle_id}/predicted-time",
+            "raw":raw,
+            "normalized":normalize_predicted_time_response(raw),
+        }
+    except Exception as exc:
+        return {"ok":False,"api_only":True,"error":str(exc)}
+
+@app.get("/msp/prediction-debug")
+def prediction_debug(
+    puzzle_id:str|None=None,
+    puzzle_name:str|None=None,
+    db:Session=Depends(get_db)
+):
+    """
+    Diagnose official API fields present in the latest synced library payload.
+    Does not call HTML pages and does not expose tokens.
+    """
+    snap=_latest_snapshot(db)
+    if not snap:
+        raise HTTPException(404,"Noch kein Snapshot")
+    payload=_snapshot_payload(snap)
+    library=payload.get("collections") or {}
+    wanted_name=(puzzle_name or "").strip().lower()
+    wanted_id=str(puzzle_id).strip() if puzzle_id else None
+    matches=[]
+
+    def walk(obj,path="$",depth=0):
+        if depth>10 or len(matches)>=20:
+            return
+        if isinstance(obj,dict):
+            oid=obj.get("id") or obj.get("puzzle_id") or obj.get("uuid")
+            name=obj.get("name") or obj.get("title") or obj.get("puzzle_name")
+            id_match=bool(wanted_id and oid is not None and str(oid)==wanted_id)
+            name_match=bool(wanted_name and name and wanted_name in str(name).lower())
+            if id_match or name_match:
+                matches.append({
+                    "path":path,
+                    "id":oid,
+                    "name":name,
+                    "prediction_fields":debug_prediction_fields(obj),
+                    "normalized":extract_puzzle_insights_from_api_payload(obj),
+                })
+            for k,v in obj.items():
+                if isinstance(v,(dict,list)):
+                    walk(v,f"{path}.{k}",depth+1)
+        elif isinstance(obj,list):
+            for i,v in enumerate(obj[:1000]):
+                if isinstance(v,(dict,list)):
+                    walk(v,f"{path}[{i}]",depth+1)
+
+    # If no explicit puzzle is supplied, return first few puzzle-shaped items.
+    if not wanted_id and not wanted_name:
+        def sample(obj,path="$",depth=0):
+            if depth>10 or len(matches)>=5:
+                return
+            if isinstance(obj,dict):
+                name=obj.get("name") or obj.get("title") or obj.get("puzzle_name")
+                pieces=obj.get("pieces") or obj.get("piece_count")
+                if name and pieces:
+                    matches.append({
+                        "path":path,
+                        "id":obj.get("id") or obj.get("puzzle_id"),
+                        "name":name,
+                        "prediction_fields":debug_prediction_fields(obj),
+                        "normalized":extract_puzzle_insights_from_api_payload(obj),
+                    })
+                for k,v in obj.items():
+                    if isinstance(v,(dict,list)):
+                        sample(v,f"{path}.{k}",depth+1)
+            elif isinstance(obj,list):
+                for i,v in enumerate(obj[:1000]):
+                    if isinstance(v,(dict,list)):
+                        sample(v,f"{path}[{i}]",depth+1)
+        sample(library)
+    else:
+        walk(library)
+
+    return {
+        "snapshot_id":snap.id,
+        "query":{"puzzle_id":puzzle_id,"puzzle_name":puzzle_name},
+        "matches":matches,
+        "count":len(matches),
+        "api_only":True,
+    }
 
 @app.get("/msp/library")
 async def msp_library(db:Session=Depends(get_db)):
@@ -490,18 +620,36 @@ async def my_competitions(
     db:Session=Depends(get_db)
 ):
     """
-    Returns only future competitions where Nicole's unique MySpeedPuzzling
-    player ID is present in the event's Connected participants list.
+    API-first tournament list with stable local fallback.
+    Live API-confirmed registrations win; known local confirmed tournaments are
+    retained whenever the API returns none or incomplete participation data.
     """
-    token=await _valid_access_token(db)
+    api_list=[]
+    api_meta={}
     try:
-        return await get_my_confirmed_competitions(
+        token=await _valid_access_token(db)
+        result=await get_my_confirmed_competitions(
             token,
             limit=max(1,min(limit,60)),
             cache=not refresh
         )
+        if isinstance(result,dict):
+            api_list=result.get("competitions") or []
+            api_meta={k:v for k,v in result.items() if k!="competitions"}
+        elif isinstance(result,list):
+            api_list=result
     except Exception as exc:
-        raise HTTPException(502,f"My tournament check failed: {exc}")
+        api_meta={"api_error":str(exc)}
+
+    merged=_merge_competitions(api_list,_local_confirmed_competitions())
+    return {
+        **api_meta,
+        "competitions":merged,
+        "count":len(merged),
+        "api_count":len(api_list),
+        "local_fallback_count":len(_local_confirmed_competitions()),
+        "source":"api_plus_local_fallback",
+    }
 
 @app.get("/msp/participation-check")
 async def participation_check(limit:int=12,db:Session=Depends(get_db)):
@@ -565,40 +713,58 @@ def _msp_only_prediction(insights):
         "source":"myspeedpuzzling",
     }
 
-async def _enrich_plan_puzzle_predictions(plan):
+async def _enrich_plan_puzzle_predictions(plan, token=None):
+    """Attach only official MySpeedPuzzling predictions to concrete puzzles."""
     targets=[]
     for key in ("next_puzzle","simulation_puzzle"):
         p=plan.get(key) or {}
-        if p.get("available"): targets.append(p)
+        if p.get("available"):
+            targets.append(p)
     for item in plan.get("weekly_plan",[]):
         p=item.get("puzzle") or {}
-        if p.get("available"): targets.append(p)
+        if p.get("available"):
+            targets.append(p)
+
     seen={}
     for puzzle in targets:
         pid=puzzle.get("id")
-        if not pid: continue
-        if str(pid) not in seen:
-            seen[str(pid)]=await get_puzzle_insights(pid, api_payload=puzzle)
-        insights=seen[str(pid)]
+        if not pid:
+            continue
+
+        key=str(pid)
+        if key not in seen:
+            insights=None
+
+            if token:
+                try:
+                    raw=await get_predicted_time(token,pid)
+                    normalized=normalize_predicted_time_response(raw)
+                    if normalized.get("available"):
+                        insights=normalized
+                except Exception:
+                    insights=None
+
+            if not insights:
+                stored=puzzle.get("msp_insights") if isinstance(puzzle,dict) else None
+                if isinstance(stored,dict) and stored.get("available"):
+                    insights=stored
+                else:
+                    insights=await get_puzzle_insights(pid,api_payload=puzzle)
+
+            seen[key]=insights or {}
+
+        insights=seen[key]
         puzzle["msp_insights"]=insights
-        prediction=_msp_only_prediction(insights)
-        if prediction:
-            puzzle["msp_prediction_seconds"]=prediction["seconds"]
-            puzzle["msp_prediction"]=prediction["text"]
-            puzzle["msp_prediction_range_from_seconds"]=prediction["range_from_seconds"]
-            puzzle["msp_prediction_range_to_seconds"]=prediction["range_to_seconds"]
-            puzzle["msp_prediction_range_from"]=prediction["range_from"]
-            puzzle["msp_prediction_range_to"]=prediction["range_to"]
-            puzzle["prediction_source"]="myspeedpuzzling"
-        else:
-            puzzle["msp_prediction_seconds"]=None
-            puzzle["msp_prediction"]=None
-            puzzle["msp_prediction_range_from_seconds"]=None
-            puzzle["msp_prediction_range_to_seconds"]=None
-            puzzle["msp_prediction_range_from"]=None
-            puzzle["msp_prediction_range_to"]=None
-            puzzle["prediction_source"]="myspeedpuzzling_unavailable"
+        puzzle["msp_prediction"]=_msp_only_prediction(insights)
+        puzzle["msp_prediction_available"]=bool(puzzle["msp_prediction"])
+        puzzle["prediction_seconds"]=None
+        puzzle["prediction_text"]=None
+        puzzle["prediction_range_from_seconds"]=None
+        puzzle["prediction_range_to_seconds"]=None
+        puzzle["prediction_basis"]="msp_only"
+
     return plan
+
 
 @app.get("/coach/wm-plan")
 async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
@@ -640,7 +806,12 @@ async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
     # Puzzle enrichment only if a real library is available.
     if payload.get("collections"):
         try:
-            plan=await _enrich_plan_puzzle_predictions(plan)
+            token_for_predictions=None
+            try:
+                token_for_predictions=await _valid_access_token(db)
+            except Exception:
+                token_for_predictions=None
+            plan=await _enrich_plan_puzzle_predictions(plan, token=token_for_predictions)
         except Exception as exc:
             if not live_warning:
                 live_warning=f"Live-Puzzle-Insights derzeit nicht möglich: {exc}"
