@@ -495,6 +495,13 @@ def _msp_median_training_signal(puzzle, history=None):
         "gap":_fmt(gap_seconds) if gap_seconds is not None else None,
     }
 
+RECENT_SOLVE_COOLDOWN_DAYS = 7
+
+def _recently_solved_for_recommendation(history, cooldown_days=RECENT_SOLVE_COOLDOWN_DAYS):
+    """Freshly completed recommendation puzzles should disappear temporarily."""
+    days=_days_since_last_solve(history)
+    return days is not None and days < cooldown_days
+
 def _days_since_last_solve(rows):
     if not rows:
         return None
@@ -526,6 +533,8 @@ def _next_puzzle(library_payload, all_results, target_pieces, training_type, exc
     scored = []
     for puzzle in candidates:
         history = _history_for_puzzle(all_results, puzzle)
+        if _recently_solved_for_recommendation(history):
+            continue
         solve_count = len(history)
         days_since = _days_since_last_solve(history)
 
