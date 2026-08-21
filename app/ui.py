@@ -81,15 +81,8 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="part"><strong>Readiness-Formsignal</strong><div id="readinessBlendedFormInfo" class="small">–</div></div>
 </div>
 <div style="margin-top:9px"><strong>Kontrolle der letzten vergleichbaren 500er</strong><div id="readinessMedianAudit" class="small" style="margin-top:5px">–</div></div></details><div class="item" style="margin-top:12px"><strong>🧩 Nächstes empfohlenes Puzzle</strong><div id="wmNextPuzzle" class="small">Bibliothek wird ausgewertet…</div></div>
-<div class="item" style="margin-top:10px"><strong>Nächste empfohlene Einheit</strong><div id="wmRecommendation" class="small">WM-Plan wird berechnet…</div></div>
-<div class="item" style="margin-top:10px"><strong>🎯 Größte Abstände zum MSP-Median · Top 5</strong><div id="medianGapFocus" class="small">Medianvergleich wird berechnet…</div></div><div class="item" style="margin-top:10px"><strong>📈 Fortschritt pro Puzzle</strong><div id="puzzleProgress" class="small">Fortschritt wird geladen…</div></div><div class="item" style="margin-top:10px"><strong>🎯 Wo lohnt sich die nächste Wiederholung am meisten?</strong><div id="repeatPriority" class="small">Wiederholungs-Priorität wird berechnet…</div></div><div class="item" style="margin-top:10px"><strong>🆕 Noch ungelöste Puzzle in meiner Library</strong><div id="unsolvedLibrary" class="small">Library wird geprüft…</div></div>
-<div class="metricrow" style="margin-top:10px"><div class="metric"><div class="label">Training Load · 7 Tage</div><b id="wmLoad7">–</b><div class="small" id="wmLoad7Info">–</div></div><div class="metric"><div class="label">Training Load · 14 Tage</div><b id="wmLoad14">–</b><div class="small" id="wmLoad14Info">–</div></div><div class="metric"><div class="label">WM-Pace / 100 Teile</div><b id="wmPace100">–</b><div class="small" id="wmWeakness">–</div></div></div>
-<div class="item" style="margin-top:10px"><strong>500er-Leistungsbild</strong><div id="wmStats" class="small">–</div></div>
-<div id="unavailableBox" class="item loanBox" style="display:none;margin-top:10px"><strong>📦 Aktuell nicht verfügbare / ausgeliehene Puzzles</strong><div class="small">Diese Puzzles werden in allen Empfehlungen und im gesamten Wochenplan ausgeschlossen.</div><div id="unavailableList" style="margin-top:7px"></div><button class="secondary" style="margin-top:7px" onclick="restoreAllPuzzles()">Alle wieder verfügbar</button></div>
 <div class="item" style="margin-top:10px"><strong>📅 Plan für die aktuelle Trainingswoche</strong><div id="wmWeeklyPlan" class="list" style="margin-top:8px"></div></div>
-</section>
-
-<section class="card full simHero" id="wmSimulationCard"><h2>🏁 WM-Simulation <span class="pill">V6.8.18</span></h2>
+<div class="item simHero" id="wmSimulationCard" style="margin-top:10px"><h2>🏁 WM-Simulation <span class="pill">V6.8.25</span></h2>
 <div class="small">Eigenständige WM-Simulation mit einem <strong>anderen Puzzle als im normalen Wochenplan</strong>. Ausgeliehene Puzzles bleiben ausgeschlossen.</div>
 <div id="wmSimSuggestion" class="item" style="margin-top:10px">Simulations-Puzzle wird gewählt…</div>
 <div id="wmSimActive" class="item activeTraining" style="display:none;margin-top:10px">
@@ -110,7 +103,23 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
   <div id="wmSimSummary" class="small" style="margin-top:5px"></div>
   <div id="wmSimHistory" class="list" style="margin-top:8px"></div>
 </div>
+</div>
+<div id="readinessTrendPanel" class="item" style="margin-top:10px">
+<strong>📈 WM-Readiness-Verlauf</strong>
+<div class="small">Tägliche Entwicklung der Readiness bis zur WM. Pro Tag wird der aktuelle Wert gespeichert.</div>
+<div id="readinessTrendSummary" style="margin-top:6px;font-weight:700">Erster Verlaufspunkt wird gespeichert…</div>
+<div id="readinessTrendBars" style="display:flex;align-items:flex-end;gap:4px;height:82px;margin-top:8px"></div>
+<div id="readinessTrendChanges" class="small" style="margin-top:7px"></div>
+</div>
+<div class="item" style="margin-top:10px"><strong>Nächste empfohlene Einheit</strong><div id="wmRecommendation" class="small">WM-Plan wird berechnet…</div></div>
+<div class="item" style="margin-top:10px"><strong>🎯 Größte Abstände zum MSP-Median · Top 5</strong><div id="medianGapFocus" class="small">Medianvergleich wird berechnet…</div></div><div class="item" style="margin-top:10px"><strong>📈 Fortschritt pro Puzzle</strong><div id="puzzleProgress" class="small">Fortschritt wird geladen…</div></div><div class="item" style="margin-top:10px"><strong>🎯 Wo lohnt sich die nächste Wiederholung am meisten?</strong><div id="repeatPriority" class="small">Wiederholungs-Priorität wird berechnet…</div></div><div class="item" style="margin-top:10px"><strong>🆕 Noch ungelöste Puzzle in meiner Library</strong><div id="unsolvedLibrary" class="small">Library wird geprüft…</div></div>
+<div class="metricrow" style="margin-top:10px"><div class="metric"><div class="label">Training Load · 7 Tage</div><b id="wmLoad7">–</b><div class="small" id="wmLoad7Info">–</div></div><div class="metric"><div class="label">Training Load · 14 Tage</div><b id="wmLoad14">–</b><div class="small" id="wmLoad14Info">–</div></div><div class="metric"><div class="label">WM-Pace / 100 Teile</div><b id="wmPace100">–</b><div class="small" id="wmWeakness">–</div></div></div>
+<div class="item" style="margin-top:10px"><strong>500er-Leistungsbild</strong><div id="wmStats" class="small">–</div></div>
+<div id="unavailableBox" class="item loanBox" style="display:none;margin-top:10px"><strong>📦 Aktuell nicht verfügbare / ausgeliehene Puzzles</strong><div class="small">Diese Puzzles werden in allen Empfehlungen und im gesamten Wochenplan ausgeschlossen.</div><div id="unavailableList" style="margin-top:7px"></div><button class="secondary" style="margin-top:7px" onclick="restoreAllPuzzles()">Alle wieder verfügbar</button></div>
+
 </section>
+
+
 
 <section class="card full"><h2>📈 Fortschritt bis zur WM</h2>
 <div class="small">Die letzten 10 500er-Solozeiten im Vergleich zu aktuellem Niveau und WM-Zielen. Entscheidend ist das wiederholbare Leistungsniveau, nicht eine einzelne Bestzeit.
@@ -141,17 +150,12 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <section class="card half"><h2>🏭 Leistung nach Hersteller</h2><div id="manufacturerPerformance" class="list"><div class="small">Analyse wird geladen…</div></div></section>
 
 <section class="card half"><h2>⏱️ Letzte MySpeedPuzzling-Ergebnisse</h2><div id="autoTrainings" class="list"></div></section>
-<section class="card half"><h2>✍️ Training zusätzlich manuell erfassen</h2><div class="formgrid">
-<input id="sDate" type="date"><input id="sPuzzle" placeholder="Puzzlename"><input id="sManufacturer" placeholder="Hersteller"><input id="sPieces" type="number" placeholder="Teilezahl">
-<select id="sMode"><option value="solo">Solo</option><option value="duo">Duo</option><option value="team">Team</option></select><input id="sDuration" placeholder="Zeit, z.B. 42:15">
-<input id="sTarget" placeholder="Zielzeit, z.B. 40:00"><input id="sFocus" placeholder="Fokus, z.B. Sortieren"><textarea id="sNotes" class="wide" placeholder="Notizen"></textarea>
-<button class="primary wide" onclick="addTraining()">Training speichern</button>
-</div></section>
 
-<section class="card full"><h2>📝 Zusätzliche manuelle Trainings</h2><div id="manualTrainings" class="list"></div></section>
+
+
 
 <section class="card full"><h2>🧠 Tournament Intelligence</h2>
-<div class="small">V6.8.18 MSP-only Puzzle Predictions + Frontend Snapshot Recovery: konkrete Puzzle-Prognosen stammen ausschliesslich aus MySpeedPuzzling; WM-Ziele und Coach-Logik bleiben unverändert. Lokale Turnier-Fallbacks: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
+<div class="small">V6.8.25 MSP-only Puzzle Predictions + Frontend Snapshot Recovery: konkrete Puzzle-Prognosen stammen ausschliesslich aus MySpeedPuzzling; WM-Ziele und Coach-Logik bleiben unverändert. Lokale Turnier-Fallbacks: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
 <div style="margin-top:12px"><a class="btn secondary" href="/docs" target="_blank">API-Dokumentation</a> <a class="btn secondary" href="/msp/my-competitions?refresh=true" target="_blank">Anmeldungen neu prüfen</a> <a class="btn secondary" href="/sync" target="_blank">MySpeedPuzzling neu synchronisieren</a> <a class="btn secondary" href="/msp/library" target="_blank">Puzzle-Bibliothek prüfen</a></div>
 </section>
 </div></div>
@@ -440,6 +444,64 @@ async function loadAll(){renderUnavailable();
  }catch(e){coachRecommendation.textContent='Trainingsanalyse konnte nicht geladen werden.'}
 
 
+
+ async function captureAndRenderReadinessTrend(w){
+   try{
+     const payload={
+       readiness:w.readiness_score,
+       form_signal:w.readiness_form_percent??null,
+       consistency:w.consistency_500??null,
+       median_hits:w.median_hit_count??null,
+       comparable_count:w.median_normalized_sample_count??null
+     };
+     const r=await fetch('/coach/readiness-history/capture',{
+       method:'POST',
+       headers:{'Content-Type':'application/json'},
+       body:JSON.stringify(payload)
+     });
+     if(!r.ok)return;
+     const d=await r.json();
+     renderReadinessTrend(d.items||[]);
+   }catch(e){}
+ }
+ function renderReadinessTrend(items){
+   const box=document.getElementById('readinessTrendBars');
+   const summary=document.getElementById('readinessTrendSummary');
+   const changes=document.getElementById('readinessTrendChanges');
+   if(!box||!summary||!changes)return;
+   box.innerHTML='';
+   if(!items.length){
+     summary.textContent='Noch keine Verlaufspunkte gespeichert.';
+     changes.textContent='';
+     return;
+   }
+   const recent=items.slice(-30);
+   const last=recent[recent.length-1];
+   summary.textContent=`Aktuell ${Math.round(Number(last.readiness))}/100 · ${items.length} gespeicherte Tageswerte`;
+   recent.forEach(x=>{
+     const bar=document.createElement('div');
+     bar.title=`${x.day} · ${Math.round(Number(x.readiness))}/100`;
+     bar.style.flex='1';
+     bar.style.minWidth='4px';
+     bar.style.maxWidth='18px';
+     bar.style.height=Math.max(4,Math.min(100,Number(x.readiness)))+'%';
+     bar.style.background='currentColor';
+     bar.style.opacity='.35';
+     bar.style.borderRadius='3px 3px 0 0';
+     box.appendChild(bar);
+   });
+   function delta(days){
+     const target=new Date();
+     target.setDate(target.getDate()-days);
+     const targetDay=target.toISOString().slice(0,10);
+     const previous=[...items].reverse().find(x=>x.day<=targetDay);
+     if(!previous)return null;
+     return Number(last.readiness)-Number(previous.readiness);
+   }
+   changes.textContent=[[7,delta(7)],[14,delta(14)],[30,delta(30)]]
+     .map(([d,v])=>v==null?`${d} Tage: noch keine Daten`:`${d} Tage: ${v>=0?'+':''}${v.toFixed(0)} Punkte`)
+     .join(' · ');
+ }
  function readinessZone(score){
    const s=Number(score);
    if(!Number.isFinite(s)) return {title:'Readiness-Zone',text:'Noch keine belastbare Einstufung.'};
@@ -477,6 +539,7 @@ async function loadAll(){renderUnavailable();
    }
    wmReadiness.textContent=w.readiness_score==null?'–':w.readiness_score+'/100';
     if(document.getElementById('readinessTopKpi')) readinessTopKpi.textContent=w.readiness_score==null?'–':w.readiness_score+'/100';
+    captureAndRenderReadinessTrend(w);
     if(document.getElementById('readinessZoneTitle') && document.getElementById('readinessZoneText')){
       const rz=readinessZone(w.readiness_score);
       let deltaText='';

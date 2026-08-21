@@ -29,7 +29,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.8.18",
+    version="6.8.25",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -279,6 +279,75 @@ def dashboard_route(): return dashboard()
 @app.get("/api")
 def api_root():
     return {"app":"Nicole Puzzle Coach API","version":"6.8.18","status":"online","dashboard":"/dashboard","docs":"/docs"}
+
+
+def _ensure_readiness_history_table(db):
+    db.execute(text("""
+        CREATE TABLE IF NOT EXISTS readiness_history (
+            day VARCHAR(10) PRIMARY KEY,
+            readiness FLOAT NOT NULL,
+            form_signal FLOAT NULL,
+            consistency FLOAT NULL,
+            median_hits INTEGER NULL,
+            comparable_count INTEGER NULL
+        )
+    """))
+    db.commit()
+
+def _readiness_history_rows(db, limit=180):
+    _ensure_readiness_history_table(db)
+    rows=db.execute(text("""
+        SELECT day, readiness, form_signal, consistency, median_hits, comparable_count
+        FROM readiness_history
+        ORDER BY day ASC
+    """)).mappings().all()
+    rows=list(rows)[-max(1,min(int(limit or 180),365)):]
+    return [dict(r) for r in rows]
+
+@app.get("/coach/readiness-history")
+def readiness_history(limit:int=180, db:Session=Depends(get_db)):
+    return {"items":_readiness_history_rows(db,limit)}
+
+@app.post("/coach/readiness-history/capture")
+async def capture_readiness_history(request:Request, db:Session=Depends(get_db)):
+    from datetime import datetime
+    body=await request.json()
+    if body.get("readiness") is None:
+        raise HTTPException(status_code=400, detail="readiness required")
+    _ensure_readiness_history_table(db)
+    day=datetime.utcnow().date().isoformat()
+
+    existing=db.execute(
+        text("SELECT day FROM readiness_history WHERE day=:day"),
+        {"day":day}
+    ).first()
+
+    values={
+        "day":day,
+        "readiness":float(body.get("readiness")),
+        "form_signal":body.get("form_signal"),
+        "consistency":body.get("consistency"),
+        "median_hits":body.get("median_hits"),
+        "comparable_count":body.get("comparable_count"),
+    }
+    if existing:
+        db.execute(text("""
+            UPDATE readiness_history
+            SET readiness=:readiness,
+                form_signal=:form_signal,
+                consistency=:consistency,
+                median_hits=:median_hits,
+                comparable_count=:comparable_count
+            WHERE day=:day
+        """), values)
+    else:
+        db.execute(text("""
+            INSERT INTO readiness_history
+            (day, readiness, form_signal, consistency, median_hits, comparable_count)
+            VALUES (:day, :readiness, :form_signal, :consistency, :median_hits, :comparable_count)
+        """), values)
+    db.commit()
+    return {"status":"captured","items":_readiness_history_rows(db,180)}
 
 @app.get("/health")
 def health(): return {"status":"ok","version":"6.8.18"}
