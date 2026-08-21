@@ -32,7 +32,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 
 <div class="grid">
 <section class="card kpi third"><div class="label">Form · vs MSP-Median <button class="infoBtn" onclick="showInfo('form')">i</button></div><div class="value" id="trendKpi">–</div><div class="small">letzter Solo-Versuch je vergleichbarem 500er</div></section>
-<section class="card kpi third"><div class="label">WM-Readiness <button class="infoBtn" onclick="document.getElementById('readinessInfoBox').open=true;document.getElementById('readinessInfoBox').scrollIntoView({behavior:'smooth',block:'center'})">i</button></div><div class="value" id="readinessTopKpi">–</div><div class="small">50 = MSP-Median-Niveau · 100 = außergewöhnliche WM-Form</div></section>
+<section class="card kpi third"><div class="label">WM-Readiness <button class="infoBtn" onclick="document.getElementById('readinessInfoBox').open=true;document.getElementById('readinessInfoBox').scrollIntoView({behavior:'smooth',block:'center'})">i</button></div><div class="value" id="readinessTopKpi">–</div><div class="small">50 = MSP-Median-Niveau · neuere Ergebnisse zählen stärker</div></section>
 <section class="card kpi third"><div class="label">Konsistenz <button class="infoBtn" onclick="showInfo('consistency')">i</button></div><div class="value" id="consistencyKpi">–</div><div class="small">median-relative Stabilität · 0–100</div></section>
 
 <section id="resilientBanner" class="card full" style="display:none;background:#fff8e6;border-color:#f0d99b">

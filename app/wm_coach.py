@@ -873,17 +873,33 @@ def _median_normalized_performance(all_results, library_payload, target_pieces=5
 
     vals=[s["performance_percent"] for s in recent]
     form=mean(vals)
+
+    # WM form should react more strongly to the newest puzzles while still
+    # retaining context from all 10. Newest -> oldest weights.
+    recency_weights=[10,9,8,7,6,5,4,3,2,1][:len(recent)]
+    weight_sum=sum(recency_weights) or 1
+    weighted_form=sum(v*w for v,w in zip(vals,recency_weights))/weight_sum
+
+    # Stability is measured on the same difficulty-neutral MSP scale.
     variability=pstdev(vals) if len(vals)>1 else 0
     consistency=max(0,min(100,round(100-variability*2.5)))
     hit_count=sum(1 for s in recent if s["median_reached"])
     miss_count=len(recent)-hit_count
     hit_rate=round(hit_count/len(recent)*100)
 
+    # Continuous quality score: not merely hit/miss. Strong performances above
+    # median earn proportionally more credit; misses lose proportionally more.
+    # 0% (exact median) = 50 quality points.
+    quality_scores=[max(0,min(100,50+v*2.5)) for v in vals]
+    weighted_quality=sum(q*w for q,w in zip(quality_scores,recency_weights))/weight_sum
+
     return {
         "available":True,
         "samples":recent,
         "sample_count":len(recent),
         "form_percent":round(form,1),
+        "weighted_form_percent":round(weighted_form,1),
+        "performance_quality_score":round(weighted_quality,1),
         "consistency_score":consistency,
         "median_hit_count":hit_count,
         "median_miss_count":miss_count,
@@ -938,11 +954,23 @@ def build_wm_plan(all_results, my_competitions, library_payload=None, target_pie
     age=max(0,(datetime.now(timezone.utc)-(last if last.tzinfo else last.replace(tzinfo=timezone.utc))).days) if last else 30
     recency_score=max(0,100-age*5)
 
-    # V6.8.18 intuitive scale:
-    # 50 = roughly MSP-median performance; 100 = exceptional, stable WM-ready form.
-    base_readiness=50 + (normalized_form or 0)*2.0 if normalized.get("available") else 50
-    consistency_modifier=(consistency-70)*0.20
-    hit_modifier=((median_hit_score or 50)-50)*0.15
+    # V6.8.22 WM-Readiness:
+    # Primary signal = magnitude of performance vs the exact puzzle's MSP median,
+    # with newer puzzles weighted more strongly. Median hit-rate remains useful,
+    # but no longer treats +17% and +1% as equivalent successes.
+    if normalized.get("available"):
+        weighted_form=normalized.get("weighted_form_percent", normalized_form or 0)
+        quality_score=normalized.get("performance_quality_score", 50)
+        base_readiness=50 + weighted_form*2.0
+        quality_modifier=(quality_score-50)*0.20
+    else:
+        weighted_form=normalized_form or 0
+        quality_score=50
+        base_readiness=50
+        quality_modifier=0
+
+    consistency_modifier=(consistency-70)*0.15
+    hit_modifier=((median_hit_score or 50)-50)*0.08
     recency_modifier=(recency_score-70)*0.10
     sample_modifier=(volume_score-50)*0.05
 
@@ -971,6 +999,7 @@ def build_wm_plan(all_results, my_competitions, library_payload=None, target_pie
     # separate coaching/Recovery signal only.
     readiness=max(0,min(100,round(
         base_readiness
+        +quality_modifier
         +consistency_modifier
         +hit_modifier
         +recency_modifier
@@ -1039,7 +1068,7 @@ def build_wm_plan(all_results, my_competitions, library_payload=None, target_pie
             'time': _fmt(r.get('seconds')),
         } for r in reversed(r10)
     ]
-    return {'target_pieces':target_pieces,'next_competition':next_comp,'days_until':days,'phase':phase,'count':len(rows),'best':_fmt(min(times)),'median':_fmt(median(times)),'average_all':_fmt(mean(times)),'recent5':_fmt(avg5),'recent10':_fmt(avg10),'recent20':_fmt(avg20),'trend10_percent':trend,'current_zone':{'from':_fmt(lo),'to':_fmt(hi)},'dynamic_target':_fmt(target),'dynamic_target_seconds':round(target),'wm_goal_realistic':_fmt(realistic),'wm_goal_realistic_seconds':round(realistic),'wm_goal_first_try':_fmt(first_try_target),'wm_goal_first_try_seconds':round(first_try_target),'wm_goal_repeat':_fmt(repeat_target),'wm_goal_repeat_seconds':round(repeat_target),'wm_goal_first_try_samples':first_try_samples,'wm_goal_repeat_samples':repeat_samples,'wm_goal_first_try_factor':round(first_try_factor,3),'wm_goal_stretch':_fmt(stretch),'wm_goal_stretch_seconds':round(stretch),'recent10_seconds':round(avg10),'progress_recent':progress_recent,'consistency_500':consistency,'readiness_score':readiness,'median_normalized_form_percent':normalized_form,'median_normalized_sample_count':normalized.get('sample_count',0),'median_hit_rate':normalized.get('median_hit_rate'),'median_hit_count':normalized.get('median_hit_count',0),'median_miss_count':normalized.get('median_miss_count',0),'median_samples':normalized.get('samples',[]),'median_audit':{'hit_count':normalized.get('median_hit_count',0),'miss_count':normalized.get('median_miss_count',0),'sample_count':normalized.get('sample_count',0),'hit_rate':normalized.get('median_hit_rate')},
+    return {'target_pieces':target_pieces,'next_competition':next_comp,'days_until':days,'phase':phase,'count':len(rows),'best':_fmt(min(times)),'median':_fmt(median(times)),'average_all':_fmt(mean(times)),'recent5':_fmt(avg5),'recent10':_fmt(avg10),'recent20':_fmt(avg20),'trend10_percent':trend,'current_zone':{'from':_fmt(lo),'to':_fmt(hi)},'dynamic_target':_fmt(target),'dynamic_target_seconds':round(target),'wm_goal_realistic':_fmt(realistic),'wm_goal_realistic_seconds':round(realistic),'wm_goal_first_try':_fmt(first_try_target),'wm_goal_first_try_seconds':round(first_try_target),'wm_goal_repeat':_fmt(repeat_target),'wm_goal_repeat_seconds':round(repeat_target),'wm_goal_first_try_samples':first_try_samples,'wm_goal_repeat_samples':repeat_samples,'wm_goal_first_try_factor':round(first_try_factor,3),'wm_goal_stretch':_fmt(stretch),'wm_goal_stretch_seconds':round(stretch),'recent10_seconds':round(avg10),'progress_recent':progress_recent,'consistency_500':consistency,'readiness_score':readiness,'median_normalized_form_percent':normalized_form,'median_normalized_sample_count':normalized.get('sample_count',0),'median_hit_rate':normalized.get('median_hit_rate'),'median_hit_count':normalized.get('median_hit_count',0),'median_miss_count':normalized.get('median_miss_count',0),'median_samples':normalized.get('samples',[]),'median_audit':{'hit_count':normalized.get('median_hit_count',0),'miss_count':normalized.get('median_miss_count',0),'sample_count':normalized.get('sample_count',0),'hit_rate':normalized.get('median_hit_rate')},'weighted_form_percent':normalized.get('weighted_form_percent'),'performance_quality_score':normalized.get('performance_quality_score'),
         'readiness_base':round(base_readiness,1),
         'readiness_consistency_modifier':round(consistency_modifier,1),
         'readiness_hit_modifier':round(hit_modifier,1),
