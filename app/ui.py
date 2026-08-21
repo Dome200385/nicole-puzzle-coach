@@ -32,7 +32,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 
 <div class="grid">
 <section class="card kpi third"><div class="label">Form · vs MSP-Median <button class="infoBtn" onclick="showInfo('form')">i</button></div><div class="value" id="trendKpi">–</div><div class="small">letzter Solo-Versuch je vergleichbarem 500er</div></section>
-<section class="card kpi third"><div class="label">WM-Readiness <button class="infoBtn" onclick="document.getElementById('readinessInfoBox').open=true;document.getElementById('readinessInfoBox').scrollIntoView({behavior:'smooth',block:'center'})">i</button></div><div class="value" id="readinessTopKpi">–</div><div class="small">50 = MSP-Median-Niveau · neuere Ergebnisse zählen stärker</div></section>
+<section class="card kpi third"><div class="label">WM-Readiness <button class="infoBtn" onclick="document.getElementById('readinessInfoBox').open=true;document.getElementById('readinessInfoBox').scrollIntoView({behavior:'smooth',block:'center'})">i</button></div><div class="value" id="readinessTopKpi">–</div><div class="small">50 = MSP-Median-Niveau · 60+ = solide WM-Form</div></section>
 <section class="card kpi third"><div class="label">Konsistenz <button class="infoBtn" onclick="showInfo('consistency')">i</button></div><div class="value" id="consistencyKpi">–</div><div class="small">median-relative Stabilität · 0–100</div></section>
 
 <section id="resilientBanner" class="card full" style="display:none;background:#fff8e6;border-color:#f0d99b">
@@ -70,6 +70,11 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="part"><strong>Verbesserung</strong><div id="readinessImprovementInfo" class="small">–</div></div>
 <div class="part"><strong>Datenbasis</strong><div id="readinessSampleInfo" class="small">–</div></div>
 </div><div id="readinessMethodText" class="small" style="margin-top:8px">–</div>
+<div id="readinessZoneBox" class="item" style="margin-top:8px;background:#f8fafc">
+<strong id="readinessZoneTitle">Readiness-Zone</strong>
+<div id="readinessZoneText" class="small" style="margin-top:3px">–</div>
+<div class="small" style="margin-top:5px">Orientierung: 50 = MSP-Median-Niveau · 60 = solide WM-Form · 70 = starke WM-Form · 80 = sehr starke WM-Form · 90+ = außergewöhnliche WM-Form.</div>
+</div>
 <div class="parts" style="margin-top:8px">
 <div class="part"><strong>Ø letzte 10 vs. Median</strong><div id="readinessRawFormInfo" class="small">–</div></div>
 <div class="part"><strong>Aktualitätsgewichteter Ø</strong><div id="readinessWeightedFormInfo" class="small">–</div></div>
@@ -435,6 +440,17 @@ async function loadAll(){renderUnavailable();
  }catch(e){coachRecommendation.textContent='Trainingsanalyse konnte nicht geladen werden.'}
 
 
+ function readinessZone(score){
+   const s=Number(score);
+   if(!Number.isFinite(s)) return {title:'Readiness-Zone',text:'Noch keine belastbare Einstufung.'};
+   if(s>=90) return {title:'90+ · Außergewöhnliche WM-Form',text:'Über mehrere unterschiedliche 500er deutlich und stabil über MSP-Median-Niveau.'};
+   if(s>=80) return {title:'80–89 · Sehr starke WM-Form',text:'Klar überdurchschnittliches, stabiles Leistungsniveau mit sehr guter WM-Nähe.'};
+   if(s>=70) return {title:'70–79 · Starke WM-Form',text:'Deutlich über MSP-Median-Niveau und bereits wettkampfnah.'};
+   if(s>=60) return {title:'60–69 · Solide WM-Form',text:'Über MSP-Median-Niveau; gute Basis, aber noch Potenzial bei Stärke oder Stabilität.'};
+   if(s>=50) return {title:'50–59 · MSP-Niveau / Aufbauzone',text:'Ungefähr MSP-Median-Niveau. Gute Basis, für starke WM-Form braucht es noch mehr wiederholbare Resultate über Median.'};
+   return {title:'Unter 50 · Aufbauphase',text:'Aktuell unter dem angestrebten MSP-Median-Niveau; Fokus auf stabile, saubere 500er statt auf einzelne Bestzeiten.'};
+ }
+
  try{
    let ex=unavailableIds(); let w=await getj('/coach/wm-plan'+(ex.length?'?exclude_puzzle_ids='+encodeURIComponent(ex.join(',')):''));
    const resilientBannerEl=document.getElementById('resilientBanner');
@@ -461,6 +477,21 @@ async function loadAll(){renderUnavailable();
    }
    wmReadiness.textContent=w.readiness_score==null?'–':w.readiness_score+'/100';
     if(document.getElementById('readinessTopKpi')) readinessTopKpi.textContent=w.readiness_score==null?'–':w.readiness_score+'/100';
+    if(document.getElementById('readinessZoneTitle') && document.getElementById('readinessZoneText')){
+      const rz=readinessZone(w.readiness_score);
+      let deltaText='';
+      try{
+        const prevRaw=localStorage.getItem('npc_readiness_previous');
+        const prev=prevRaw==null?null:Number(prevRaw);
+        const cur=Number(w.readiness_score);
+        if(Number.isFinite(prev)&&Number.isFinite(cur)&&prev!==cur){
+          const d=cur-prev; deltaText=` Seit der letzten geladenen Bewertung: ${d>0?'+':''}${d} Punkte.`;
+        }
+        if(Number.isFinite(cur)) localStorage.setItem('npc_readiness_previous',String(cur));
+      }catch(e){}
+      readinessZoneTitle.textContent=rz.title;
+      readinessZoneText.textContent=rz.text+deltaText;
+    }
     if(document.getElementById('readinessBaseInfo')) readinessBaseInfo.textContent=`${w.readiness_base??'–'} Punkte · 50 + 2 Punkte je Prozentpunkt unter/über MSP-Median`;
     if(document.getElementById('readinessConsistencyInfo')) readinessConsistencyInfo.textContent=`${w.readiness_consistency_modifier>=0?'+':''}${w.readiness_consistency_modifier??'–'} Punkte`;
     if(document.getElementById('readinessHitInfo')) readinessHitInfo.textContent=`${w.readiness_hit_modifier>=0?'+':''}${w.readiness_hit_modifier??'–'} Punkte · ${w.median_hit_count??0} von ${w.median_normalized_sample_count??0} unter/auf Median (${w.median_hit_rate??'–'}%)`;
