@@ -29,7 +29,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.8.15",
+    version="6.8.16",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -278,10 +278,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.8.15","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.8.16","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.8.15"}
+def health(): return {"status":"ok","version":"6.8.16"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -296,7 +296,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.8.15",
+        "version":"6.8.16",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -492,15 +492,15 @@ async def msp_api_test(db:Session=Depends(get_db)):
         return {"ok":False,"mode":"pat","reason":"MSP_PERSONAL_ACCESS_TOKEN not configured"}
     try:
         profile=await get_profile(token)
-        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.15","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
+        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.16","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
     except Exception as exc:
-        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.15","error":str(exc)}
+        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.16","error":str(exc)}
 
 @app.get("/msp/sync-status")
 def msp_sync_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     return {
-        "version":"6.8.15",
+        "version":"6.8.16",
         "snapshot_id":snap.id if snap else None,
         "synced_at":snap.synced_at if snap else None,
         "data_available":snap is not None,
@@ -883,6 +883,64 @@ async def _enrich_plan_puzzle_predictions(plan, token=None):
 
     return plan
 
+
+@app.get("/coach/repeat-priority")
+def repeat_priority(limit:int=5, db:Session=Depends(get_db)):
+    payload,source,snapshot_id=_best_available_payload(db)
+    if not payload:return {"available":False,"items":[],"count":0,"message":"Noch keine synchronisierten MySpeedPuzzling-Daten vorhanden."}
+    try:
+        rows=normalize_results(payload.get("results") or {})
+        from app.wm_coach import _extract_library_puzzles,_history_for_puzzle,_days_since_last_solve
+        items=[]
+        for p in _extract_library_puzzles(payload.get("collections") or {}):
+            if not isinstance(p,dict):continue
+            try:
+                if int(p.get("pieces") or 0)!=500:continue
+            except Exception:continue
+            hist=_history_for_puzzle(rows,p)
+            if not hist:continue
+            vals=[]
+            for r in hist:
+                try:vals.append(int(r.get("seconds")))
+                except Exception:pass
+            if not vals:continue
+            latest=vals[0];previous=vals[1] if len(vals)>1 else None;best=min(vals);solves=len(vals);days=_days_since_last_solve(hist)
+            ins=p.get("msp_insights") or {};stats=ins.get("statistics") or p.get("statistics") or {}
+            solo=stats.get("solo") if isinstance(stats,dict) else {}
+            try:median=int((solo or {}).get("median_seconds")) if (solo or {}).get("median_seconds") is not None else None
+            except Exception:median=None
+            score=0.0;reasons=[]
+            gap=latest-median if median is not None else None
+            if gap is not None:
+                if gap>0:
+                    score+=min(42.0,12.0+(gap/max(1,median))*70.0);reasons.append(f"{_fmt_seconds(gap)} über MSP-Median")
+                else:
+                    score-=12;reasons.append("MSP-Median bereits erreicht")
+            delta=latest-previous if previous is not None else None
+            if delta is not None:
+                if delta<0:score+=min(22.0,7.0+(-delta)/90.0);reasons.append(f"zuletzt {_fmt_seconds(-delta)} verbessert")
+                elif delta>0:score+=4;reasons.append(f"zuletzt {_fmt_seconds(delta)} langsamer")
+            if solves==1:score+=18;reasons.append("erst 1 Solo-Lauf")
+            elif solves==2:score+=14;reasons.append("erst 2 Solo-Läufe")
+            elif solves<=4:score+=8;reasons.append(f"erst {solves} Solo-Läufe")
+            elif solves>=8:score-=6;reasons.append(f"bereits {solves} Solo-Läufe")
+            if days is not None:
+                if days<3:score-=28;reasons.append(f"erst vor {days} Tagen gelöst")
+                elif days<7:score-=10;reasons.append(f"vor {days} Tagen gelöst")
+                elif days>=30:score+=8;reasons.append(f"seit {days} Tagen nicht gelöst")
+                elif days>=14:score+=5;reasons.append(f"seit {days} Tagen nicht gelöst")
+            pbgap=latest-best
+            if pbgap>0:score+=min(10.0,pbgap/120.0);reasons.append(f"{_fmt_seconds(pbgap)} über eigener Bestzeit")
+            score=max(0,min(100,score))
+            label="Sehr hoch" if score>=70 else "Hoch" if score>=50 else "Mittel" if score>=30 else "Niedrig"
+            items.append({"id":p.get("id"),"name":p.get("name"),"manufacturer":p.get("manufacturer"),"image_url":p.get("image_url"),"score":round(score,1),"label":label,
+                          "latest":_fmt_seconds(latest),"previous":_fmt_seconds(previous) if previous is not None else None,"best":_fmt_seconds(best),
+                          "solo_solves":solves,"days_since_last_solve":days,"median":_fmt_seconds(median) if median is not None else None,
+                          "median_gap":_fmt_seconds(gap) if gap is not None and gap>0 else None,"reasons":reasons[:5]})
+        items.sort(key=lambda x:x["score"],reverse=True);items=items[:max(1,min(limit,10))]
+        return {"available":bool(items),"items":items,"count":len(items),"snapshot_id":snapshot_id,"data_source":source,
+                "message":"Priorisierung bereits gelöster 500er – Trainingsnutzen aus MSP-Daten, keine eigene Zeitprognose."}
+    except Exception as exc:return {"available":False,"items":[],"count":0,"message":"Wiederholungs-Priorität derzeit nicht verfügbar.","error":str(exc)}
 
 @app.get("/coach/unsolved-library")
 def unsolved_library(db:Session=Depends(get_db)):
