@@ -70,6 +70,11 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="part"><strong>Verbesserung</strong><div id="readinessImprovementInfo" class="small">–</div></div>
 <div class="part"><strong>Datenbasis</strong><div id="readinessSampleInfo" class="small">–</div></div>
 </div><div id="readinessMethodText" class="small" style="margin-top:8px">–</div>
+<div class="parts" style="margin-top:8px">
+<div class="part"><strong>Ø letzte 10 vs. Median</strong><div id="readinessRawFormInfo" class="small">–</div></div>
+<div class="part"><strong>Aktualitätsgewichteter Ø</strong><div id="readinessWeightedFormInfo" class="small">–</div></div>
+<div class="part"><strong>Readiness-Formsignal</strong><div id="readinessBlendedFormInfo" class="small">–</div></div>
+</div>
 <div style="margin-top:9px"><strong>Kontrolle der letzten vergleichbaren 500er</strong><div id="readinessMedianAudit" class="small" style="margin-top:5px">–</div></div></details><div class="item" style="margin-top:12px"><strong>🧩 Nächstes empfohlenes Puzzle</strong><div id="wmNextPuzzle" class="small">Bibliothek wird ausgewertet…</div></div>
 <div class="item" style="margin-top:10px"><strong>Nächste empfohlene Einheit</strong><div id="wmRecommendation" class="small">WM-Plan wird berechnet…</div></div>
 <div class="item" style="margin-top:10px"><strong>🎯 Größte Abstände zum MSP-Median · Top 5</strong><div id="medianGapFocus" class="small">Medianvergleich wird berechnet…</div></div><div class="item" style="margin-top:10px"><strong>📈 Fortschritt pro Puzzle</strong><div id="puzzleProgress" class="small">Fortschritt wird geladen…</div></div><div class="item" style="margin-top:10px"><strong>🎯 Wo lohnt sich die nächste Wiederholung am meisten?</strong><div id="repeatPriority" class="small">Wiederholungs-Priorität wird berechnet…</div></div><div class="item" style="margin-top:10px"><strong>🆕 Noch ungelöste Puzzle in meiner Library</strong><div id="unsolvedLibrary" class="small">Library wird geprüft…</div></div>
@@ -463,6 +468,9 @@ async function loadAll(){renderUnavailable();
     if(document.getElementById('readinessImprovementInfo')) readinessImprovementInfo.textContent=`${w.readiness_improvement_modifier>=0?'+':''}${w.readiness_improvement_modifier??'–'} Punkte`;
     if(document.getElementById('readinessSampleInfo')) readinessSampleInfo.textContent=`${w.median_normalized_sample_count??0} vergleichbare 500er · Trainingsbelastung: kein Einfluss`;
     if(document.getElementById('readinessMethodText')) readinessMethodText.textContent=w.readiness_explanation||w.readiness_definition||'';
+    if(document.getElementById('readinessRawFormInfo')) readinessRawFormInfo.textContent=(w.median_normalized_form_percent==null?'–':`${w.median_normalized_form_percent>=0?'+':''}${w.median_normalized_form_percent}%`);
+    if(document.getElementById('readinessWeightedFormInfo')) readinessWeightedFormInfo.textContent=(w.weighted_form_percent==null?'–':`${w.weighted_form_percent>=0?'+':''}${w.weighted_form_percent}%`);
+    if(document.getElementById('readinessBlendedFormInfo')) readinessBlendedFormInfo.textContent=(w.readiness_form_percent==null?'–':`${w.readiness_form_percent>=0?'+':''}${w.readiness_form_percent}% · 70% Gesamtform / 30% Aktualität`);
     if(document.getElementById('readinessMedianAudit')){
       try{
         const a=Array.isArray(w.median_samples)?w.median_samples:[];

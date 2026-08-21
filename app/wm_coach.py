@@ -876,7 +876,10 @@ def _median_normalized_performance(all_results, library_payload, target_pieces=5
 
     # WM form should react more strongly to the newest puzzles while still
     # retaining context from all 10. Newest -> oldest weights.
-    recency_weights=[10,9,8,7,6,5,4,3,2,1][:len(recent)]
+    # Moderate recency advantage: newest results matter, but 2-3 recent
+    # misses must not erase a strong 10-puzzle performance profile.
+    # Newest -> oldest weights across 10 samples.
+    recency_weights=[1.30,1.24,1.18,1.12,1.06,1.00,0.94,0.88,0.82,0.76][:len(recent)]
     weight_sum=sum(recency_weights) or 1
     weighted_form=sum(v*w for v,w in zip(vals,recency_weights))/weight_sum
 
@@ -961,8 +964,11 @@ def build_wm_plan(all_results, my_competitions, library_payload=None, target_pie
     if normalized.get("available"):
         weighted_form=normalized.get("weighted_form_percent", normalized_form or 0)
         quality_score=normalized.get("performance_quality_score", 50)
-        base_readiness=50 + weighted_form*2.0
-        quality_modifier=(quality_score-50)*0.20
+        # 70% complete 10-puzzle form + 30% recency-weighted form.
+        # This preserves current-form sensitivity without overreacting.
+        readiness_form=(normalized_form or 0)*0.70 + weighted_form*0.30
+        base_readiness=50 + readiness_form*2.0
+        quality_modifier=(quality_score-50)*0.15
     else:
         weighted_form=normalized_form or 0
         quality_score=50
@@ -1068,7 +1074,7 @@ def build_wm_plan(all_results, my_competitions, library_payload=None, target_pie
             'time': _fmt(r.get('seconds')),
         } for r in reversed(r10)
     ]
-    return {'target_pieces':target_pieces,'next_competition':next_comp,'days_until':days,'phase':phase,'count':len(rows),'best':_fmt(min(times)),'median':_fmt(median(times)),'average_all':_fmt(mean(times)),'recent5':_fmt(avg5),'recent10':_fmt(avg10),'recent20':_fmt(avg20),'trend10_percent':trend,'current_zone':{'from':_fmt(lo),'to':_fmt(hi)},'dynamic_target':_fmt(target),'dynamic_target_seconds':round(target),'wm_goal_realistic':_fmt(realistic),'wm_goal_realistic_seconds':round(realistic),'wm_goal_first_try':_fmt(first_try_target),'wm_goal_first_try_seconds':round(first_try_target),'wm_goal_repeat':_fmt(repeat_target),'wm_goal_repeat_seconds':round(repeat_target),'wm_goal_first_try_samples':first_try_samples,'wm_goal_repeat_samples':repeat_samples,'wm_goal_first_try_factor':round(first_try_factor,3),'wm_goal_stretch':_fmt(stretch),'wm_goal_stretch_seconds':round(stretch),'recent10_seconds':round(avg10),'progress_recent':progress_recent,'consistency_500':consistency,'readiness_score':readiness,'median_normalized_form_percent':normalized_form,'median_normalized_sample_count':normalized.get('sample_count',0),'median_hit_rate':normalized.get('median_hit_rate'),'median_hit_count':normalized.get('median_hit_count',0),'median_miss_count':normalized.get('median_miss_count',0),'median_samples':normalized.get('samples',[]),'median_audit':{'hit_count':normalized.get('median_hit_count',0),'miss_count':normalized.get('median_miss_count',0),'sample_count':normalized.get('sample_count',0),'hit_rate':normalized.get('median_hit_rate')},'weighted_form_percent':normalized.get('weighted_form_percent'),'performance_quality_score':normalized.get('performance_quality_score'),
+    return {'target_pieces':target_pieces,'next_competition':next_comp,'days_until':days,'phase':phase,'count':len(rows),'best':_fmt(min(times)),'median':_fmt(median(times)),'average_all':_fmt(mean(times)),'recent5':_fmt(avg5),'recent10':_fmt(avg10),'recent20':_fmt(avg20),'trend10_percent':trend,'current_zone':{'from':_fmt(lo),'to':_fmt(hi)},'dynamic_target':_fmt(target),'dynamic_target_seconds':round(target),'wm_goal_realistic':_fmt(realistic),'wm_goal_realistic_seconds':round(realistic),'wm_goal_first_try':_fmt(first_try_target),'wm_goal_first_try_seconds':round(first_try_target),'wm_goal_repeat':_fmt(repeat_target),'wm_goal_repeat_seconds':round(repeat_target),'wm_goal_first_try_samples':first_try_samples,'wm_goal_repeat_samples':repeat_samples,'wm_goal_first_try_factor':round(first_try_factor,3),'wm_goal_stretch':_fmt(stretch),'wm_goal_stretch_seconds':round(stretch),'recent10_seconds':round(avg10),'progress_recent':progress_recent,'consistency_500':consistency,'readiness_score':readiness,'median_normalized_form_percent':normalized_form,'median_normalized_sample_count':normalized.get('sample_count',0),'median_hit_rate':normalized.get('median_hit_rate'),'median_hit_count':normalized.get('median_hit_count',0),'median_miss_count':normalized.get('median_miss_count',0),'median_samples':normalized.get('samples',[]),'median_audit':{'hit_count':normalized.get('median_hit_count',0),'miss_count':normalized.get('median_miss_count',0),'sample_count':normalized.get('sample_count',0),'hit_rate':normalized.get('median_hit_rate')},'weighted_form_percent':normalized.get('weighted_form_percent'),'performance_quality_score':normalized.get('performance_quality_score'),'readiness_form_percent':round(readiness_form,1) if normalized.get('available') else None,
         'readiness_base':round(base_readiness,1),
         'readiness_consistency_modifier':round(consistency_modifier,1),
         'readiness_hit_modifier':round(hit_modifier,1),
@@ -1076,4 +1082,4 @@ def build_wm_plan(all_results, my_competitions, library_payload=None, target_pie
         'readiness_sample_modifier':round(sample_modifier,1),
         'readiness_improvement_modifier':round(improvement_modifier,1),
         'readiness_load_penalty':0,
-        'readiness_definition':'50 = MSP-Median-Niveau; 100 = außergewöhnlich starke, stabile und aktuelle WM-Form.','next_training':training,'recent_training_days_7':recent_days,'weekly_plan':weekly,'recommendation':recommendation,'training_load_7':load7,'training_load_14':load14,'wm_pace_per_100':_fmt(pace100),'weakness_focus':weakness,'next_puzzle':next_puzzle,'simulation_puzzle':simulation_puzzle,'readiness_explanation':'50/100 entspricht ungefähr MSP-Median-Niveau. 100/100 steht für außergewöhnlich starke, stabile und aktuelle WM-Form. Basis ist der letzte Solo-Versuch je 500er relativ zum offiziellen MSP-Median; ergänzt um Konsistenz, Median-Trefferquote, Aktualität und Datenbreite. Verbesserung kann nur Bonuspunkte geben. Trainingsbelastung beeinflusst die WM-Readiness nicht. Der Median-Nachweis zeigt die tatsächlich verwendeten Vergleichspuzzle einzeln.','goal_explanation':'Realistisches WM-Ziel basiert auf den letzten 5/10 500er-Solozeiten; Stretch Goal bleibt durch die historische Bestzeit begrenzt.'}
+        'readiness_definition':'50 = MSP-Median-Niveau; 100 = außergewöhnlich starke, stabile und aktuelle WM-Form.','next_training':training,'recent_training_days_7':recent_days,'weekly_plan':weekly,'recommendation':recommendation,'training_load_7':load7,'training_load_14':load14,'wm_pace_per_100':_fmt(pace100),'weakness_focus':weakness,'next_puzzle':next_puzzle,'simulation_puzzle':simulation_puzzle,'readiness_explanation':'50/100 entspricht ungefähr MSP-Median-Niveau. 100/100 steht für außergewöhnlich starke, stabile und aktuelle WM-Form. Hauptbasis sind die letzten 10 vergleichbaren 500er relativ zum jeweiligen offiziellen MSP-Median. 70% des Formsignals stammen aus dem normalen 10-Puzzle-Durchschnitt, 30% aus einem moderat aktualitätsgewichteten Durchschnitt. Die Höhe der Abweichung zählt direkt. Ergänzt wird um Konsistenz, Median-Trefferquote, Aktualität und Datenbreite. Verbesserung kann nur Bonuspunkte geben. Trainingsbelastung beeinflusst die WM-Readiness nicht.','goal_explanation':'Realistisches WM-Ziel basiert auf den letzten 5/10 500er-Solozeiten; Stretch Goal bleibt durch die historische Bestzeit begrenzt.'}
