@@ -61,15 +61,16 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="metric"><div class="label">Nächster Trainingstyp</div><b id="wmTrainingType">–</b><div class="small" id="wmTrainingReason">–</div></div>
 </div>
 <details class="readinessInfo" id="readinessInfoBox"><summary>ℹ️ WM-Readiness: Definition & Berechnungsnachweis</summary>
-<div class="small" style="margin-top:7px"><strong>Skala:</strong> 50/100 = ungefähr MSP-Median-Niveau. 100/100 = außergewöhnlich starke, stabile und aktuelle WM-Form über mehrere unterschiedliche 500er. Schwierige Puzzle werden fair bewertet, weil nicht die Rohzeit zählt, sondern Nicoles letzter Versuch relativ zum MSP-Median genau dieses Puzzles.</div>
+<div class="small" style="margin-top:7px"><strong>Skala:</strong> 50/100 = ungefähr MSP-Median-Niveau. 100/100 = außergewöhnlich starke, stabile und aktuelle WM-Form über mehrere unterschiedliche 500er. Schwierige Puzzle werden fair bewertet, weil nicht die Rohzeit zählt, sondern Nicoles letzter Versuch relativ zum MSP-Median genau dieses Puzzles. Trainingsbelastung hat keinen Einfluss auf diesen Wert.</div>
 <div class="readinessFormula">
 <div class="part"><strong>Basis</strong><div id="readinessBaseInfo" class="small">–</div></div>
 <div class="part"><strong>Konsistenz</strong><div id="readinessConsistencyInfo" class="small">–</div></div>
 <div class="part"><strong>Median-Treffer</strong><div id="readinessHitInfo" class="small">–</div></div>
 <div class="part"><strong>Aktualität</strong><div id="readinessRecencyInfo" class="small">–</div></div>
 <div class="part"><strong>Verbesserung</strong><div id="readinessImprovementInfo" class="small">–</div></div>
-<div class="part"><strong>Trainingsbelastung</strong><div id="readinessLoadInfo" class="small">–</div></div>
-</div><div id="readinessMethodText" class="small" style="margin-top:8px">–</div></details><div class="item" style="margin-top:12px"><strong>🧩 Nächstes empfohlenes Puzzle</strong><div id="wmNextPuzzle" class="small">Bibliothek wird ausgewertet…</div></div>
+<div class="part"><strong>Datenbasis</strong><div id="readinessSampleInfo" class="small">–</div></div>
+</div><div id="readinessMethodText" class="small" style="margin-top:8px">–</div>
+<div style="margin-top:9px"><strong>Kontrolle der letzten vergleichbaren 500er</strong><div id="readinessMedianAudit" class="small" style="margin-top:5px">–</div></div></details><div class="item" style="margin-top:12px"><strong>🧩 Nächstes empfohlenes Puzzle</strong><div id="wmNextPuzzle" class="small">Bibliothek wird ausgewertet…</div></div>
 <div class="item" style="margin-top:10px"><strong>Nächste empfohlene Einheit</strong><div id="wmRecommendation" class="small">WM-Plan wird berechnet…</div></div>
 <div class="item" style="margin-top:10px"><strong>🎯 Größte Abstände zum MSP-Median · Top 5</strong><div id="medianGapFocus" class="small">Medianvergleich wird berechnet…</div></div><div class="item" style="margin-top:10px"><strong>📈 Fortschritt pro Puzzle</strong><div id="puzzleProgress" class="small">Fortschritt wird geladen…</div></div><div class="item" style="margin-top:10px"><strong>🎯 Wo lohnt sich die nächste Wiederholung am meisten?</strong><div id="repeatPriority" class="small">Wiederholungs-Priorität wird berechnet…</div></div><div class="item" style="margin-top:10px"><strong>🆕 Noch ungelöste Puzzle in meiner Library</strong><div id="unsolvedLibrary" class="small">Library wird geprüft…</div></div>
 <div class="metricrow" style="margin-top:10px"><div class="metric"><div class="label">Training Load · 7 Tage</div><b id="wmLoad7">–</b><div class="small" id="wmLoad7Info">–</div></div><div class="metric"><div class="label">Training Load · 14 Tage</div><b id="wmLoad14">–</b><div class="small" id="wmLoad14Info">–</div></div><div class="metric"><div class="label">WM-Pace / 100 Teile</div><b id="wmPace100">–</b><div class="small" id="wmWeakness">–</div></div></div>
@@ -444,11 +445,18 @@ async function loadAll(){renderUnavailable();
     if(document.getElementById('readinessTopKpi')) readinessTopKpi.textContent=w.readiness_score==null?'–':w.readiness_score+'/100';
     if(document.getElementById('readinessBaseInfo')) readinessBaseInfo.textContent=`${w.readiness_base??'–'} Punkte · 50 + 2 Punkte je Prozentpunkt unter/über MSP-Median`;
     if(document.getElementById('readinessConsistencyInfo')) readinessConsistencyInfo.textContent=`${w.readiness_consistency_modifier>=0?'+':''}${w.readiness_consistency_modifier??'–'} Punkte`;
-    if(document.getElementById('readinessHitInfo')) readinessHitInfo.textContent=`${w.readiness_hit_modifier>=0?'+':''}${w.readiness_hit_modifier??'–'} Punkte · ${w.median_hit_rate??'–'}% Median erreicht`;
+    if(document.getElementById('readinessHitInfo')) readinessHitInfo.textContent=`${w.readiness_hit_modifier>=0?'+':''}${w.readiness_hit_modifier??'–'} Punkte · ${w.median_hit_count??0} von ${w.median_normalized_sample_count??0} unter/auf Median (${w.median_hit_rate??'–'}%)`;
     if(document.getElementById('readinessRecencyInfo')) readinessRecencyInfo.textContent=`${w.readiness_recency_modifier>=0?'+':''}${w.readiness_recency_modifier??'–'} Punkte`;
     if(document.getElementById('readinessImprovementInfo')) readinessImprovementInfo.textContent=`${w.readiness_improvement_modifier>=0?'+':''}${w.readiness_improvement_modifier??'–'} Punkte`;
-    if(document.getElementById('readinessLoadInfo')) readinessLoadInfo.textContent=`-${w.readiness_load_penalty??0} Punkte`;
+    if(document.getElementById('readinessSampleInfo')) readinessSampleInfo.textContent=`${w.median_normalized_sample_count??0} vergleichbare 500er · Trainingsbelastung: kein Einfluss`;
     if(document.getElementById('readinessMethodText')) readinessMethodText.textContent=w.readiness_explanation||w.readiness_definition||'';
+    if(document.getElementById('readinessMedianAudit')){
+      const a=w.median_samples||[];
+      readinessMedianAudit.innerHTML=a.length?a.map((s,i)=>{
+        const ok=s.median_reached===true;
+        return `<div style="padding:4px 0;border-top:${i?'1px solid #edf0f4':'0'}"><strong>${i+1}. ${esc(s.puzzle_name||'Puzzle')}</strong> · letzte Zeit ${fmtSec(s.seconds)} · MSP-Median ${fmtSec(s.median_seconds)} · <strong>${ok?'✓ Median erreicht':'✗ über Median'}</strong> · ${Number(s.performance_percent)>=0?'+':''}${s.performance_percent}%</div>`;
+      }).join(''):'Keine vergleichbaren Median-Daten vorhanden.';
+    }
    wmPhase.textContent=(w.days_until!=null?`Noch ${w.days_until} Tage · `:'')+(w.phase?.name||'Planung')+' · '+(w.phase?.description||'')+(w.median_hit_rate!=null?` · ${w.median_hit_rate}% Median erreicht (${w.median_normalized_sample_count||0} Puzzle)`:``);
    if(document.getElementById('wmGoalFirstTry')) wmGoalFirstTry.textContent=w.wm_goal_first_try||w.wm_goal_realistic||'–';
    if(document.getElementById('wmGoalRepeat')) wmGoalRepeat.textContent=w.wm_goal_repeat||w.wm_goal_realistic||'–';
