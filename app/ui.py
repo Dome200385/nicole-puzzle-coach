@@ -401,6 +401,16 @@ async function loadRepeatPriority(){
  const days=p.days_since_last_solve!=null?` · zuletzt vor ${p.days_since_last_solve} Tagen`:'';
  return `<div class="puzzleRow" style="margin-top:${i?8:4}px;padding-top:${i?8:0}px;${i?'border-top:1px solid #e5e7eb;':''}">${p.image_url?`<img class="puzzleImg" src="${p.image_url}" alt="${p.name||'Puzzle'}" loading="lazy" onerror="this.style.display='none'">`:''}<div class="puzzleInfo"><strong>${i+1}. ${p.name||'Puzzle'}</strong>${p.manufacturer?' · '+p.manufacturer:''}<div class="small">Priorität <strong>${p.score}/100</strong> · ${p.label}</div><div class="small">Letzte ${p.latest}${prev} · Best ${p.best}${med}${days}</div><div class="small">${(p.reasons||[]).join(' · ')}</div></div></div>`}).join('');
  }catch(e){el.textContent='Wiederholungs-Priorität derzeit nicht verfügbar.'}}
+
+function readinessTime(seconds){
+  const n=Number(seconds);
+  if(!Number.isFinite(n)||n<0)return '–';
+  const s=Math.round(n);
+  const h=Math.floor(s/3600);
+  const m=Math.floor((s%3600)/60);
+  const sec=s%60;
+  return h>0?`${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`:`${m}:${String(sec).padStart(2,'0')}`;
+}
 async function loadAll(){renderUnavailable();
  try{let st=await getj('/coach/status');systemKpi.textContent='OK';systemText.textContent=`Backend V${st.version} · Datenbank ok`;systemBadge.textContent='🟢 System bereit';mspKpi.textContent=st.data_source==='legacy'?'LEGACY':(st.has_myspeedpuzzling_data?'DATA':(st.pat_configured?'PAT':(st.oauth_configured?'READY':'WAIT')));mspText.textContent=st.data_source==='legacy'?'Historische DB-Daten aktiv':(st.has_myspeedpuzzling_data?`Letzter Datenstand verfügbar · Snapshot #${st.latest_snapshot_id||'–'}`:(st.pat_configured?'PAT eingerichtet · noch kein Snapshot':'Verbindung möglich'))}catch(e){systemBadge.textContent='🔴 Fehler'}
 
@@ -451,11 +461,17 @@ async function loadAll(){renderUnavailable();
     if(document.getElementById('readinessSampleInfo')) readinessSampleInfo.textContent=`${w.median_normalized_sample_count??0} vergleichbare 500er · Trainingsbelastung: kein Einfluss`;
     if(document.getElementById('readinessMethodText')) readinessMethodText.textContent=w.readiness_explanation||w.readiness_definition||'';
     if(document.getElementById('readinessMedianAudit')){
-      const a=w.median_samples||[];
-      readinessMedianAudit.innerHTML=a.length?a.map((s,i)=>{
-        const ok=s.median_reached===true;
-        return `<div style="padding:4px 0;border-top:${i?'1px solid #edf0f4':'0'}"><strong>${i+1}. ${esc(s.puzzle_name||'Puzzle')}</strong> · letzte Zeit ${fmtSec(s.seconds)} · MSP-Median ${fmtSec(s.median_seconds)} · <strong>${ok?'✓ Median erreicht':'✗ über Median'}</strong> · ${Number(s.performance_percent)>=0?'+':''}${s.performance_percent}%</div>`;
-      }).join(''):'Keine vergleichbaren Median-Daten vorhanden.';
+      try{
+        const a=Array.isArray(w.median_samples)?w.median_samples:[];
+        readinessMedianAudit.innerHTML=a.length?a.map((s,i)=>{
+          const ok=s.median_reached===true;
+          const pct=Number(s.performance_percent);
+          const pctText=Number.isFinite(pct)?`${pct>=0?'+':''}${pct.toFixed(1)}%`:'–';
+          return `<div style="padding:5px 0;border-top:${i?'1px solid #edf0f4':'0'}"><strong>${i+1}. ${esc(s.puzzle_name||'Puzzle')}</strong> · letzte Zeit ${readinessTime(s.seconds)} · MSP-Median ${readinessTime(s.median_seconds)} · <strong>${ok?'✓ Median erreicht':'✗ über Median'}</strong> · ${pctText}</div>`;
+        }).join(''):'Keine vergleichbaren Median-Daten vorhanden.';
+      }catch(auditError){
+        readinessMedianAudit.textContent='Median-Nachweis konnte nicht dargestellt werden.';
+      }
     }
    wmPhase.textContent=(w.days_until!=null?`Noch ${w.days_until} Tage · `:'')+(w.phase?.name||'Planung')+' · '+(w.phase?.description||'')+(w.median_hit_rate!=null?` · ${w.median_hit_rate}% Median erreicht (${w.median_normalized_sample_count||0} Puzzle)`:``);
    if(document.getElementById('wmGoalFirstTry')) wmGoalFirstTry.textContent=w.wm_goal_first_try||w.wm_goal_realistic||'–';
