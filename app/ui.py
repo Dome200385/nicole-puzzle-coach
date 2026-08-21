@@ -402,6 +402,9 @@ async function loadRepeatPriority(){
  return `<div class="puzzleRow" style="margin-top:${i?8:4}px;padding-top:${i?8:0}px;${i?'border-top:1px solid #e5e7eb;':''}">${p.image_url?`<img class="puzzleImg" src="${p.image_url}" alt="${p.name||'Puzzle'}" loading="lazy" onerror="this.style.display='none'">`:''}<div class="puzzleInfo"><strong>${i+1}. ${p.name||'Puzzle'}</strong>${p.manufacturer?' · '+p.manufacturer:''}<div class="small">Priorität <strong>${p.score}/100</strong> · ${p.label}</div><div class="small">Letzte ${p.latest}${prev} · Best ${p.best}${med}${days}</div><div class="small">${(p.reasons||[]).join(' · ')}</div></div></div>`}).join('');
  }catch(e){el.textContent='Wiederholungs-Priorität derzeit nicht verfügbar.'}}
 
+function readinessEsc(value){
+  return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 function readinessTime(seconds){
   const n=Number(seconds);
   if(!Number.isFinite(n)||n<0)return '–';
@@ -467,10 +470,10 @@ async function loadAll(){renderUnavailable();
           const ok=s.median_reached===true;
           const pct=Number(s.performance_percent);
           const pctText=Number.isFinite(pct)?`${pct>=0?'+':''}${pct.toFixed(1)}%`:'–';
-          return `<div style="padding:5px 0;border-top:${i?'1px solid #edf0f4':'0'}"><strong>${i+1}. ${esc(s.puzzle_name||'Puzzle')}</strong> · letzte Zeit ${readinessTime(s.seconds)} · MSP-Median ${readinessTime(s.median_seconds)} · <strong>${ok?'✓ Median erreicht':'✗ über Median'}</strong> · ${pctText}</div>`;
+          return `<div style="padding:5px 0;border-top:${i?'1px solid #edf0f4':'0'}"><strong>${i+1}. ${readinessEsc(s.puzzle_name||'Puzzle')}</strong> · letzte Zeit ${readinessTime(s.seconds)} · MSP-Median ${readinessTime(s.median_seconds)} · <strong>${ok?'✓ Median erreicht':'✗ über Median'}</strong> · ${pctText}</div>`;
         }).join(''):'Keine vergleichbaren Median-Daten vorhanden.';
       }catch(auditError){
-        readinessMedianAudit.textContent='Median-Nachweis konnte nicht dargestellt werden.';
+        readinessMedianAudit.textContent='Median-Nachweis konnte nicht dargestellt werden: '+(auditError?.message||'unbekannter Darstellungsfehler');
       }
     }
    wmPhase.textContent=(w.days_until!=null?`Noch ${w.days_until} Tage · `:'')+(w.phase?.name||'Planung')+' · '+(w.phase?.description||'')+(w.median_hit_rate!=null?` · ${w.median_hit_rate}% Median erreicht (${w.median_normalized_sample_count||0} Puzzle)`:``);
