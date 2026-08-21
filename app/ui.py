@@ -24,15 +24,16 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 .infoBtn{border:1px solid var(--line);background:#eef3ff;color:var(--text);width:20px;height:20px;padding:0;border-radius:50%;font-size:12px;line-height:18px;margin-left:4px}
 .modal{display:none;position:fixed;inset:0;background:rgba(20,25,35,.45);z-index:99;align-items:center;justify-content:center;padding:20px}.modal.open{display:flex}.modalbox{max-width:620px;width:100%;background:#fff;border-radius:18px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.2)}.modalbox h2{margin-bottom:10px}.modalbox p{line-height:1.5}.scale{display:grid;gap:7px;margin:14px 0}.scale div{padding:9px;border-radius:9px;background:#f5f7fb}
 @media(max-width:900px){.kpi,.third,.half{grid-column:span 12}.formgrid,.metricrow,.simGrid,.progressTargets{grid-template-columns:1fr}.historyRow{grid-template-columns:50px 1fr auto}}
-.goalSplit{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:4px 0}.goalSplit b{font-size:18px}</style></head>
+.goalSplit{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:4px 0}.goalSplit b{font-size:18px}
+.headerRight{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}.techStatus{font-size:10px;color:#788295;background:#eef2f7;border-radius:999px;padding:5px 8px}.techStatus strong{font-size:10px;color:#344054}.compactRefresh{font-size:10px!important;padding:5px 8px!important}.grid>.kpi.third{grid-column:span 4}.readinessInfo{background:#f8fafc;border:1px solid #dbe4ef;border-radius:12px;padding:11px;margin:10px 0}.readinessInfo summary{cursor:pointer;font-weight:800}.readinessFormula{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:8px}.readinessFormula .part{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:7px}@media(max-width:900px){.readinessFormula{grid-template-columns:1fr}.headerRight{justify-content:flex-start}.techStatus{white-space:normal}}
+</style></head>
 <body><div class="wrap">
-<header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div id="systemBadge" class="badge">System wird geprüft…</div> <button id="mspRefreshBtn" class="secondary" style="margin-left:8px;padding:6px 10px" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button></header>
+<header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button></div></header>
 
 <div class="grid">
-<section class="card kpi"><div class="label">System</div><div class="value" id="systemKpi">–</div><div class="small" id="systemText"></div></section>
-<section class="card kpi"><div class="label">MySpeedPuzzling</div><div class="value" id="mspKpi">–</div><div class="small" id="mspText"></div></section>
-<section class="card kpi"><div class="label">Form <button class="infoBtn" onclick="showInfo('form')">i</button></div><div class="value" id="trendKpi">–</div><div class="small">letzte Solo-Ergebnisse</div></section>
-<section class="card kpi"><div class="label">Konsistenz <button class="infoBtn" onclick="showInfo('consistency')">i</button></div><div class="value" id="consistencyKpi">–</div><div class="small">0–100</div></section>
+<section class="card kpi third"><div class="label">Form · vs MSP-Median <button class="infoBtn" onclick="showInfo('form')">i</button></div><div class="value" id="trendKpi">–</div><div class="small">letzter Solo-Versuch je vergleichbarem 500er</div></section>
+<section class="card kpi third"><div class="label">WM-Readiness <button class="infoBtn" onclick="document.getElementById('readinessInfoBox').open=true;document.getElementById('readinessInfoBox').scrollIntoView({behavior:'smooth',block:'center'})">i</button></div><div class="value" id="readinessTopKpi">–</div><div class="small">50 = MSP-Median-Niveau · 100 = außergewöhnliche WM-Form</div></section>
+<section class="card kpi third"><div class="label">Konsistenz <button class="infoBtn" onclick="showInfo('consistency')">i</button></div><div class="value" id="consistencyKpi">–</div><div class="small">median-relative Stabilität · 0–100</div></section>
 
 <section id="resilientBanner" class="card full" style="display:none;background:#fff8e6;border-color:#f0d99b">
   <strong>🛡️ Resilient Mode</strong>
@@ -47,7 +48,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <section class="card full hero"><h2>🏁 WM Coach · Adaptive Preparation</h2>
 
 <div class="metricrow">
-<div class="metric"><div class="label">WM-Readiness · median-normalisiert</div><b id="wmReadiness">–</b><div class="small" id="wmPhase">–</div></div>
+<div class="metric"><div class="label">WM-Readiness · Detail</div><b id="wmReadiness">–</b><div class="small" id="wmPhase">–</div></div>
 <div class="metric"><div class="label">Realistisches Puzzle-Ziel</div>
 <div class="goalSplit"><span class="small">First Try</span><b id="wmGoalFirstTry">–</b></div>
 <div class="goalSplit"><span class="small">bekannt / mehrfach gemacht</span><b id="wmGoalRepeat">–</b></div>
@@ -59,7 +60,16 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="metric"><div class="label">Trainings-Zielzeit</div><b id="wmTarget">–</b><div class="small" id="wmTrend">–</div></div>
 <div class="metric"><div class="label">Nächster Trainingstyp</div><b id="wmTrainingType">–</b><div class="small" id="wmTrainingReason">–</div></div>
 </div>
-<div class="item" style="margin-top:12px"><strong>🧩 Nächstes empfohlenes Puzzle</strong><div id="wmNextPuzzle" class="small">Bibliothek wird ausgewertet…</div></div>
+<details class="readinessInfo" id="readinessInfoBox"><summary>ℹ️ WM-Readiness: Definition & Berechnungsnachweis</summary>
+<div class="small" style="margin-top:7px"><strong>Skala:</strong> 50/100 = ungefähr MSP-Median-Niveau. 100/100 = außergewöhnlich starke, stabile und aktuelle WM-Form über mehrere unterschiedliche 500er. Schwierige Puzzle werden fair bewertet, weil nicht die Rohzeit zählt, sondern Nicoles letzter Versuch relativ zum MSP-Median genau dieses Puzzles.</div>
+<div class="readinessFormula">
+<div class="part"><strong>Basis</strong><div id="readinessBaseInfo" class="small">–</div></div>
+<div class="part"><strong>Konsistenz</strong><div id="readinessConsistencyInfo" class="small">–</div></div>
+<div class="part"><strong>Median-Treffer</strong><div id="readinessHitInfo" class="small">–</div></div>
+<div class="part"><strong>Aktualität</strong><div id="readinessRecencyInfo" class="small">–</div></div>
+<div class="part"><strong>Verbesserung</strong><div id="readinessImprovementInfo" class="small">–</div></div>
+<div class="part"><strong>Trainingsbelastung</strong><div id="readinessLoadInfo" class="small">–</div></div>
+</div><div id="readinessMethodText" class="small" style="margin-top:8px">–</div></details><div class="item" style="margin-top:12px"><strong>🧩 Nächstes empfohlenes Puzzle</strong><div id="wmNextPuzzle" class="small">Bibliothek wird ausgewertet…</div></div>
 <div class="item" style="margin-top:10px"><strong>Nächste empfohlene Einheit</strong><div id="wmRecommendation" class="small">WM-Plan wird berechnet…</div></div>
 <div class="item" style="margin-top:10px"><strong>🎯 Größte Abstände zum MSP-Median · Top 5</strong><div id="medianGapFocus" class="small">Medianvergleich wird berechnet…</div></div><div class="item" style="margin-top:10px"><strong>📈 Fortschritt pro Puzzle</strong><div id="puzzleProgress" class="small">Fortschritt wird geladen…</div></div><div class="item" style="margin-top:10px"><strong>🎯 Wo lohnt sich die nächste Wiederholung am meisten?</strong><div id="repeatPriority" class="small">Wiederholungs-Priorität wird berechnet…</div></div><div class="item" style="margin-top:10px"><strong>🆕 Noch ungelöste Puzzle in meiner Library</strong><div id="unsolvedLibrary" class="small">Library wird geprüft…</div></div>
 <div class="metricrow" style="margin-top:10px"><div class="metric"><div class="label">Training Load · 7 Tage</div><b id="wmLoad7">–</b><div class="small" id="wmLoad7Info">–</div></div><div class="metric"><div class="label">Training Load · 14 Tage</div><b id="wmLoad14">–</b><div class="small" id="wmLoad14Info">–</div></div><div class="metric"><div class="label">WM-Pace / 100 Teile</div><b id="wmPace100">–</b><div class="small" id="wmWeakness">–</div></div></div>
@@ -68,7 +78,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="item" style="margin-top:10px"><strong>📅 Plan für die aktuelle Trainingswoche</strong><div id="wmWeeklyPlan" class="list" style="margin-top:8px"></div></div>
 </section>
 
-<section class="card full simHero" id="wmSimulationCard"><h2>🏁 WM-Simulation <span class="pill">V6.8.17</span></h2>
+<section class="card full simHero" id="wmSimulationCard"><h2>🏁 WM-Simulation <span class="pill">V6.8.18</span></h2>
 <div class="small">Eigenständige WM-Simulation mit einem <strong>anderen Puzzle als im normalen Wochenplan</strong>. Ausgeliehene Puzzles bleiben ausgeschlossen.</div>
 <div id="wmSimSuggestion" class="item" style="margin-top:10px">Simulations-Puzzle wird gewählt…</div>
 <div id="wmSimActive" class="item activeTraining" style="display:none;margin-top:10px">
@@ -130,7 +140,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <section class="card full"><h2>📝 Zusätzliche manuelle Trainings</h2><div id="manualTrainings" class="list"></div></section>
 
 <section class="card full"><h2>🧠 Tournament Intelligence</h2>
-<div class="small">V6.8.17 MSP-only Puzzle Predictions + Frontend Snapshot Recovery: konkrete Puzzle-Prognosen stammen ausschliesslich aus MySpeedPuzzling; WM-Ziele und Coach-Logik bleiben unverändert. Lokale Turnier-Fallbacks: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
+<div class="small">V6.8.18 MSP-only Puzzle Predictions + Frontend Snapshot Recovery: konkrete Puzzle-Prognosen stammen ausschliesslich aus MySpeedPuzzling; WM-Ziele und Coach-Logik bleiben unverändert. Lokale Turnier-Fallbacks: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
 <div style="margin-top:12px"><a class="btn secondary" href="/docs" target="_blank">API-Dokumentation</a> <a class="btn secondary" href="/msp/my-competitions?refresh=true" target="_blank">Anmeldungen neu prüfen</a> <a class="btn secondary" href="/sync" target="_blank">MySpeedPuzzling neu synchronisieren</a> <a class="btn secondary" href="/msp/library" target="_blank">Puzzle-Bibliothek prüfen</a></div>
 </section>
 </div></div>
@@ -431,6 +441,14 @@ async function loadAll(){renderUnavailable();
      mspCompetitions.innerHTML=`<div class="item"><strong>${fallbackCompetition.name}</strong><div class="small">${dateText(fallbackCompetition.date_from)}${fallbackCompetition.date_to?' – '+dateText(fallbackCompetition.date_to):''}${fallbackCompetition.location?' · '+fallbackCompetition.location:''}</div><span class="pill">✅ Angemeldet</span><span class="pill">⏳ ${countdownText(fallbackCompetition.date_from)}</span>${fallbackCompetition.registration_source==='local_fallback'?'<span class="pill">lokaler Fallback</span>':''}</div>`;
    }
    wmReadiness.textContent=w.readiness_score==null?'–':w.readiness_score+'/100';
+    if(document.getElementById('readinessTopKpi')) readinessTopKpi.textContent=w.readiness_score==null?'–':w.readiness_score+'/100';
+    if(document.getElementById('readinessBaseInfo')) readinessBaseInfo.textContent=`${w.readiness_base??'–'} Punkte · 50 + 2 Punkte je Prozentpunkt unter/über MSP-Median`;
+    if(document.getElementById('readinessConsistencyInfo')) readinessConsistencyInfo.textContent=`${w.readiness_consistency_modifier>=0?'+':''}${w.readiness_consistency_modifier??'–'} Punkte`;
+    if(document.getElementById('readinessHitInfo')) readinessHitInfo.textContent=`${w.readiness_hit_modifier>=0?'+':''}${w.readiness_hit_modifier??'–'} Punkte · ${w.median_hit_rate??'–'}% Median erreicht`;
+    if(document.getElementById('readinessRecencyInfo')) readinessRecencyInfo.textContent=`${w.readiness_recency_modifier>=0?'+':''}${w.readiness_recency_modifier??'–'} Punkte`;
+    if(document.getElementById('readinessImprovementInfo')) readinessImprovementInfo.textContent=`${w.readiness_improvement_modifier>=0?'+':''}${w.readiness_improvement_modifier??'–'} Punkte`;
+    if(document.getElementById('readinessLoadInfo')) readinessLoadInfo.textContent=`-${w.readiness_load_penalty??0} Punkte`;
+    if(document.getElementById('readinessMethodText')) readinessMethodText.textContent=w.readiness_explanation||w.readiness_definition||'';
    wmPhase.textContent=(w.days_until!=null?`Noch ${w.days_until} Tage · `:'')+(w.phase?.name||'Planung')+' · '+(w.phase?.description||'')+(w.median_hit_rate!=null?` · ${w.median_hit_rate}% Median erreicht (${w.median_normalized_sample_count||0} Puzzle)`:``);
    if(document.getElementById('wmGoalFirstTry')) wmGoalFirstTry.textContent=w.wm_goal_first_try||w.wm_goal_realistic||'–';
    if(document.getElementById('wmGoalRepeat')) wmGoalRepeat.textContent=w.wm_goal_repeat||w.wm_goal_realistic||'–';
