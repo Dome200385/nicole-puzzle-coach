@@ -24,12 +24,12 @@ from app.coach import (
     next_puzzle_recommendation, manual_training_overview, tournament_countdown
 )
 from app.msp_analytics import build_training_summary, normalize_results
-from app.wm_coach import build_wm_plan
+from app.wm_coach import build_wm_plan, _median_normalized_performance
 from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.8.16",
+    version="6.8.17",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -278,10 +278,10 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.8.16","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.8.17","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.8.16"}
+def health(): return {"status":"ok","version":"6.8.17"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -296,7 +296,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.8.16",
+        "version":"6.8.17",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -492,15 +492,15 @@ async def msp_api_test(db:Session=Depends(get_db)):
         return {"ok":False,"mode":"pat","reason":"MSP_PERSONAL_ACCESS_TOKEN not configured"}
     try:
         profile=await get_profile(token)
-        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.16","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
+        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.17","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
     except Exception as exc:
-        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.16","error":str(exc)}
+        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.17","error":str(exc)}
 
 @app.get("/msp/sync-status")
 def msp_sync_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     return {
-        "version":"6.8.16",
+        "version":"6.8.17",
         "snapshot_id":snap.id if snap else None,
         "synced_at":snap.synced_at if snap else None,
         "data_available":snap is not None,
@@ -1404,7 +1404,34 @@ def msp_training_summary(db:Session=Depends(get_db)):
     if not s:
         raise HTTPException(404,"Noch keine MySpeedPuzzling-Daten synchronisiert")
     payload=_snapshot_payload(s)
-    return build_training_summary(payload["results"])
+    summary=build_training_summary(payload["results"])
+    normalized=_median_normalized_performance(
+        normalize_results(payload["results"]),
+        payload.get("collections") or {},
+        target_pieces=500,
+        limit=10
+    )
+    if normalized.get("available"):
+        form=normalized.get("form_percent")
+        summary["form_percent"]=form
+        summary["consistency_score"]=normalized.get("consistency_score")
+        summary["median_hit_rate"]=normalized.get("median_hit_rate")
+        summary["median_normalized_sample_count"]=normalized.get("sample_count")
+        summary["median_normalized_samples"]=normalized.get("samples")
+        if form is None:
+            recommendation="Weitere median-normalisierte 500er-Ergebnisse sammeln."
+        elif form>=5:
+            recommendation="Sehr starke aktuelle Form: die letzten Puzzle liegen im Schnitt klar unter ihrem MSP-Median."
+        elif form>=0:
+            recommendation="Gute aktuelle Form: die letzten Puzzle liegen im Schnitt auf oder unter ihrem MSP-Median."
+        elif form>-5:
+            recommendation="Solide Form auf schwierigkeitsbereinigter Basis; einzelne Median-Lücken gezielt bearbeiten."
+        else:
+            recommendation="Aktuell liegen mehrere letzte Versuche über ihrem jeweiligen MSP-Median; gezielte Wiederholungen priorisieren."
+        summary["recommendation"]=recommendation
+        summary["method"]["form"]="Latest Solo attempt per 500-piece puzzle vs official MSP Solo median; one sample per puzzle."
+        summary["method"]["consistency"]="Variation of recent puzzle-specific median-relative performance, not raw solve time."
+    return summary
 
 @app.get("/coach/msp-training-live")
 async def msp_training_live(db:Session=Depends(get_db)):
@@ -1412,7 +1439,22 @@ async def msp_training_live(db:Session=Depends(get_db)):
     token=await _valid_access_token(db)
     try:
         results=await get_results(token)
-        return build_training_summary(results)
+        summary=build_training_summary(results)
+        snap=_latest_snapshot(db)
+        if snap:
+            payload=_snapshot_payload(snap)
+            normalized=_median_normalized_performance(
+                normalize_results(results),
+                payload.get("collections") or {},
+                target_pieces=500,
+                limit=10
+            )
+            if normalized.get("available"):
+                summary["form_percent"]=normalized.get("form_percent")
+                summary["consistency_score"]=normalized.get("consistency_score")
+                summary["median_hit_rate"]=normalized.get("median_hit_rate")
+                summary["median_normalized_sample_count"]=normalized.get("sample_count")
+        return summary
     except Exception as exc:
         raise HTTPException(502,f"MySpeedPuzzling training analysis failed: {exc}")
 
