@@ -646,14 +646,15 @@ async function refreshFromMSP(){
     const r=await getj('/sync');
     const n=r.new_results_count||0;
     if(status)status.textContent='Daten geladen · Dashboard wird neu berechnet…';
-    // Refresh core first; heavy detail areas only if the user has opened them.
-    await loadAll();
-    const extraJobs=[];
-    if(trainingExtrasLoaded)extraJobs.push(loadMedianGapFocus(),loadRepeatPriority(),loadUnsolvedLibrary());
-    if(progressExtrasLoaded)extraJobs.push(loadPuzzleProgress());
-    if(extraJobs.length)await Promise.allSettled(extraJobs);
+    // /sync itself succeeded. Secondary dashboard panels must never turn this
+    // into the misleading message "Sync fehlgeschlagen".
+    const reloadJobs=[loadAll()];
+    if(trainingExtrasLoaded)reloadJobs.push(loadMedianGapFocus(),loadRepeatPriority(),loadUnsolvedLibrary());
+    if(progressExtrasLoaded)reloadJobs.push(loadPuzzleProgress());
+    const reloadResults=await Promise.allSettled(reloadJobs);
+    const partialReload=reloadResults.some(x=>x.status==='rejected');
     if(btn)btn.textContent=n?`✓ ${n} neue Ergebnis${n===1?'':'se'}`:'✓ Aktuell';
-    if(status)status.textContent='Synchronisierung abgeschlossen';
+    if(status)status.textContent=partialReload?'Synchronisiert · einzelne Ansicht wird nachgeladen':'Synchronisierung abgeschlossen';
   }catch(e){
     if(btn)btn.textContent='⚠ Sync fehlgeschlagen';
     if(status)status.textContent='Bitte erneut versuchen';
@@ -1169,13 +1170,6 @@ async function loadAll(){renderUnavailable();
 
  try{
    let data=await competitionsPromise;let rows=data.competitions||[];
-   // The dedicated competition endpoint is authoritative for live connectivity.
-   if(data.live_ok===true){
-     const rb=document.getElementById('resilientBanner');
-     if(rb)rb.style.display='none';
-     if(document.getElementById('mspKpi'))mspKpi.textContent='LIVE';
-     if(document.getElementById('mspText'))mspText.textContent='MySpeedPuzzling live verbunden · MSP Live-Sync aktiv';
-   }
    if(rows.length){
      let c=rows[0];
      nextMspCompetition.innerHTML=`<strong>${c.name}</strong><br>${dateText(c.date_from)}${c.location?' · '+c.location:''}${c.country_code?' · '+c.country_code.toUpperCase():''}<br><span class="pill">✅ Angemeldet</span><span class="pill">⏳ ${countdownText(c.date_from)}</span>`;
@@ -1185,9 +1179,8 @@ async function loadAll(){renderUnavailable();
      mspCompetitions.innerHTML='<div class="small">Keine bestätigten zukünftigen Turniere.</div>';
    }
  }catch(e){
-   if(!nextMspCompetition.innerHTML || nextMspCompetition.textContent.includes('Prüfe bestätigte Anmeldung')){
-     nextMspCompetition.textContent='Live-Anmeldung derzeit nicht erreichbar.';
-   }
+   nextMspCompetition.textContent='Turnierdaten werden beim nächsten erfolgreichen Abruf erneut geladen.';
+   mspCompetitions.innerHTML='<div class="small">Bestätigte Turniere derzeit nicht abrufbar.</div>';
  }
 
 }

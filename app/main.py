@@ -29,7 +29,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.11.0",
+    version="6.11.1",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -278,7 +278,7 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.11.0","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.11.1","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 
 def _ensure_readiness_history_table(db):
@@ -360,7 +360,7 @@ def pwa_manifest():
 
 @app.get("/sw.js")
 def pwa_service_worker():
-    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v6110';
+    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v6111';
 const SHELL=['/manifest.webmanifest','/pwa/icon-192.png','/pwa/icon-512.png','/pwa/icon-maskable-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(SHELL)).catch(()=>{}));
@@ -398,7 +398,7 @@ def pwa_asset(filename:str):
     return FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.11.0"}
+def health(): return {"status":"ok","version":"6.11.1"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -413,7 +413,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.11.0",
+        "version":"6.11.1",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -609,15 +609,15 @@ async def msp_api_test(db:Session=Depends(get_db)):
         return {"ok":False,"mode":"pat","reason":"MSP_PERSONAL_ACCESS_TOKEN not configured"}
     try:
         profile=await get_profile(token)
-        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.11.0","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
+        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.11.1","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
     except Exception as exc:
-        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.11.0","error":str(exc)}
+        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.11.1","error":str(exc)}
 
 @app.get("/msp/sync-status")
 def msp_sync_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     return {
-        "version":"6.11.0",
+        "version":"6.11.1",
         "snapshot_id":snap.id if snap else None,
         "synced_at":snap.synced_at if snap else None,
         "data_available":snap is not None,
@@ -789,7 +789,19 @@ async def my_competitions(
     except Exception as exc:
         api_meta={"api_error":str(exc)}
 
-    merged=_merge_competitions(api_list,_local_confirmed_competitions())
+    # If only the competition sub-request is unavailable, prefer competitions
+    # saved by the last successful official sync before using local continuity.
+    snapshot_list=[]
+    if not api_list:
+        try:
+            snap=_latest_snapshot(db)
+            if snap:
+                snap_payload=_snapshot_payload(snap)
+                snapshot_list=snap_payload.get("confirmed_competitions") or []
+        except Exception:
+            snapshot_list=[]
+    base_list=api_list or snapshot_list
+    merged=_merge_competitions(base_list,_local_confirmed_competitions())
     live_ok=not bool(api_meta.get("api_error"))
     fallback_keys={
         str(c.get("slug") or c.get("name") or "").strip().lower()
@@ -807,7 +819,7 @@ async def my_competitions(
         "api_count":len(api_list),
         "live_ok":live_ok,
         "fallback_used":fallback_used,
-        "source":"live" if live_ok else "snapshot_plus_local_fallback",
+        "source":"live" if live_ok else ("last_official_sync_plus_local" if snapshot_list else "local_continuity"),
     }
 
 @app.get("/msp/participation-check")
@@ -1293,7 +1305,10 @@ async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
         payload.get("confirmed_competitions") or [],
         _local_confirmed_competitions()
     )
-    data_mode="snapshot" if source=="snapshot" else "legacy"
+    # A snapshot is the normal persisted result of a successful official MSP sync.
+    # Do not label the whole coach "Resilient" merely because the separate
+    # competitions request fails. Legacy mode is the actual fallback mode.
+    data_mode="live" if source=="snapshot" else "legacy"
     live_warning=None
 
     try:
@@ -1302,9 +1317,8 @@ async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
         if fresh:
             fresh_list=fresh.get("competitions",[]) if isinstance(fresh,dict) else fresh
             comps=_merge_competitions(fresh_list,_local_confirmed_competitions())
-        data_mode="live"
     except Exception as exc:
-        live_warning=f"MySpeedPuzzling Live-Zugriff derzeit nicht möglich: {exc}"
+        live_warning=f"Turnier-Liveabfrage derzeit nicht möglich: {exc}"
 
     competition_payload = comps if isinstance(comps,dict) else {"competitions": comps}
     plan=build_wm_plan(
