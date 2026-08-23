@@ -185,6 +185,9 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
   .weeklyCoachReason{font-size:10px;line-height:1.35;color:var(--muted);margin-top:8px}
   .weeklyPills{margin-top:7px}
 }
+
+.wmHeroGrid{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:10px;margin:4px 0 12px}.wmHeroReadiness,.wmHeroGoal{border:1px solid var(--line);border-radius:14px;background:#fafafa;padding:14px}.wmHeroReadiness strong{display:block;font-size:34px;margin-top:4px}.wmHeroGoal strong{display:block;font-size:24px;margin-top:4px}.wmMovedPanels{display:grid;gap:10px}.wmMovedPanels .readinessInfo,.wmMovedPanels #readinessTrendPanel{margin:0}
+@media(max-width:760px){.wmDashboard>h2{font-size:19px}.wmHeroGrid{grid-template-columns:1fr 1fr}.wmHeroReadiness{grid-column:1/-1}.wmHeroReadiness strong{font-size:40px}.wmHeroGoal strong{font-size:22px}.wmMovedPanels .readinessInfo{padding:10px}.wmMovedPanels .readinessFormula{grid-template-columns:1fr 1fr}.wmMovedPanels #readinessTrendBars{height:70px}}
 </style></head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
@@ -232,7 +235,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div id="trainingQuickReason" class="trainingQuickReason"></div>
 </div><div class="trainingPriorityGroup"><div class="item trainingDuplicatePuzzle" style="margin-top:12px"><strong>🧩 Nächstes empfohlenes Puzzle</strong><div id="wmNextPuzzle" class="small">Bibliothek wird ausgewertet…</div></div>
 <div class="item" style="margin-top:10px"><strong>📅 Plan für die aktuelle Trainingswoche</strong><div id="wmWeeklyPlan" class="list" style="margin-top:8px"></div></div>
-<div class="item simHero" id="wmSimulationCard" style="margin-top:10px"><h2>🏁 WM-Simulation <span class="pill">V6.9.9</span></h2>
+<div class="item simHero" id="wmSimulationCard" style="margin-top:10px"><h2>🏁 WM-Simulation <span class="pill">V6.10.0</span></h2>
 <div class="small">Eigenständige WM-Simulation mit einem <strong>anderen Puzzle als im normalen Wochenplan</strong>. Ausgeliehene Puzzles bleiben ausgeschlossen.</div>
 <div id="wmSimSuggestion" class="item" style="margin-top:10px">Simulations-Puzzle wird gewählt…</div>
 <div id="wmSimActive" class="item activeTraining" style="display:none;margin-top:10px">
@@ -269,7 +272,23 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="metric"><div class="label">Trainings-Zielzeit</div><b id="wmTarget">–</b><div class="small" id="wmTrend">–</div></div>
 <div class="metric"><div class="label">Nächster Trainingstyp</div><b id="wmTrainingType">–</b><div class="small" id="wmTrainingReason">–</div></div>
 </div>
-<details class="readinessInfo" id="readinessInfoBox"><summary>ℹ️ WM-Readiness: Definition & Berechnungsnachweis</summary>
+<div class="item" style="margin-top:10px"><strong>Nächste empfohlene Einheit</strong><div id="wmRecommendation" class="small">WM-Plan wird berechnet…</div></div>
+<div class="item" style="margin-top:10px"><strong>🎯 Größte Abstände zum MSP-Median · Top 5</strong><div id="medianGapFocus" class="small">Medianvergleich wird berechnet…</div></div><div class="item" style="margin-top:10px"><strong>🎯 Wo lohnt sich die nächste Wiederholung am meisten?</strong><div id="repeatPriority" class="small">Wiederholungs-Priorität wird berechnet…</div></div><div class="item" style="margin-top:10px"><strong>🆕 Noch ungelöste Puzzle in meiner Library</strong><div id="unsolvedLibrary" class="small">Library wird geprüft…</div></div>
+<div class="metricrow" style="margin-top:10px"><div class="metric"><div class="label">Training Load · 7 Tage</div><b id="wmLoad7">–</b><div class="small" id="wmLoad7Info">–</div></div><div class="metric"><div class="label">Training Load · 14 Tage</div><b id="wmLoad14">–</b><div class="small" id="wmLoad14Info">–</div></div><div class="metric"><div class="label">WM-Pace / 100 Teile</div><b id="wmPace100">–</b><div class="small" id="wmWeakness">–</div></div></div>
+<div class="item" style="margin-top:10px"><strong>500er-Leistungsbild</strong><div id="wmStats" class="small">–</div></div>
+<div id="unavailableBox" class="item loanBox" style="display:none;margin-top:10px"><strong>📦 Aktuell nicht verfügbare / ausgeliehene Puzzles</strong><div class="small">Diese Puzzles werden in allen Empfehlungen und im gesamten Wochenplan ausgeschlossen.</div><div id="unavailableList" style="margin-top:7px"></div><button class="secondary" style="margin-top:7px" onclick="restoreAllPuzzles()">Alle wieder verfügbar</button></div>
+
+</section>
+
+
+
+<section class="card full appSection wmDashboard" id="appWM" data-app-page="wm"><h2>🏁 WM · Wettkampfvorbereitung</h2>
+<div class="wmHeroGrid">
+<div class="wmHeroReadiness"><div class="label">WM-Readiness</div><strong id="wmTabReadiness">–</strong><div class="small">Aktuelle Wettkampfform auf Basis vergleichbarer 500er</div></div>
+<div class="wmHeroGoal"><div class="label">First-Try-Ziel</div><strong id="wmTabFirstTry">–</strong><div class="small">realistisches Ziel bei unbekanntem Puzzle</div></div>
+<div class="wmHeroGoal"><div class="label">Stretch Goal</div><strong id="wmTabStretch">–</strong><div class="small">ambitionierter Best-Case-Tag</div></div>
+</div>
+<div class="wmMovedPanels"><details class="readinessInfo" id="readinessInfoBox"><summary>ℹ️ WM-Readiness: Definition & Berechnungsnachweis</summary>
 <div class="small" style="margin-top:7px"><strong>Skala:</strong> 50/100 = ungefähr MSP-Median-Niveau. 100/100 = außergewöhnlich starke, stabile und aktuelle WM-Form über mehrere unterschiedliche 500er. Schwierige Puzzle werden fair bewertet, weil nicht die Rohzeit zählt, sondern Nicoles letzter Versuch relativ zum MSP-Median genau dieses Puzzles. Trainingsbelastung hat keinen Einfluss auf diesen Wert.</div>
 <div class="readinessFormula">
 <div class="part"><strong>Basis</strong><div id="readinessBaseInfo" class="small">–</div></div>
@@ -296,17 +315,8 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div id="readinessTrendBars" style="display:flex;align-items:flex-end;gap:4px;height:82px;margin-top:8px"></div>
 <div id="readinessTrendChanges" class="small" style="margin-top:7px"></div>
 </div>
-<div class="item" style="margin-top:10px"><strong>Nächste empfohlene Einheit</strong><div id="wmRecommendation" class="small">WM-Plan wird berechnet…</div></div>
-<div class="item" style="margin-top:10px"><strong>🎯 Größte Abstände zum MSP-Median · Top 5</strong><div id="medianGapFocus" class="small">Medianvergleich wird berechnet…</div></div><div class="item" style="margin-top:10px"><strong>🎯 Wo lohnt sich die nächste Wiederholung am meisten?</strong><div id="repeatPriority" class="small">Wiederholungs-Priorität wird berechnet…</div></div><div class="item" style="margin-top:10px"><strong>🆕 Noch ungelöste Puzzle in meiner Library</strong><div id="unsolvedLibrary" class="small">Library wird geprüft…</div></div>
-<div class="metricrow" style="margin-top:10px"><div class="metric"><div class="label">Training Load · 7 Tage</div><b id="wmLoad7">–</b><div class="small" id="wmLoad7Info">–</div></div><div class="metric"><div class="label">Training Load · 14 Tage</div><b id="wmLoad14">–</b><div class="small" id="wmLoad14Info">–</div></div><div class="metric"><div class="label">WM-Pace / 100 Teile</div><b id="wmPace100">–</b><div class="small" id="wmWeakness">–</div></div></div>
-<div class="item" style="margin-top:10px"><strong>500er-Leistungsbild</strong><div id="wmStats" class="small">–</div></div>
-<div id="unavailableBox" class="item loanBox" style="display:none;margin-top:10px"><strong>📦 Aktuell nicht verfügbare / ausgeliehene Puzzles</strong><div class="small">Diese Puzzles werden in allen Empfehlungen und im gesamten Wochenplan ausgeschlossen.</div><div id="unavailableList" style="margin-top:7px"></div><button class="secondary" style="margin-top:7px" onclick="restoreAllPuzzles()">Alle wieder verfügbar</button></div>
-
-</section>
-
-
-
-<section class="card full appSection" id="appWM" data-app-page="wm"><h2>📈 Fortschritt bis zur WM</h2>
+</div>
+<h2 style="margin-top:16px">📈 Fortschritt bis zur WM</h2>
 <div class="small">Die letzten 10 500er-Solozeiten im Vergleich zu aktuellem Niveau und WM-Zielen. Entscheidend ist das wiederholbare Leistungsniveau, nicht eine einzelne Bestzeit.
 <div class="progressTargets">
 <div class="targetCard"><div class="label">Aktuelles Niveau</div><b id="progressCurrent">–</b><div class="small">Ø letzte 10</div></div>
@@ -360,6 +370,7 @@ function showInfo(type){
 function closeInfo(){infoModal.classList.remove('open')}
 
 function timeToSeconds(v){if(!v)return null;let p=v.split(':').map(Number);if(p.some(Number.isNaN))return null;if(p.length===3)return p[0]*3600+p[1]*60+p[2];if(p.length===2)return p[0]*60+p[1];return Number(v)}
+function displayPuzzleTime(v){if(!v)return '–';let sec=timeToSeconds(String(v));if(sec==null||!Number.isFinite(sec))return v;let h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),ss=Math.floor(sec%60);return h>0?`${h}:${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`:`${m}:${String(ss).padStart(2,'0')}`}
 async function getj(u){let r=await fetch(u),d=await r.json();if(!r.ok)throw new Error(d.detail||'Fehler');return d}
 function dateText(v){if(!v)return'–';try{return new Date(v).toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit',year:'numeric'})}catch(e){return v}}
 function countdownText(v){if(!v)return'';let ms=new Date(v)-new Date();if(ms<=0)return'Heute / gestartet';let d=Math.floor(ms/86400000),h=Math.floor((ms%86400000)/3600000);return d>1?`Noch ${d} Tage`:d===1?`Noch 1 Tag ${h} Std.`:`Noch ${h} Stunden`}
@@ -903,6 +914,7 @@ async function loadAll(){renderUnavailable();
    wmPace100.textContent=w.wm_pace_per_100||'–'; wmWeakness.textContent=w.weakness_focus?`Aktueller Fokus: ${w.weakness_focus}`:'–';
    wmStats.textContent=w.count?`${w.count} × 500er Solo · Best ${w.best} · Median ${w.median} · Ø letzte 5 ${w.recent5} · Ø letzte 10 ${w.recent10} · Ø letzte 20 ${w.recent20}`:'Noch keine 500er-Daten.';
    progressCurrent.textContent=w.recent10||'–';progressTraining.textContent=w.dynamic_target||'–';progressGoal.textContent=w.wm_goal_first_try||w.wm_goal_realistic||'–';progressStretch.textContent=w.wm_goal_stretch||'–';
+   wmTabReadiness.textContent=(w.readiness_score!=null?w.readiness_score+'/100':(w.readiness!=null?w.readiness+'/100':'–'));wmTabFirstTry.textContent=w.wm_goal_first_try||w.wm_goal_realistic||'–';wmTabStretch.textContent=w.wm_goal_stretch||'–';
    let pr=w.progress_recent||[];
    if(pr.length){
      let vals=pr.map(x=>x.seconds), mn=Math.min(...vals,w.wm_goal_stretch_seconds||99999), mx=Math.max(...vals);
@@ -916,14 +928,14 @@ async function loadAll(){renderUnavailable();
      let compactImage=p.available&&p.image_url?`<img class="weeklyThumb" src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.style.display='none'">`:`<div class="weeklyThumb weeklyThumbEmpty">🧩</div>`;
      let compactName=p.available?(p.name||'Puzzle'):(p.not_required?'Technik / Recovery':'Kein Puzzle');
      let diff=p.msp_insights?.difficulty_label||'–';
-     if(p.msp_insights?.difficulty_percent!=null) diff+=` (${p.msp_insights.difficulty_percent>0?'+':''}${p.msp_insights.difficulty_percent}% ggü. Ø)`;
+     if(p.msp_insights?.difficulty_percent!=null){let dp=Number(p.msp_insights.difficulty_percent);diff=`${diff.charAt(0).toUpperCase()+diff.slice(1)} · ${dp>0?'+':''}${dp.toFixed(1)}% ggü. Ø`;}
      let medianDelta='–';
      if(p.msp_last_time_seconds!=null&&p.msp_median_seconds!=null&&p.msp_median_seconds>0){
        let d=((p.msp_last_time_seconds/p.msp_median_seconds)-1)*100;
        medianDelta=`${d>0?'+':''}${d.toFixed(1)}% ${d<=0?'unter':'über'} Median`;
      }else if(p.median_gap){medianDelta=p.median_gap+' über Median';}
      let detail=p.available
-       ? `<div class="weeklyDetail"><div class="weeklyFacts"><div class="weeklyFact"><span>MSP-Median</span><strong>${p.msp_median||'–'}</strong></div><div class="weeklyFact"><span>Letzte Zeit</span><strong>${p.msp_last_time||'–'}</strong></div><div class="weeklyFact"><span>vs. Median</span><strong>${medianDelta}</strong></div><div class="weeklyFact"><span>MSP Prediction</span><strong>${p.msp_prediction||'–'}</strong></div><div class="weeklyFact"><span>Difficulty</span><strong>${diff}</strong></div><div class="weeklyFact"><span>WM-Fit</span><strong>${p.wm_fit?.score!=null?p.wm_fit.score+'/100':'–'}</strong></div></div><div class="weeklyCoachReason"><strong>Coach:</strong> ${p.reason||p.wm_fit?.summary||'Passend für diese Trainingseinheit.'}</div><div class="weeklyPills"><span class="pill">${p.previous_solo_solves||0} Solo-Läufe</span>${p.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${p.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}${p.wm_suitability?`<span class="pill ${p.wm_suitability.level==='hoch'||p.wm_suitability.level==='gut'?'wmGood':''}">${p.wm_suitability.label}</span>`:''}</div>${p.competition_risk?.score>=80?`<div class="small riskHigh" style="padding:7px;border-radius:8px;margin-top:7px">⚠️ ${p.competition_risk.reason}</div>`:''}<button class="skipBtn" style="margin-top:8px" onclick='skipPuzzle(${JSON.stringify(p)})'>Skip – ausgeliehen</button></div>`
+       ? `<div class="weeklyDetail"><div class="weeklyFacts"><div class="weeklyFact"><span>MSP-Median</span><strong>${p.msp_median||'–'}</strong></div><div class="weeklyFact"><span>Letzte Zeit</span><strong>${p.msp_last_time||'–'}</strong></div><div class="weeklyFact"><span>vs. Median</span><strong>${medianDelta}</strong></div><div class="weeklyFact"><span>MSP Prediction</span><strong>${displayPuzzleTime(p.msp_prediction)}</strong></div><div class="weeklyFact"><span>Difficulty</span><strong>${diff}</strong></div><div class="weeklyFact"><span>WM-Fit</span><strong>${p.wm_fit?.score!=null?p.wm_fit.score+'/100':'–'}</strong></div></div><div class="weeklyCoachReason"><strong>Coach:</strong> ${p.reason||p.wm_fit?.summary||'Passend für diese Trainingseinheit.'}</div><div class="weeklyPills"><span class="pill">${p.previous_solo_solves||0} Solo-Läufe</span>${p.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${p.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}${p.wm_suitability?`<span class="pill ${p.wm_suitability.level==='hoch'||p.wm_suitability.level==='gut'?'wmGood':''}">${p.wm_suitability.label}</span>`:''}</div>${p.competition_risk?.score>=80?`<div class="small riskHigh" style="padding:7px;border-radius:8px;margin-top:7px">⚠️ ${p.competition_risk.reason}</div>`:''}<button class="skipBtn" style="margin-top:8px" onclick='skipPuzzle(${JSON.stringify(p)})'>Skip – ausgeliehen</button></div>`
        : `<div class="weeklyDetail small">${p.reason||'Für diese Technik-/Recovery-Einheit ist kein vollständiges Puzzle nötig.'}</div>`;
      let displayName=p.available?compactName:'';
      return `<details class="item weeklySession"${i===0?' open':''}><summary><div class="weeklyIndex">${i+1}</div>${compactImage}<div class="weeklySummaryText"><div class="weeklySessionTitle"><strong>${s.session}</strong><span class="pill weeklyIntensity">${s.intensity}</span></div>${displayName?`<div class="weeklyPuzzleName">${displayName}</div>`:''}<div class="small">${s.goal}</div></div></summary>${detail}</details>`;
