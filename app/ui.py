@@ -135,6 +135,17 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
   .appPageHeading{display:block;grid-column:1/-1;margin:3px 2px 0;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.08em}
 }
 @media(min-width:761px){.appPageHeading{display:none}}
+@media(max-width:760px){
+#appTraining{padding:12px}#appTraining>h2{font-size:18px;margin-bottom:8px}
+.trainingQuick{display:block;background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px;margin:8px 0 10px}
+.trainingQuickHero{display:grid;grid-template-columns:76px 1fr;gap:11px;align-items:center}
+.trainingQuickImage{width:76px;height:76px;border-radius:11px;overflow:hidden;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:28px}
+.trainingQuickImage img{width:100%;height:100%;object-fit:cover}.trainingQuickMain{min-width:0}.trainingQuickMain strong{display:block;font-size:18px;line-height:1.15}
+.trainingQuickStats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.trainingQuickStats>div{border:1px solid var(--border);border-radius:10px;padding:9px}
+.trainingQuickStats span{display:block}.trainingQuickStats strong{display:block;font-size:16px;margin-top:2px}.trainingPriorityGroup>.item{margin-top:9px!important}
+#appTraining>.metricrow{grid-template-columns:1fr 1fr;gap:8px}#appTraining>.metricrow .metric{padding:10px}#appTraining>.metricrow .metric .label{font-size:10px}
+#appTraining>.metricrow .metric b{font-size:18px}#appTraining>.metricrow .metric .small{font-size:9px;line-height:1.25}#appTraining>.metricrow .metric:nth-child(3){grid-column:1/-1}
+#readinessInfoBox{margin-top:10px}#readinessInfoBox summary{font-size:12px}#wmSimulationCard h2{font-size:15px}}
 </style></head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
@@ -170,7 +181,34 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 
 <section class="card full" data-app-page="today"><h2>✅ Meine bestätigten Turniere</h2><div id="mspCompetitions" class="list"></div></section>
 
-<section class="card full hero appSection" id="appTraining" data-app-page="training"><h2>🏁 WM Coach · Adaptive Preparation</h2>
+<section class="card full hero appSection" id="appTraining" data-app-page="training"><h2>🏁 WM Coach · Adaptive Preparation</h2><div class="mobileOnly trainingQuick">
+<div class="trainingQuickHero"><div id="trainingQuickImage" class="trainingQuickImage">🧩</div><div class="trainingQuickMain"><div class="label">Heute trainieren</div><strong id="trainingQuickPuzzle">Wird geladen…</strong><div id="trainingQuickMeta" class="small"></div></div></div>
+<div class="trainingQuickStats"><div><span class="label">Training</span><strong id="trainingQuickType">–</strong></div><div><span class="label">Ziel</span><strong id="trainingQuickTarget">–</strong></div></div>
+</div><div class="trainingPriorityGroup"><div class="item" style="margin-top:12px"><strong>🧩 Nächstes empfohlenes Puzzle</strong><div id="wmNextPuzzle" class="small">Bibliothek wird ausgewertet…</div></div>
+<div class="item" style="margin-top:10px"><strong>📅 Plan für die aktuelle Trainingswoche</strong><div id="wmWeeklyPlan" class="list" style="margin-top:8px"></div></div>
+<div class="item simHero" id="wmSimulationCard" style="margin-top:10px"><h2>🏁 WM-Simulation <span class="pill">V6.9.5</span></h2>
+<div class="small">Eigenständige WM-Simulation mit einem <strong>anderen Puzzle als im normalen Wochenplan</strong>. Ausgeliehene Puzzles bleiben ausgeschlossen.</div>
+<div id="wmSimSuggestion" class="item" style="margin-top:10px">Simulations-Puzzle wird gewählt…</div>
+<div id="wmSimActive" class="item activeTraining" style="display:none;margin-top:10px">
+  <strong>▶️ Laufende WM-Simulation</strong>
+  <div class="puzzleRow" style="margin-top:8px">
+    <div id="wmSimImage"></div>
+    <div class="puzzleInfo">
+      <strong id="wmSimName"></strong>
+      <div id="wmSimGoals" class="small"></div>
+      <div id="wmSimResult" class="small" style="margin-top:6px"></div>
+      <button class="primary" style="margin-top:8px" onclick="checkWMSimulation()">Ergebnis synchronisieren & auswerten</button>
+      <button class="secondary" style="margin-top:8px" onclick="cancelWMSimulation()">Abbrechen</button>
+    </div>
+  </div>
+</div>
+<div class="item" style="margin-top:10px">
+  <strong>📚 Simulationshistorie</strong>
+  <div id="wmSimSummary" class="small" style="margin-top:5px"></div>
+  <div id="wmSimHistory" class="list" style="margin-top:8px"></div>
+</div>
+</div>
+</div>
 
 <div class="metricrow">
 <div class="metric"><div class="label">WM-Readiness · Detail</div><b id="wmReadiness">–</b><div class="small" id="wmPhase">–</div></div>
@@ -205,31 +243,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="part"><strong>Aktualitätsgewichteter Ø</strong><div id="readinessWeightedFormInfo" class="small">–</div></div>
 <div class="part"><strong>Readiness-Formsignal</strong><div id="readinessBlendedFormInfo" class="small">–</div></div>
 </div>
-<div style="margin-top:9px"><strong>Kontrolle der letzten vergleichbaren 500er</strong><div id="readinessMedianAudit" class="small" style="margin-top:5px">–</div></div></details><div class="item" style="margin-top:12px"><strong>🧩 Nächstes empfohlenes Puzzle</strong><div id="wmNextPuzzle" class="small">Bibliothek wird ausgewertet…</div></div>
-<div class="item" style="margin-top:10px"><strong>📅 Plan für die aktuelle Trainingswoche</strong><div id="wmWeeklyPlan" class="list" style="margin-top:8px"></div></div>
-<div class="item simHero" id="wmSimulationCard" style="margin-top:10px"><h2>🏁 WM-Simulation <span class="pill">V6.9.4</span></h2>
-<div class="small">Eigenständige WM-Simulation mit einem <strong>anderen Puzzle als im normalen Wochenplan</strong>. Ausgeliehene Puzzles bleiben ausgeschlossen.</div>
-<div id="wmSimSuggestion" class="item" style="margin-top:10px">Simulations-Puzzle wird gewählt…</div>
-<div id="wmSimActive" class="item activeTraining" style="display:none;margin-top:10px">
-  <strong>▶️ Laufende WM-Simulation</strong>
-  <div class="puzzleRow" style="margin-top:8px">
-    <div id="wmSimImage"></div>
-    <div class="puzzleInfo">
-      <strong id="wmSimName"></strong>
-      <div id="wmSimGoals" class="small"></div>
-      <div id="wmSimResult" class="small" style="margin-top:6px"></div>
-      <button class="primary" style="margin-top:8px" onclick="checkWMSimulation()">Ergebnis synchronisieren & auswerten</button>
-      <button class="secondary" style="margin-top:8px" onclick="cancelWMSimulation()">Abbrechen</button>
-    </div>
-  </div>
-</div>
-<div class="item" style="margin-top:10px">
-  <strong>📚 Simulationshistorie</strong>
-  <div id="wmSimSummary" class="small" style="margin-top:5px"></div>
-  <div id="wmSimHistory" class="list" style="margin-top:8px"></div>
-</div>
-</div>
-<div id="readinessTrendPanel" class="item" style="margin-top:10px">
+<div style="margin-top:9px"><strong>Kontrolle der letzten vergleichbaren 500er</strong><div id="readinessMedianAudit" class="small" style="margin-top:5px">–</div></div></details><div id="readinessTrendPanel" class="item" style="margin-top:10px">
 <strong>📈 WM-Readiness-Verlauf</strong>
 <div class="small">Tägliche Entwicklung der Readiness bis zur WM. Pro Tag wird der aktuelle Wert gespeichert.</div>
 <div id="readinessTrendSummary" style="margin-top:6px;font-weight:700">Erster Verlaufspunkt wird gespeichert…</div>
@@ -285,7 +299,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 </section>
 
 <section class="card full appSection" id="appMore" data-app-page="more"><h2>🧠 Tournament Intelligence</h2>
-<div class="small">V6.9.4 MSP-only Puzzle Predictions + Frontend Snapshot Recovery: konkrete Puzzle-Prognosen stammen ausschliesslich aus MySpeedPuzzling; WM-Ziele und Coach-Logik bleiben unverändert. Lokale Turnier-Fallbacks: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
+<div class="small">V6.9.5 MSP-only Puzzle Predictions + Frontend Snapshot Recovery: konkrete Puzzle-Prognosen stammen ausschliesslich aus MySpeedPuzzling; WM-Ziele und Coach-Logik bleiben unverändert. Lokale Turnier-Fallbacks: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
 <div style="margin-top:12px"><a class="btn secondary" href="/docs" target="_blank">API-Dokumentation</a> <a class="btn secondary" href="/msp/my-competitions?refresh=true" target="_blank">Anmeldungen neu prüfen</a> <a class="btn secondary" href="/sync" target="_blank">MySpeedPuzzling neu synchronisieren</a> <a class="btn secondary" href="/msp/library" target="_blank">Puzzle-Bibliothek prüfen</a></div>
 </section>
 </div></div>
@@ -589,6 +603,14 @@ function initAppNavigation(){
   });
   showAppPage('today',false);
 }
+function updateTrainingQuick(w){
+ const p=w?.next_puzzle||{},img=document.getElementById('trainingQuickImage'),name=document.getElementById('trainingQuickPuzzle'),meta=document.getElementById('trainingQuickMeta'),type=document.getElementById('trainingQuickType'),target=document.getElementById('trainingQuickTarget');
+ if(name)name.textContent=p.name||'Noch keine Empfehlung';
+ if(meta)meta.textContent=[p.manufacturer,p.pieces?`${p.pieces} Teile`:null].filter(Boolean).join(' · ');
+ if(type)type.textContent=w?.next_training?.type||'–';
+ if(target)target.textContent=w?.dynamic_target||w?.wm_goal_first_try||'–';
+ if(img)img.innerHTML=p.image_url?`<img src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.parentElement.textContent='🧩'">`:'🧩';
+}
 function updateTodaySummary(w){
   const rp=document.getElementById('todayPuzzle');
   const rt=document.getElementById('todayTraining');
@@ -635,7 +657,7 @@ function readinessTime(seconds){
   return h>0?`${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`:`${m}:${String(sec).padStart(2,'0')}`;
 }
 async function loadAll(){renderUnavailable();
- // Performance V6.9.4: independent API calls start immediately in parallel.
+ // Performance V6.9.5: independent API calls start immediately in parallel.
  const exPrefetch=unavailableIds();
  const statusPromise=getj('/coach/status');
  const summaryPromise=getj('/coach/msp-training-summary');
@@ -753,6 +775,7 @@ async function loadAll(){renderUnavailable();
    }
    wmReadiness.textContent=w.readiness_score==null?'–':w.readiness_score+'/100';
    updateTodaySummary(w);
+   updateTrainingQuick(w);
     if(document.getElementById('readinessTopKpi')) readinessTopKpi.textContent=w.readiness_score==null?'–':w.readiness_score+'/100';
     captureAndRenderReadinessTrend(w);
     if(document.getElementById('readinessZoneTitle') && document.getElementById('readinessZoneText')){
