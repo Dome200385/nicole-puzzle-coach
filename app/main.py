@@ -1,3 +1,4 @@
+import httpx
 import traceback
 import time
 import asyncio
@@ -32,7 +33,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.11.8",
+    version="6.11.9",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -281,7 +282,7 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.11.8","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.11.9","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 
 def _ensure_readiness_history_table(db):
@@ -363,7 +364,7 @@ def pwa_manifest():
 
 @app.get("/sw.js")
 def pwa_service_worker():
-    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v6118';
+    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v6119';
 const SHELL=['/manifest.webmanifest','/pwa/icon-192.png','/pwa/icon-512.png','/pwa/icon-maskable-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(SHELL)).catch(()=>{}));
@@ -401,7 +402,7 @@ def pwa_asset(filename:str):
     return FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.11.8"}
+def health(): return {"status":"ok","version":"6.11.9"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -416,7 +417,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.11.8",
+        "version":"6.11.9",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -612,15 +613,15 @@ async def msp_api_test(db:Session=Depends(get_db)):
         return {"ok":False,"mode":"pat","reason":"MSP_PERSONAL_ACCESS_TOKEN not configured"}
     try:
         profile=await get_profile(token)
-        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.11.8","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
+        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.11.9","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
     except Exception as exc:
-        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.11.8","error":str(exc)}
+        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.11.9","error":str(exc)}
 
 @app.get("/msp/sync-status")
 def msp_sync_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     return {
-        "version":"6.11.8",
+        "version":"6.11.9",
         "snapshot_id":snap.id if snap else None,
         "synced_at":snap.synced_at if snap else None,
         "data_available":snap is not None,
@@ -828,11 +829,11 @@ async def my_competitions(
 
 @app.get("/msp/tournament-diagnostics")
 async def msp_tournament_diagnostics(db:Session=Depends(get_db)):
-    """V6.11.8: inspect the tournament pipeline before confirmed filtering."""
+    """V6.11.9: inspect the tournament pipeline before confirmed filtering."""
     import time as _time
     from datetime import datetime as _dt
     started=_time.monotonic()
-    diag={"version":"6.11.8","checked_at":_dt.utcnow().isoformat()+"Z","steps":[],"summary":{}}
+    diag={"version":"6.11.9","checked_at":_dt.utcnow().isoformat()+"Z","steps":[],"summary":{}}
 
     def step(name, ok, **kw):
         diag["steps"].append({"step":name,"ok":bool(ok),**kw})
@@ -1013,12 +1014,12 @@ async def msp_tournament_diagnostics(db:Session=Depends(get_db)):
 @app.get("/msp/registration-diagnostics")
 async def msp_registration_diagnostics(db:Session=Depends(get_db)):
     """
-    V6.11.8 read-only endpoint discovery for personal competition registrations.
+    V6.11.9 read-only endpoint discovery for personal competition registrations.
     No writes, no registration actions, and no coach calculations are changed.
     """
     import time as _time
     started=_time.monotonic()
-    out={"version":"6.11.8","probes":[],"targets":[],"summary":{}}
+    out={"version":"6.11.9","probes":[],"targets":[],"summary":{}}
 
     try:
         token=await asyncio.wait_for(_valid_access_token(db), timeout=7.0)
@@ -1147,6 +1148,97 @@ async def msp_registration_diagnostics(db:Session=Depends(get_db)):
         "player_match_count":len(player_matches),
         "successful_paths":[p.get("path") for p in successful],
         "player_match_paths":[p.get("path") for p in player_matches],
+        "elapsed_ms":round((_time.monotonic()-started)*1000),
+    }
+    return out
+
+
+
+@app.get("/msp/api-route-diagnostics")
+async def msp_api_route_diagnostics(db:Session=Depends(get_db)):
+    """
+    V6.11.9 read-only API route discovery.
+    Tries standard OpenAPI/schema locations and OPTIONS on known working endpoints.
+    """
+    import time as _time
+    started=_time.monotonic()
+    out={"version":"6.11.9","schemas":[],"options":[],"summary":{}}
+
+    try:
+        token=await asyncio.wait_for(_valid_access_token(db), timeout=7.0)
+    except Exception as exc:
+        out["summary"]={"ok":False,"stage":"auth","error":f"{type(exc).__name__}: {exc}"}
+        return out
+
+    headers={"Authorization":f"Bearer {token}","Accept":"application/json"}
+    origins=[
+        "https://myspeedpuzzling.com",
+        "https://myspeedpuzzling.com/api",
+        "https://myspeedpuzzling.com/api/v1",
+    ]
+    schema_paths=[
+        "/openapi.json","/api/openapi.json","/api/v1/openapi.json",
+        "/swagger.json","/api/swagger.json","/api/v1/swagger.json",
+        "/docs/openapi.json","/api/docs/openapi.json"
+    ]
+
+    async with httpx.AsyncClient(timeout=6.0,follow_redirects=True) as client:
+        seen=set()
+        for path in schema_paths:
+            url="https://myspeedpuzzling.com"+path
+            if url in seen: continue
+            seen.add(url)
+            t=_time.monotonic()
+            try:
+                r=await client.get(url,headers=headers)
+                row={"url":url,"status":r.status_code,"content_type":r.headers.get("content-type"),"elapsed_ms":round((_time.monotonic()-t)*1000)}
+                if r.status_code==200 and "json" in (r.headers.get("content-type") or "").lower():
+                    try:
+                        data=r.json()
+                        paths=data.get("paths",{}) if isinstance(data,dict) else {}
+                        route_names=list(paths.keys())
+                        row["route_count"]=len(route_names)
+                        row["registration_routes"]=[p for p in route_names if any(x in p.lower() for x in ("registr","particip","entry","competition","event"))][:100]
+                    except Exception as exc:
+                        row["parse_error"]=str(exc)
+                else:
+                    row["preview"]=r.text[:180]
+                out["schemas"].append(row)
+            except Exception as exc:
+                out["schemas"].append({"url":url,"error":f"{type(exc).__name__}: {exc}"})
+
+        # OPTIONS on known working competition endpoints may expose Allow headers.
+        option_urls=[
+            "https://myspeedpuzzling.com/api/v1/competitions",
+        ]
+        for target in (
+            "019b9ce6-3308-728e-9d10-112aa62e8888",
+            "019b9cfc-e933-7afd-99ec-b2c15eaa39a2",
+        ):
+            option_urls.append(f"https://myspeedpuzzling.com/api/v1/competitions/{target}")
+
+        for url in option_urls:
+            t=_time.monotonic()
+            try:
+                r=await client.options(url,headers=headers)
+                out["options"].append({
+                    "url":url,
+                    "status":r.status_code,
+                    "allow":r.headers.get("allow"),
+                    "access_control_allow_methods":r.headers.get("access-control-allow-methods"),
+                    "elapsed_ms":round((_time.monotonic()-t)*1000),
+                    "preview":r.text[:180]
+                })
+            except Exception as exc:
+                out["options"].append({"url":url,"error":f"{type(exc).__name__}: {exc}"})
+
+    found=[]
+    for s in out["schemas"]:
+        found.extend(s.get("registration_routes") or [])
+    out["summary"]={
+        "ok":True,
+        "schema_successes":sum(1 for s in out["schemas"] if s.get("status")==200),
+        "discovered_routes":list(dict.fromkeys(found))[:150],
         "elapsed_ms":round((_time.monotonic()-started)*1000),
     }
     return out

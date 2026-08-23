@@ -453,6 +453,14 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div id="registrationDiagStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
 <div id="registrationDiagList" class="list" style="margin-top:8px"></div>
 </section>
+<section class="card full" data-app-page="more">
+<h2>🧭 MSP API Route Discovery</h2>
+<div class="small">Liest nur öffentlich bzw. authentifiziert zugängliche API-Schemata/OPTIONS. Keine Datenänderungen.</div>
+<button class="btn secondary" style="margin-top:10px" onclick="runRouteDiagnostics()">API-Routen suchen</button>
+<div id="routeDiagStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
+<div id="routeDiagList" class="list" style="margin-top:8px"></div>
+</section>
+
 
 <section class="card full appSection" id="appMore" data-app-page="more"><h2>🧠 Tournament Intelligence</h2>
 <div class="small">V6.9.6 MSP-only Puzzle Predictions + Frontend Snapshot Recovery: konkrete Puzzle-Prognosen stammen ausschliesslich aus MySpeedPuzzling; WM-Ziele und Coach-Logik bleiben unverändert. Lokale Turnier-Fallbacks: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
@@ -1018,6 +1026,33 @@ async function runRegistrationDiagnostics(){
    list.innerHTML=targetHtml+probeHtml;
  }catch(e){
    status.textContent='Registration-Diagnose fehlgeschlagen oder Timeout.';
+   list.innerHTML=`<div class="item small">${readinessEsc(e.message||e)}</div>`;
+ }
+}
+
+
+async function runRouteDiagnostics(){
+ const status=document.getElementById('routeDiagStatus');
+ const list=document.getElementById('routeDiagList');
+ if(!status||!list)return;
+ status.textContent='API-Routen werden gesucht…'; list.innerHTML='';
+ try{
+   const r=await fetch('/msp/api-route-diagnostics',{cache:'no-store'});
+   const txt=await r.text();
+   let d; try{d=JSON.parse(txt)}catch(_){throw new Error(`HTTP ${r.status}: ${txt.slice(0,300)}`)}
+   if(!r.ok)throw new Error(`HTTP ${r.status}`);
+   status.innerHTML=`Version <strong>${d.version}</strong> · Schema-Treffer <strong>${d.summary?.schema_successes??0}</strong> · ${d.summary?.elapsed_ms??'–'} ms`;
+   const schema=(d.schemas||[]).map(s=>`<details class="item"><summary><strong>${s.status===200?'✅':'❌'} ${readinessEsc(s.url||'Schema')}</strong></summary>
+     <div class="small">HTTP ${s.status??'–'} · ${readinessEsc(s.content_type||'')}</div>
+     ${s.route_count!=null?`<div class="small">Routes: ${s.route_count}</div>`:''}
+     ${s.registration_routes?.length?`<pre class="diagPre">${readinessEsc(s.registration_routes.join('\n'))}</pre>`:''}
+     ${s.preview?`<div class="small">${readinessEsc(s.preview)}</div>`:''}
+   </details>`).join('');
+   const opts=(d.options||[]).map(o=>`<div class="item"><strong>OPTIONS ${readinessEsc(o.url||'')}</strong><div class="small">HTTP ${o.status??'–'} · Allow: ${readinessEsc(o.allow||o.access_control_allow_methods||'–')}</div></div>`).join('');
+   const discovered=d.summary?.discovered_routes||[];
+   list.innerHTML=(discovered.length?`<div class="item"><strong>🎯 Relevante gefundene Routen</strong><pre class="diagPre">${readinessEsc(discovered.join('\n'))}</pre></div>`:'')+schema+opts;
+ }catch(e){
+   status.textContent='Route Discovery fehlgeschlagen.';
    list.innerHTML=`<div class="item small">${readinessEsc(e.message||e)}</div>`;
  }
 }
