@@ -210,6 +210,13 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
   .grid>section.card.kpi[data-app-page="today"].appPageActive:not([hidden]):nth-of-type(2){grid-column:1/-1!important}
 }
 @media(min-width:761px){.grid>section[data-app-page][hidden]{display:block!important}}
+
+@media(max-width:760px){
+  body[data-app-current="today"] .trainingOnlyPuzzleLists,
+  body[data-app-current="today"] #appTraining,
+  body[data-app-current="today"] #appWM,
+  body[data-app-current="today"] [data-app-page="progress"]{display:none!important}
+}
 </style></head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
@@ -246,35 +253,19 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 </div>
 </div>
 
-<div class="metricrow">
-
-<div class="metric"><div class="label">Realistisches Puzzle-Ziel</div>
-<div class="goalSplit"><span class="small">First Try</span><b id="wmGoalFirstTry">–</b></div>
-<div class="goalSplit"><span class="small">bekannt / mehrfach gemacht</span><b id="wmGoalRepeat">–</b></div>
-<div class="small">First Try wird bewusst langsamer bewertet, da Bild, Sortierung und Suchmuster noch unbekannt sind.</div></div>
-<div class="metric"><div class="label">Stretch Goal</div><b id="wmStretch">–</b><div class="small">ambitionierter Best-Case-Tag</div></div>
-</div>
-<div class="metricrow" style="margin-top:10px">
-<div class="metric"><div class="label">Aktuelle 500er-Zone</div><b id="wmZone">–</b><div class="small">zentrale Zone der letzten 10</div></div>
-<div class="metric"><div class="label">Trainings-Zielzeit</div><b id="wmTarget">–</b><div class="small" id="wmTrend">–</div></div>
-<div class="metric"><div class="label">Nächster Trainingstyp</div><b id="wmTrainingType">–</b><div class="small" id="wmTrainingReason">–</div></div>
-</div>
-<div class="item" style="margin-top:10px"><strong>Nächste empfohlene Einheit</strong><div id="wmRecommendation" class="small">WM-Plan wird berechnet…</div></div>
-<div class="metricrow" style="margin-top:10px"><div class="metric"><div class="label">Training Load · 7 Tage</div><b id="wmLoad7">–</b><div class="small" id="wmLoad7Info">–</div></div><div class="metric"><div class="label">Training Load · 14 Tage</div><b id="wmLoad14">–</b><div class="small" id="wmLoad14Info">–</div></div><div class="metric"><div class="label">WM-Pace / 100 Teile</div><b id="wmPace100">–</b><div class="small" id="wmWeakness">–</div></div></div>
-<div class="item" style="margin-top:10px"><strong>500er-Leistungsbild</strong><div id="wmStats" class="small">–</div></div>
-<div id="unavailableBox" class="item loanBox" style="display:none;margin-top:10px"><strong>📦 Aktuell nicht verfügbare / ausgeliehene Puzzles</strong><div class="small">Diese Puzzles werden in allen Empfehlungen und im gesamten Wochenplan ausgeschlossen.</div><div id="unavailableList" style="margin-top:7px"></div><button class="secondary" style="margin-top:7px" onclick="restoreAllPuzzles()">Alle wieder verfügbar</button></div>
-<div class="trainingAnalysisBottom trainingOnlyPuzzleLists" style="margin-top:16px">
+<div id="unavailableBox" class="item loanBox" style="display:none;margin-top:10px"><strong>📦 Aktuell nicht verfügbare / ausgeliehene Puzzles</strong><div class="small">Diese Puzzles werden in allen Empfehlungen und im gesamten Wochenplan ausgeschlossen.</div><div id="unavailableList" style="margin-top:7px"></div><button class="secondary" style="margin-top:7px" onclick="restoreAllPuzzles()">Alle wieder verfügbar</button></div><div class="trainingAnalysisBottom trainingOnlyPuzzleLists" style="margin-top:16px">
   <h2>🧠 Weitere Trainingsauswahl</h2>
   <div class="item" style="margin-top:10px"><strong>🎯 Größte Abstände zum MSP-Median · Top 5</strong><div id="medianGapFocus" class="small">Medianvergleich wird berechnet…</div></div>
   <div class="item" style="margin-top:10px"><strong>🔁 Wo lohnt sich die nächste Wiederholung am meisten?</strong><div id="repeatPriority" class="small">Wiederholungs-Priorität wird berechnet…</div></div>
   <div class="item" style="margin-top:10px"><strong>🆕 Noch ungelöste Puzzle in meiner Library</strong><div id="unsolvedLibrary" class="small">Library wird geprüft…</div></div>
 </div>
 
+
 </section>
 
 
 
-<section class="card full appSection wmDashboard" id="appWM" data-app-page="wm"><h2>🏁 WM · Wettkampfvorbereitung</h2><div class="legacyDataSinks" aria-hidden="true" style="display:none"><span id="wmReadiness"></span><span id="wmPhase"></span></div>
+<section class="card full appSection wmDashboard" id="appWM" data-app-page="wm"><h2>🏁 WM · Wettkampfvorbereitung</h2><div class="legacyDataSinks" aria-hidden="true" style="display:none"><span id="wmGoalFirstTry"></span><span id="wmGoalRepeat"></span><span id="wmStretch"></span><span id="wmZone"></span><span id="wmTarget"></span><span id="wmTrend"></span><span id="wmTrainingType"></span><span id="wmTrainingReason"></span><span id="wmRecommendation"></span><span id="wmLoad7"></span><span id="wmLoad7Info"></span><span id="wmLoad14"></span><span id="wmLoad14Info"></span><span id="wmPace100"></span><span id="wmWeakness"></span><span id="wmStats"></span></div><div class="legacyDataSinks" aria-hidden="true" style="display:none"><span id="wmReadiness"></span><span id="wmPhase"></span></div>
 <div class="wmHeroGrid">
 <div class="wmHeroReadiness"><div class="label">WM-Readiness</div><strong id="wmTabReadiness">–</strong><div class="small" id="wmTabReadinessCompact">Wettkampfform · vergleichbare 500er</div></div>
 <div class="wmHeroGoal"><div class="label">First Try</div><strong id="wmTabFirstTry">–</strong></div>
@@ -645,6 +636,7 @@ async function loadRepeatPriority(){
 
 
 function showAppPage(page,scrollTop=true){
+  document.body.dataset.appCurrent=page;
   document.body.dataset.currentPage=page;
   const mobile=window.matchMedia('(max-width:760px)').matches;
   const labels={today:'Heute',training:'Training',wm:'WM',progress:'Fortschritt',more:'Mehr'};
