@@ -883,7 +883,7 @@ function updateTodaySummary(w){
 if('serviceWorker' in navigator){
   window.addEventListener('load',async()=>{
     try{
-      const reg=await navigator.serviceWorker.register('/sw.js?v=6109');
+      const reg=await navigator.serviceWorker.register('/sw.js?v=6110');
       await reg.update();
       let reloading=false;
       navigator.serviceWorker.addEventListener('controllerchange',()=>{
@@ -1051,11 +1051,8 @@ async function loadAll(){renderUnavailable();
      mspKpi.textContent='LIVE';
      mspText.textContent='MySpeedPuzzling live verbunden · MSP Live-Sync aktiv';
    }
-   let fallbackCompetition=w.next_competition||null;
-   if(fallbackCompetition){
-     nextMspCompetition.innerHTML=`<strong>${fallbackCompetition.name}</strong><br>${dateText(fallbackCompetition.date_from)}${fallbackCompetition.location?' · '+fallbackCompetition.location:''}${fallbackCompetition.country_code?' · '+fallbackCompetition.country_code.toUpperCase():''}<br><span class="pill">✅ Angemeldet</span><span class="pill">⏳ ${countdownText(fallbackCompetition.date_from)}</span>${fallbackCompetition.registration_source==='local_fallback'?'<span class="pill">lokaler Fallback</span>':''}`;
-     mspCompetitions.innerHTML=`<div class="item"><strong>${fallbackCompetition.name}</strong><div class="small">${dateText(fallbackCompetition.date_from)}${fallbackCompetition.date_to?' – '+dateText(fallbackCompetition.date_to):''}${fallbackCompetition.location?' · '+fallbackCompetition.location:''}</div><span class="pill">✅ Angemeldet</span><span class="pill">⏳ ${countdownText(fallbackCompetition.date_from)}</span>${fallbackCompetition.registration_source==='local_fallback'?'<span class="pill">lokaler Fallback</span>':''}</div>`;
-   }
+   // Competition cards are rendered only from /msp/my-competitions below.
+   // Do not let wm-plan overwrite the complete confirmed competition list.
    wmReadiness.textContent=w.readiness_score==null?'–':w.readiness_score+'/100';
    updateTodaySummary(w);
    updateTrainingQuick(w);
@@ -1172,9 +1169,21 @@ async function loadAll(){renderUnavailable();
 
  try{
    let data=await competitionsPromise;let rows=data.competitions||[];
-   if(rows.length){let c=rows[0];nextMspCompetition.innerHTML=`<strong>${c.name}</strong><br>${dateText(c.date_from)}${c.location?' · '+c.location:''}${c.country_code?' · '+c.country_code.toUpperCase():''}<br><span class="pill">✅ Angemeldet</span><span class="pill">⏳ ${countdownText(c.date_from)}</span>`;
-   mspCompetitions.innerHTML=rows.map(c=>`<div class="item"><strong>${c.name}</strong><div class="small">${dateText(c.date_from)}${c.date_to?' – '+dateText(c.date_to):''}${c.location?' · '+c.location:''}</div><span class="pill">✅ Angemeldet</span><span class="pill">⏳ ${countdownText(c.date_from)}</span>${c.link?`<br><a class="btn secondary" style="margin-top:8px" href="${c.link}" target="_blank">Turnier öffnen</a>`:''}</div>`).join('')}
-   else{nextMspCompetition.textContent='Keine bestätigte zukünftige Anmeldung gefunden.';mspCompetitions.innerHTML='<div class="small">Keine bestätigten zukünftigen Turniere.</div>'}
+   // The dedicated competition endpoint is authoritative for live connectivity.
+   if(data.live_ok===true){
+     const rb=document.getElementById('resilientBanner');
+     if(rb)rb.style.display='none';
+     if(document.getElementById('mspKpi'))mspKpi.textContent='LIVE';
+     if(document.getElementById('mspText'))mspText.textContent='MySpeedPuzzling live verbunden · MSP Live-Sync aktiv';
+   }
+   if(rows.length){
+     let c=rows[0];
+     nextMspCompetition.innerHTML=`<strong>${c.name}</strong><br>${dateText(c.date_from)}${c.location?' · '+c.location:''}${c.country_code?' · '+c.country_code.toUpperCase():''}<br><span class="pill">✅ Angemeldet</span><span class="pill">⏳ ${countdownText(c.date_from)}</span>`;
+     mspCompetitions.innerHTML=rows.map(c=>`<div class="item"><strong>${c.name}</strong><div class="small">${dateText(c.date_from)}${c.date_to?' – '+dateText(c.date_to):''}${c.location?' · '+c.location:''}${c.country_code?' · '+c.country_code.toUpperCase():''}</div><span class="pill">✅ Angemeldet</span><span class="pill">⏳ ${countdownText(c.date_from)}</span>${c.link?`<br><a class="btn secondary" style="margin-top:8px" href="${c.link}" target="_blank">Turnier öffnen</a>`:''}</div>`).join('');
+   }else{
+     nextMspCompetition.textContent='Keine bestätigte zukünftige Anmeldung gefunden.';
+     mspCompetitions.innerHTML='<div class="small">Keine bestätigten zukünftigen Turniere.</div>';
+   }
  }catch(e){
    if(!nextMspCompetition.innerHTML || nextMspCompetition.textContent.includes('Prüfe bestätigte Anmeldung')){
      nextMspCompetition.textContent='Live-Anmeldung derzeit nicht erreichbar.';
