@@ -190,7 +190,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 .wmDashboard .simHero{margin:10px 0 0}.wmProgressCompact{display:flex;gap:8px;flex-wrap:wrap}.wmProgressCompact span{background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:8px 10px;font-size:12px}.wmProgressCompact b{display:block;font-size:9px;text-transform:uppercase;color:var(--muted);letter-spacing:.04em}.wmMobileBars .pbarTime,.wmMobileBars .pbarDate{font-size:9px;white-space:nowrap}
 @media(max-width:760px){.wmDashboard>h2{font-size:19px}.wmHeroGrid{grid-template-columns:1fr 1fr}.wmHeroReadiness{grid-column:1/-1}.wmHeroReadiness strong{font-size:40px}.wmHeroGoal strong{font-size:22px}.wmMovedPanels .readinessInfo{padding:10px}.wmMovedPanels .readinessFormula{grid-template-columns:1fr 1fr}.wmMovedPanels #readinessTrendBars{height:70px}.wmMobileBars{gap:7px}.wmMobileBars .pbarTime,.wmMobileBars .pbarDate{font-size:8px}.wmDashboard .simHero h2{font-size:18px}}
 
-/* V6.10.3 hard mobile page isolation: prevents content leaking between tabs */
+/* V6.10.4 hard mobile page isolation: prevents content leaking between tabs */
 @media(max-width:760px){
   body[data-current-page="today"] section[data-app-page]:not([data-app-page="today"]),
   body[data-current-page="training"] section[data-app-page]:not([data-app-page="training"]),
@@ -201,12 +201,22 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
   .wmHeroGrid{grid-template-columns:1fr 1fr!important}
   .wmHeroReadiness{grid-column:1/-1!important}
 }
+
+@media(max-width:760px){
+  .grid>section[data-app-page]{display:none!important}
+  .grid>section[data-app-page].appPageActive:not([hidden]){display:block!important}
+  .grid>section.card.kpi[data-app-page="today"].appPageActive:not([hidden]):nth-of-type(1),
+  .grid>section.card.kpi[data-app-page="today"].appPageActive:not([hidden]):nth-of-type(3){grid-column:span 6!important}
+  .grid>section.card.kpi[data-app-page="today"].appPageActive:not([hidden]):nth-of-type(2){grid-column:1/-1!important}
+}
+@media(min-width:761px){.grid>section[data-app-page][hidden]{display:block!important}}
 </style></head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
 
 <div class="grid"><div id="appPageHeading" class="appPageHeading">Heute</div>
 <section class="card kpi third" data-app-page="today"><div class="label">Form · vs MSP-Median <button class="infoBtn" onclick="showInfo('form')">i</button></div><div class="value" id="trendKpi">–</div><div class="small">letzter Solo-Versuch je vergleichbarem 500er</div></section>
+<section class="card kpi third" data-app-page="today"><div class="label">WM-Readiness <button class="infoBtn" onclick="showInfo('readiness')">i</button></div><div class="value" id="readinessTopKpi">–</div><div class="small">50 = MSP-Median-Niveau · 60+ = solide WM-Form</div></section>
 <section class="card kpi third" data-app-page="today"><div class="label">Konsistenz <button class="infoBtn" onclick="showInfo('consistency')">i</button></div><div class="value" id="consistencyKpi">–</div><div class="small">median-relative Stabilität · 0–100</div></section>
 
 <section id="resilientBanner" class="card full" data-app-page="today" style="display:none;background:#fff8e6;border-color:#f0d99b">
@@ -214,21 +224,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
   <div id="resilientText" class="small" style="margin-top:4px"></div>
 </section>
 
-<section id="mobileTodayCard" class="card full mobileOnly todayCard" data-app-page="today">
-<h2>✨ Heute</h2>
-<div class="todayHero">
-<div id="todayPuzzleImage" class="todayPuzzleImage"></div>
-<div class="todayHeroText">
-<div class="label">Nächstes Puzzle</div>
-<strong id="todayPuzzle">Wird geladen…</strong>
-<div class="small" id="todayPuzzleMeta"></div>
-</div>
-</div>
-<div class="todayGrid todayGridSingle">
-<div><div class="label">Training</div><strong id="todayTraining">Wird geladen…</strong></div>
-</div>
-<button type="button" class="primary todayAction" id="todayTrainingBtn">Training ansehen</button>
-</section>
+
 <section class="card half hero appSection" id="appToday" data-app-page="today"><h2>🏆 Mein nächstes Turnier</h2><div id="nextMspCompetition" class="small">Prüfe bestätigte Anmeldung…</div></section>
 <section class="card half hero" data-app-page="today"><h2>🎯 Coach-Empfehlung</h2><div id="coachRecommendation" class="small">Analysiere MySpeedPuzzling-Ergebnisse…</div></section>
 
@@ -251,7 +247,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 </div>
 
 <div class="metricrow">
-<div class="metric"><div class="label">WM-Readiness · Detail</div><b id="wmReadiness">–</b><div class="small" id="wmPhase">–</div></div>
+
 <div class="metric"><div class="label">Realistisches Puzzle-Ziel</div>
 <div class="goalSplit"><span class="small">First Try</span><b id="wmGoalFirstTry">–</b></div>
 <div class="goalSplit"><span class="small">bekannt / mehrfach gemacht</span><b id="wmGoalRepeat">–</b></div>
@@ -267,7 +263,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="metricrow" style="margin-top:10px"><div class="metric"><div class="label">Training Load · 7 Tage</div><b id="wmLoad7">–</b><div class="small" id="wmLoad7Info">–</div></div><div class="metric"><div class="label">Training Load · 14 Tage</div><b id="wmLoad14">–</b><div class="small" id="wmLoad14Info">–</div></div><div class="metric"><div class="label">WM-Pace / 100 Teile</div><b id="wmPace100">–</b><div class="small" id="wmWeakness">–</div></div></div>
 <div class="item" style="margin-top:10px"><strong>500er-Leistungsbild</strong><div id="wmStats" class="small">–</div></div>
 <div id="unavailableBox" class="item loanBox" style="display:none;margin-top:10px"><strong>📦 Aktuell nicht verfügbare / ausgeliehene Puzzles</strong><div class="small">Diese Puzzles werden in allen Empfehlungen und im gesamten Wochenplan ausgeschlossen.</div><div id="unavailableList" style="margin-top:7px"></div><button class="secondary" style="margin-top:7px" onclick="restoreAllPuzzles()">Alle wieder verfügbar</button></div>
-<div class="trainingAnalysisBottom" style="margin-top:16px">
+<div class="trainingAnalysisBottom trainingOnlyPuzzleLists" style="margin-top:16px">
   <h2>🧠 Weitere Trainingsauswahl</h2>
   <div class="item" style="margin-top:10px"><strong>🎯 Größte Abstände zum MSP-Median · Top 5</strong><div id="medianGapFocus" class="small">Medianvergleich wird berechnet…</div></div>
   <div class="item" style="margin-top:10px"><strong>🔁 Wo lohnt sich die nächste Wiederholung am meisten?</strong><div id="repeatPriority" class="small">Wiederholungs-Priorität wird berechnet…</div></div>
@@ -278,13 +274,13 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 
 
 
-<section class="card full appSection wmDashboard" id="appWM" data-app-page="wm"><h2>🏁 WM · Wettkampfvorbereitung</h2>
+<section class="card full appSection wmDashboard" id="appWM" data-app-page="wm"><h2>🏁 WM · Wettkampfvorbereitung</h2><div class="legacyDataSinks" aria-hidden="true" style="display:none"><span id="wmReadiness"></span><span id="wmPhase"></span></div>
 <div class="wmHeroGrid">
 <div class="wmHeroReadiness"><div class="label">WM-Readiness</div><strong id="wmTabReadiness">–</strong><div class="small" id="wmTabReadinessCompact">Wettkampfform · vergleichbare 500er</div></div>
 <div class="wmHeroGoal"><div class="label">First Try</div><strong id="wmTabFirstTry">–</strong></div>
 <div class="wmHeroGoal"><div class="label">Bekannt / mehrfach</div><strong id="wmTabRepeat">–</strong></div>
 </div>
-<div class="item simHero" id="wmSimulationCard" style="margin-top:10px"><h2>🏁 WM-Simulation <span class="pill">V6.10.3</span></h2>
+<div class="item simHero" id="wmSimulationCard" style="margin-top:10px"><h2>🏁 WM-Simulation <span class="pill">V6.10.4</span></h2>
 <div class="small">Eigenständige WM-Simulation mit einem <strong>anderen Puzzle als im normalen Wochenplan</strong>. Ausgeliehene Puzzles bleiben ausgeschlossen.</div>
 <div id="wmSimSuggestion" class="item" style="margin-top:10px">Simulations-Puzzle wird gewählt…</div>
 <div id="wmSimActive" class="item activeTraining" style="display:none;margin-top:10px">
@@ -670,6 +666,12 @@ function showAppPage(page,scrollTop=true){
   if(page==='training')loadTrainingExtrasOnce();
   if(page==='progress')loadProgressExtrasOnce();
 }
+// npcTabResizeFix
+window.addEventListener('resize',()=>{
+  if(!window.matchMedia('(max-width:760px)').matches){
+    document.querySelectorAll('.grid>section[data-app-page]').forEach(el=>{el.hidden=false;});
+  }
+});
 function initAppNavigation(){
   const map={appToday:'today',appTraining:'training',appWM:'wm',appProgress:'progress',appMore:'more'};
   const buttons=[...document.querySelectorAll('.appBottomNav button')];
