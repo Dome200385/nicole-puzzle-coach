@@ -1,0 +1,1085 @@
+from __future__ import annotations
+from datetime import datetime, timezone
+from statistics import mean, median, pstdev
+
+
+def _dt(value):
+    if not value: return None
+    try: return datetime.fromisoformat(str(value).replace('Z','+00:00'))
+    except Exception: return None
+
+def _fmt(seconds):
+    if seconds is None: return None
+    seconds=int(round(seconds)); h,rem=divmod(seconds,3600); m,s=divmod(rem,60)
+    return f'{h}:{m:02d}:{s:02d}' if h else f'{m}:{s:02d}'
+
+def _days_until(value):
+    dt=_dt(value)
+    if not dt: return None
+    if dt.tzinfo is None: dt=dt.replace(tzinfo=timezone.utc)
+    return max(0,int((dt-datetime.now(timezone.utc)).total_seconds()//86400))
+
+def _phase(days):
+    if days is None: return {'key':'planning','name':'Planung','description':'Turnierdatum nicht verfügbar.','weekly_sessions':3}
+    if days>28: return {'key':'build','name':'Aufbauphase','description':'Tempo und stabile Abläufe entwickeln.','weekly_sessions':4}
+    if days>14: return {'key':'specific','name':'Spezifische WM-Phase','description':'500er-Fokus und echte Turniersimulationen erhöhen.','weekly_sessions':4}
+    if days>7: return {'key':'sharpen','name':'Schärfungsphase','description':'Qualität vor Umfang; weniger, aber präzisere Einheiten.','weekly_sessions':3}
+    if days>2: return {'key':'taper','name':'Tapering','description':'Belastung deutlich reduzieren; Rhythmus und Sicherheit halten.','weekly_sessions':2}
+    return {'key':'race','name':'Turniermodus','description':'Keine harte Einheit mehr; Frische, Schlaf und Routine priorisieren.','weekly_sessions':0}
+
+def _recent_training_days(rows, lookback=7):
+    now=datetime.now(timezone.utc); dates=set()
+    for r in rows:
+        dt=_dt(r.get('finished_at'))
+        if not dt: continue
+        if dt.tzinfo is None: dt=dt.replace(tzinfo=timezone.utc)
+        if 0 <= (now-dt).days <= lookback: dates.add(dt.date())
+    return len(dates)
+
+def _training_load(rows, days):
+    now=datetime.now(timezone.utc); selected=[]
+    for r in rows:
+        dt=_dt(r.get('finished_at'))
+        if not dt: continue
+        if dt.tzinfo is None: dt=dt.replace(tzinfo=timezone.utc)
+        age=(now-dt).total_seconds()/86400
+        if 0 <= age <= days: selected.append(r)
+    # Piece-weighted load: a 500er = 1.0 unit. Keeps mixed piece counts comparable.
+    units=sum(max(0,float(r.get('pieces') or 0))/500 for r in selected)
+    return {'days':days,'sessions':len(selected),'units':round(units,1)}
+
+def _training_type(phase, trend, consistency, recent5, recent10, recent_days):
+    key=phase['key']
+    if key=='race': return {'type':'Regeneration','intensity':'Sehr leicht','reason':'Turnier steht unmittelbar bevor.'}
+    if key=='taper': return {'type':'Kontrollierter 500er','intensity':'Leicht','reason':'Form erhalten ohne zusätzliche Ermüdung.'}
+    if recent_days>=5: return {'type':'Recovery / Technik','intensity':'Leicht','reason':'Viele Trainingstage in den letzten 7 Tagen.'}
+    if consistency < 80: return {'type':'Konstanztraining','intensity':'Moderat','reason':'Schwankungen reduzieren und Ablauf stabilisieren.'}
+    if trend is not None and trend >= 8: return {'type':'Turniersimulation','intensity':'Hoch','reason':'Starker positiver Trend erlaubt eine gezielte Belastung.'}
+    if recent5 < recent10 * .96: return {'type':'Speed-Run','intensity':'Hoch','reason':'Aktuelle Form ist schneller als der 10er-Schnitt.'}
+    if key in ('specific','sharpen'): return {'type':'Turniersimulation','intensity':'Hoch','reason':'WM-spezifische Phase.'}
+    return {'type':'Kontrollierter 500er','intensity':'Moderat','reason':'Tempo und Konstanz gemeinsam entwickeln.'}
+
+def _weekly_plan(phase, target, realistic_goal, stretch_goal):
+    key=phase['key']
+    if key=='race': return [{'session':'Ruhetag / Aktivierung','goal':'10–15 Min. leichte Sortier-/Start-Routine, kein vollständiges Puzzle.','intensity':'Sehr leicht'}]
+    if key=='taper': return [
+        {'session':'Kontrollierter 500er','goal':f'Sauberer Lauf ohne Maximaldruck, ca. {_fmt(target*1.04)}–{_fmt(target*1.10)}.','intensity':'Leicht'},
+        {'session':'Start-/Sortierroutine','goal':'20–30 Min. Startphase, Box öffnen, Rand/Sortierung reproduzierbar üben.','intensity':'Leicht'}]
+    if key=='sharpen': return [
+        {'session':'Turniersimulation','goal':f'500 Teile, Ziel {realistic_goal} oder schneller; komplette WM-Routine.','intensity':'Hoch'},
+        {'session':'Technik / Sortieren','goal':'Kurze Einheit mit Fokus auf Start, Farbfelder und Wechselkosten.','intensity':'Leicht'},
+        {'session':'Kontrollierter 500er','goal':f'Konstant im Bereich {_fmt(target)}–{_fmt(target*1.06)} bleiben.','intensity':'Moderat'}]
+    if key=='specific': return [
+        {'session':'Turniersimulation','goal':f'500 Teile, realistisches WM-Ziel {realistic_goal}.','intensity':'Hoch'},
+        {'session':'Speed-Run','goal':f'500 Teile, aggressiver Start; Stretch Goal {stretch_goal} nur bei gutem Flow.','intensity':'Hoch'},
+        {'session':'Konstanztraining','goal':f'500 Teile ohne Einbruch; Zielkorridor {_fmt(target)}–{_fmt(target*1.06)}.','intensity':'Moderat'},
+        {'session':'Technik / Recovery','goal':'Sortieren, Starttechnik oder sehr lockere Einheit.','intensity':'Leicht'}]
+    return [
+        {'session':'Kontrollierter 500er','goal':f'Stabiler Lauf im Zielkorridor {_fmt(target)}–{_fmt(target*1.08)}.','intensity':'Moderat'},
+        {'session':'Speed-Run','goal':f'Tempo testen; realistisches Ziel {realistic_goal}.','intensity':'Hoch'},
+        {'session':'Konstanztraining','goal':'Gleichmässige Zwischenphasen, wenig Such-/Wechselzeiten.','intensity':'Moderat'},
+        {'session':'Technik / Recovery','goal':'Start, Sortieren, Randstrategie oder lockere Einheit.','intensity':'Leicht'}]
+
+def _as_int(value):
+    try:
+        if value is None or value == "":
+            return None
+        return int(value)
+    except Exception:
+        return None
+
+
+# Puzzles confirmed by user feedback as originating from a prior championship.
+# These are not deleted from the library; they are strongly de-prioritized for
+# WM simulation because the preliminary round is expected to be closer to
+# ordinary published retail puzzles not previously revealed at championships.
+KNOWN_CHAMPIONSHIP_PUZZLES = {
+    "art studio": {
+        "source": "US-Meisterschaft",
+        "confidence": "confirmed_by_user",
+    },
+}
+
+_COMPETITION_WORDS = (
+    "championship", "championships", "competition", "contest", "tournament",
+    "meisterschaft", "national championship", "nationals", "speed puzzling event",
+)
+
+def _image_url(image):
+    if not image:
+        return None
+    image = str(image).strip()
+    if image.startswith("http://") or image.startswith("https://"):
+        return image
+    image = image.lstrip("/")
+    return f"https://img.myspeedpuzzling.com/preset:puzzle_small/plain/{image}"
+
+def _provenance_text(candidate):
+    """
+    Collect only provenance-like metadata. We deliberately do not classify
+    championship origin solely from the puzzle title.
+    """
+    bits = []
+    interesting = (
+        "competition", "championship", "event", "contest", "tournament",
+        "source", "origin", "edition", "category", "tag", "series",
+    )
+
+    def walk(obj, prefix=""):
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                low = str(key).lower()
+                path = f"{prefix}.{low}" if prefix else low
+                if any(k in low for k in interesting):
+                    if isinstance(value, (str, int, float, bool)):
+                        bits.append(f"{path}:{value}")
+                    elif isinstance(value, dict):
+                        for k2, v2 in value.items():
+                            if isinstance(v2, (str, int, float, bool)):
+                                bits.append(f"{path}.{k2}:{v2}")
+                if isinstance(value, (dict, list)):
+                    walk(value, path)
+        elif isinstance(obj, list):
+            for value in obj[:50]:
+                walk(value, prefix)
+    walk(candidate)
+    return " | ".join(bits)
+
+def _competition_risk(name, provenance):
+    normalized = (name or "").strip().lower()
+    if normalized in KNOWN_CHAMPIONSHIP_PUZZLES:
+        info = KNOWN_CHAMPIONSHIP_PUZZLES[normalized]
+        return {
+            "score": 100,
+            "level": "hoch",
+            "reason": f"bereits als Meisterschaftspuzzle bekannt ({info['source']})",
+            "source": info["source"],
+        }
+
+    text = (provenance or "").lower()
+    if any(word in text for word in _COMPETITION_WORDS):
+        return {
+            "score": 90,
+            "level": "hoch",
+            "reason": "Bibliotheks-Metadaten weisen auf einen früheren Wettbewerb hin",
+            "source": provenance,
+        }
+
+    return {
+        "score": 0,
+        "level": "niedrig",
+        "reason": "kein Hinweis auf frühere Meisterschaftsnutzung gefunden",
+        "source": None,
+    }
+
+
+def _wm_fit_score(puzzle, history, training_type):
+    """WM-Fit 0-100 with deliberately non-saturating weighted dimensions.
+
+    A score near 100 is reserved for exceptionally strong evidence of WM
+    preliminary-round similarity. Ordinary suitable library puzzles should
+    normally land around 65-90 instead of all collapsing to 100.
+    """
+    history = history or []
+    solves = len(history)
+    pieces = int(puzzle.get("pieces") or 0)
+    manufacturer = str(puzzle.get("manufacturer") or "").strip().lower()
+    risk = puzzle.get("competition_risk") or {"score": 0}
+    risk_score = int(risk.get("score", 0) or 0)
+    days = _days_since_last_solve(history)
+
+    # Six independent dimensions. Their maxima sum to 96 on purpose: without
+    # stronger WM-specific metadata we do not claim a perfect 100/100 fit.
+    format_pts = 18 if pieces == 500 else 4
+    brand_pts = 6 if manufacturer == "ravensburger" else 3
+
+    if risk_score >= 80:
+        provenance_pts = 0
+    elif risk_score >= 40:
+        provenance_pts = 8
+    else:
+        provenance_pts = 24
+
+    if solves == 0:
+        novelty_pts = 22
+    elif solves == 1:
+        novelty_pts = 16
+    elif solves == 2:
+        novelty_pts = 11
+    elif solves == 3:
+        novelty_pts = 7
+    elif solves <= 5:
+        novelty_pts = 3
+    else:
+        novelty_pts = 0
+
+    if days is None:
+        memory_pts = 12
+    elif days >= 180:
+        memory_pts = 11
+    elif days >= 120:
+        memory_pts = 9
+    elif days >= 90:
+        memory_pts = 7
+    elif days >= 60:
+        memory_pts = 5
+    elif days >= 31:
+        memory_pts = 3
+    else:
+        memory_pts = 0
+
+    # Training-role match is intentionally small: WM-Fit describes WM
+    # similarity, not merely whether the puzzle is useful for today's drill.
+    if training_type in ("Turniersimulation", "Speed-Run"):
+        role_pts = 14 if solves == 0 else 10 if solves == 1 else 6 if solves <= 3 else 2
+    elif training_type == "Kontrollierter 500er":
+        role_pts = 10 if solves <= 1 else 12 if solves <= 3 else 6
+    elif training_type == "Konstanztraining":
+        role_pts = 5 if solves == 0 else 12 if solves <= 3 else 7
+    else:
+        role_pts = 5
+
+    score = format_pts + brand_pts + provenance_pts + novelty_pts + memory_pts + role_pts
+
+    # A known previous championship puzzle is a poor proxy for a fresh WM
+    # preliminary puzzle, regardless of its usefulness for technique training.
+    if risk_score >= 80:
+        score = min(score, 42)
+    elif risk_score >= 40:
+        score = min(score, 68)
+
+    score = max(0, min(96, int(round(score))))
+    label = "exzellent" if score >= 90 else "sehr hoch" if score >= 82 else "hoch" if score >= 72 else "mittel" if score >= 58 else "niedrig"
+
+    reasons = []
+    if pieces == 500:
+        reasons.append("500 Teile")
+    if manufacturer == "ravensburger":
+        reasons.append("Ravensburger")
+    reasons.append("kein Meisterschaftshinweis" if risk_score < 40 else "Meisterschaftsbezug vorhanden")
+    if solves == 0:
+        reasons.append("noch nie Solo gelöst")
+    elif solves == 1:
+        reasons.append("1 Solo-Lauf")
+    else:
+        reasons.append(f"{solves} Solo-Läufe")
+    if days is None:
+        reasons.append("kein Erinnerungsvorteil")
+    elif days >= 120:
+        reasons.append("lange nicht gelöst")
+    elif days <= 30:
+        reasons.append("kürzlich gelöst")
+
+    return {
+        "score": score,
+        "label": label,
+        "summary": " · ".join(reasons[:4]),
+        "reasons": reasons[:6],
+        "components": {
+            "format": format_pts,
+            "brand": brand_pts,
+            "no_prior_championship": provenance_pts,
+            "novelty": novelty_pts,
+            "memory_distance": memory_pts,
+            "training_role": role_pts,
+        },
+        "max_without_wm_specific_evidence": 96,
+    }
+
+def _wm_suitability(puzzle, solve_count=0):
+    risk = puzzle.get("competition_risk") or {"score": 0}
+    if risk.get("score", 0) >= 80:
+        return {
+            "level": "niedrig",
+            "label": "WM-Ähnlichkeit niedrig",
+            "reason": "früheres Meisterschaftspuzzle – für eine realistische WM-Vorrunden-Simulation weniger geeignet",
+        }
+    if solve_count == 0:
+        return {
+            "level": "hoch",
+            "label": "WM-Ähnlichkeit hoch",
+            "reason": "veröffentlichtes Bibliotheks-Puzzle ohne bekannten Meisterschaftshinweis und ohne Erinnerungsvorteil",
+        }
+    if solve_count <= 2:
+        return {
+            "level": "gut",
+            "label": "WM-Ähnlichkeit gut",
+            "reason": "kein Meisterschaftshinweis und nur geringer Wiederholungsvorteil",
+        }
+    return {
+        "level": "mittel",
+        "label": "WM-Ähnlichkeit mittel",
+        "reason": "kein Meisterschaftshinweis, aber durch Wiederholungen weniger wettkampfnah",
+    }
+
+def _extract_library_puzzles(payload):
+    """
+    Extract actual puzzle entries from the expanded MySpeedPuzzling library.
+
+    V5.8 expects get_library() output, where every collection contains an
+    items_payload fetched from /me/collections/{collectionId}/items.
+    Parsing remains deliberately defensive because API field names can evolve.
+    A recommendation is only returned when a real puzzle name is present.
+    """
+    found = {}
+
+    def add_candidate(candidate, collection_name=None):
+        if not isinstance(candidate, dict):
+            return
+
+        nested = candidate.get("puzzle")
+        if isinstance(nested, dict):
+            merged = dict(candidate)
+            merged.update(nested)
+            candidate = merged
+
+        pid = (
+            candidate.get("puzzle_id")
+            or candidate.get("puzzleId")
+            or candidate.get("id")
+        )
+        name = (
+            candidate.get("puzzle_name")
+            or candidate.get("puzzleName")
+            or candidate.get("name")
+            or candidate.get("title")
+        )
+        manufacturer = (
+            candidate.get("manufacturer_name")
+            or candidate.get("manufacturerName")
+            or candidate.get("manufacturer")
+            or candidate.get("brand")
+        )
+        if isinstance(manufacturer, dict):
+            manufacturer = (
+                manufacturer.get("name")
+                or manufacturer.get("title")
+                or manufacturer.get("manufacturer_name")
+            )
+
+        pieces = _as_int(
+            candidate.get("pieces_count")
+            or candidate.get("piecesCount")
+            or candidate.get("piece_count")
+            or candidate.get("pieces")
+        )
+        image = (
+            candidate.get("puzzle_image")
+            or candidate.get("image")
+            or candidate.get("image_url")
+            or candidate.get("thumbnail")
+        )
+        provenance = _provenance_text(candidate)
+        competition_risk = _competition_risk(str(name or ""), provenance)
+
+        # We never manufacture a name. Require a real name and at least one
+        # piece of puzzle-specific evidence.
+        puzzle_evidence = bool(pid or pieces or candidate.get("puzzle_id") or isinstance(nested, dict))
+        if not name or not puzzle_evidence:
+            return
+
+        key = str(pid or (str(name).strip().lower(), str(manufacturer or "").strip().lower(), pieces))
+        # Preserve official MySpeedPuzzling Puzzle Insights from the collection
+        # item. Earlier versions normalized the puzzle but accidentally dropped
+        # prediction/difficulty before the recommendation engine saw it.
+        try:
+            from app.myspeedpuzzling import extract_puzzle_insights_from_api_payload
+            msp_insights = extract_puzzle_insights_from_api_payload(candidate)
+        except Exception:
+            msp_insights = {"available": False, "source": "official_api_payload"}
+
+        found[key] = {
+            "id": pid,
+            "name": str(name).strip(),
+            "manufacturer": manufacturer,
+            "pieces": pieces,
+            "image": image,
+            "image_url": _image_url(image),
+            "collection": collection_name,
+            "in_library": True,
+            "provenance": provenance,
+            "competition_risk": competition_risk,
+            "msp_insights": msp_insights,
+            # Keep the official objects available to downstream diagnostics.
+            "prediction": candidate.get("prediction"),
+            "difficulty": candidate.get("difficulty"),
+            "statistics": candidate.get("statistics"),
+            "solves": candidate.get("solves"),
+        }
+
+    def walk(obj, collection_name=None):
+        if isinstance(obj, dict):
+            # Avoid turning collection metadata itself into a puzzle.
+            collection_keys = {"collection_id", "visibility", "description", "items_payload"}
+            looks_like_collection = "collection_id" in obj and "items_payload" in obj
+            if not looks_like_collection:
+                add_candidate(obj, collection_name)
+
+            next_collection = collection_name
+            if looks_like_collection:
+                next_collection = obj.get("name") or collection_name
+
+            for key, value in obj.items():
+                if key in ("description", "visibility"):
+                    continue
+                walk(value, next_collection)
+        elif isinstance(obj, list):
+            for value in obj:
+                walk(value, collection_name)
+
+    walk(payload)
+    return list(found.values())
+
+def _history_for_puzzle(all_results, puzzle):
+    pid = puzzle.get("id")
+    pname = (puzzle.get("name") or "").strip().lower()
+    rows = []
+    for r in all_results:
+        if r.get("mode") != "solo":
+            continue
+        rid = r.get("puzzle_id")
+        rname = (r.get("puzzle_name") or "").strip().lower()
+        if (pid and rid and str(pid) == str(rid)) or (pname and rname == pname):
+            rows.append(r)
+    rows.sort(
+        key=lambda r: _dt(r.get("finished_at"))
+        or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )
+    return rows
+
+def _msp_median_training_signal(puzzle, history=None):
+    """
+    Compare Nicole's latest personal Solo time with the official MSP Solo median.
+
+    Rule requested for the coach:
+    - if MSP median < Nicole's last time -> this puzzle needs continued work
+    - if Nicole is at/below median -> do not prioritize an immediate repeat
+
+    The median itself is never invented; it comes from MSP statistics.
+    """
+    history=history or []
+    insights=puzzle.get("msp_insights") or {}
+    statistics=insights.get("statistics") or puzzle.get("statistics") or {}
+    solves=insights.get("solves") or puzzle.get("solves") or {}
+
+    solo_stats=statistics.get("solo") if isinstance(statistics,dict) else {}
+    solo_solves=solves.get("solo") if isinstance(solves,dict) else {}
+
+    median_seconds=_as_int((solo_stats or {}).get("median_seconds"))
+    last_seconds=_as_int((solo_solves or {}).get("last_time_seconds"))
+
+    if last_seconds is None and history:
+        last_seconds=_as_int(history[0].get("seconds"))
+
+    needs_work=bool(
+        median_seconds is not None
+        and last_seconds is not None
+        and median_seconds < last_seconds
+    )
+    reached=bool(
+        median_seconds is not None
+        and last_seconds is not None
+        and last_seconds <= median_seconds
+    )
+    gap_seconds=(last_seconds-median_seconds) if needs_work else None
+
+    return {
+        "median_seconds":median_seconds,
+        "median":_fmt(median_seconds) if median_seconds is not None else None,
+        "last_seconds":last_seconds,
+        "last":_fmt(last_seconds) if last_seconds is not None else None,
+        "needs_work":needs_work,
+        "median_reached":reached,
+        "gap_seconds":gap_seconds,
+        "gap":_fmt(gap_seconds) if gap_seconds is not None else None,
+    }
+
+RECENT_SOLVE_COOLDOWN_DAYS = 7
+
+def _recently_solved_for_recommendation(history, cooldown_days=RECENT_SOLVE_COOLDOWN_DAYS):
+    """Freshly completed recommendation puzzles should disappear temporarily."""
+    days=_days_since_last_solve(history)
+    return days is not None and days < cooldown_days
+
+def _days_since_last_solve(rows):
+    if not rows:
+        return None
+    dt = _dt(rows[0].get("finished_at"))
+    if not dt:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return max(0, (datetime.now(timezone.utc) - dt).days)
+
+def _next_puzzle(library_payload, all_results, target_pieces, training_type, excluded_ids=None):
+    excluded_ids={str(x) for x in (excluded_ids or []) if x}
+    library = _extract_library_puzzles(library_payload)
+    candidates = [p for p in library if _as_int(p.get("pieces")) == target_pieces and str(p.get("id")) not in excluded_ids]
+
+    if not candidates:
+        return {
+            "available": False,
+            "name": None,
+            "reason": (
+                f"Kein konkret benanntes {target_pieces}-Teile-Puzzle wurde in den "
+                "geladenen MySpeedPuzzling-Bibliotheks-Einträgen gefunden. "
+                "Es wird kein Puzzle-Name erfunden."
+            ),
+            "library_total": len(library),
+            "library_candidates": 0,
+        }
+
+    scored = []
+    for puzzle in candidates:
+        history = _history_for_puzzle(all_results, puzzle)
+        if _recently_solved_for_recommendation(history):
+            continue
+        solve_count = len(history)
+        days_since = _days_since_last_solve(history)
+
+        # Base score rewards a long gap since the last solve.
+        score = 50.0
+        if days_since is None:
+            score += 35
+        else:
+            score += min(days_since, 120) / 4
+
+        if training_type in ("Turniersimulation", "Speed-Run"):
+            # Novelty is valuable: less memory advantage, closer to competition.
+            score += max(0, 35 - solve_count * 10)
+            if solve_count == 0:
+                rationale = (
+                    "noch nie als Solo-Ergebnis erfasst – dadurch besonders gut "
+                    "für eine realistische Turniersimulation ohne Erinnerungsvorteil"
+                )
+            elif solve_count == 1:
+                rationale = (
+                    "erst einmal als Solo-Ergebnis erfasst – wenig Wiederholungsvorteil "
+                    "und deshalb gut für wettkampfnahes Tempo"
+                )
+            else:
+                rationale = (
+                    "passt zur 500er-Einheit; die Auswahl bevorzugt innerhalb der "
+                    "Bibliothek möglichst wenig wiederholte Puzzles"
+                )
+
+        elif training_type in ("Recovery / Technik", "Regeneration"):
+            # Known puzzles are useful for technique because puzzle difficulty
+            # is less likely to dominate the session.
+            score += min(solve_count, 4) * 8
+            if days_since is not None:
+                score += min(days_since, 60) / 6
+            rationale = (
+                "bereits bekanntes Bibliotheks-Puzzle – dadurch geeignet für "
+                "Start-, Sortier- und Technikarbeit ohne reine Bestzeitjagd"
+            )
+
+        elif training_type == "Konstanztraining":
+            # Prefer one with at least one benchmark but avoid heavy repetition.
+            score += 22 if 1 <= solve_count <= 3 else 0
+            score -= max(0, solve_count - 3) * 6
+            rationale = (
+                "liefert einen brauchbaren Vergleichswert, ohne zu stark durch "
+                "häufige Wiederholung verfälscht zu sein"
+            )
+
+        else:  # Controlled 500
+            score += 18 if solve_count <= 2 else 0
+            rationale = (
+                "passt zur kontrollierten 500er-Einheit und bietet einen guten "
+                "Kompromiss aus Vergleichbarkeit und geringem Wiederholungseffekt"
+            )
+
+        # WM relevance: championship-used puzzles are technically valid
+        # training puzzles, but are poor proxies for a WM preliminary round
+        # dominated by already-published retail puzzles that have not already
+        # appeared at a championship.
+        risk = puzzle.get("competition_risk") or {"score": 0}
+        if training_type in ("Turniersimulation", "Speed-Run", "Kontrollierter 500er"):
+            score -= risk.get("score", 0) * 8
+        else:
+            score -= risk.get("score", 0) * 1.5
+
+        # MSP median benchmark: if Nicole's latest time is slower than the
+        # official puzzle median, this puzzle gets a strong training priority.
+        median_signal=_msp_median_training_signal(puzzle,history)
+        if median_signal["needs_work"]:
+            score += 55
+            rationale += (
+                f" · Median-Ziel {median_signal['median']} noch nicht erreicht"
+                f" (letzte Zeit {median_signal['last']})"
+            )
+        elif median_signal["median_reached"]:
+            # Avoid recommending an immediate repeat when the median benchmark
+            # has already been reached, unless other training factors dominate.
+            score -= 28
+
+        # Slight preference for Ravensburger because current 500er benchmark
+        # data is dominated by Ravensburger, but never at the cost of inventing.
+        manufacturer = str(puzzle.get("manufacturer") or "")
+        if manufacturer.lower() == "ravensburger":
+            score += 4
+
+        scored.append((score, puzzle, history, rationale))
+
+    scored.sort(
+        key=lambda item: (
+            -item[0],
+            len(item[2]),
+            item[1]["name"].lower(),
+        )
+    )
+    score, puzzle, history, rationale = scored[0]
+    days_since = _days_since_last_solve(history)
+
+    return {
+        "available": True,
+        "id": puzzle.get("id"),
+        "name": puzzle["name"],
+        "manufacturer": puzzle.get("manufacturer"),
+        "pieces": target_pieces,
+        "image": puzzle.get("image"),
+        "image_url": puzzle.get("image_url"),
+        "collection": puzzle.get("collection"),
+        "competition_risk": puzzle.get("competition_risk"),
+        "wm_suitability": _wm_suitability(puzzle, len(history)),
+        "wm_fit": _wm_fit_score(puzzle, history, training_type),
+        "previous_solo_solves": len(history),
+        "days_since_last_solve": days_since,
+        "reason": rationale,
+        "library_total": len(library),
+        "library_candidates": len(candidates),
+        "excluded_count": len({str(x) for x in (excluded_ids or []) if x}),
+        "selection_score": round(score, 1),
+        "median_target": _msp_median_training_signal(puzzle,history),
+        "msp_insights": puzzle.get("msp_insights") or {},
+        "statistics": puzzle.get("statistics"),
+        "solves": puzzle.get("solves"),
+    }
+
+
+
+def _is_excluded_puzzle(puzzle, excluded_ids=None):
+    excluded={str(x) for x in (excluded_ids or []) if x}
+    pid=puzzle.get("id") if isinstance(puzzle,dict) else None
+    return bool(pid and str(pid) in excluded)
+
+def _weekly_plan_with_puzzles(weekly_plan, library_payload, all_results, target_pieces=500, excluded_ids=None):
+    """
+    Attach a concrete real MySpeedPuzzling library puzzle to each weekly
+    full-puzzle session. Avoid duplicate puzzle assignments inside the same week.
+    Technique-only sessions may intentionally have no full puzzle.
+    """
+    excluded_ids={str(x) for x in (excluded_ids or []) if x}
+    library = _extract_library_puzzles(library_payload or {})
+    candidates = [p for p in library if _as_int(p.get("pieces")) == target_pieces and str(p.get("id")) not in excluded_ids]
+    used = set()
+    enriched = []
+
+    def training_type_for_session(name):
+        n = (name or "").lower()
+        if "turnier" in n:
+            return "Turniersimulation"
+        if "speed" in n:
+            return "Speed-Run"
+        if "konstanz" in n:
+            return "Konstanztraining"
+        if "technik" in n or "recovery" in n or "sortier" in n or "routine" in n:
+            return "Recovery / Technik"
+        return "Kontrollierter 500er"
+
+    for session in weekly_plan or []:
+        row = dict(session)
+        session_name = row.get("session", "")
+        ttype = training_type_for_session(session_name)
+
+        # Pure technique/routine sessions do not need a complete puzzle.
+        lower = session_name.lower()
+        full_puzzle = not (
+            ("technik" in lower or "routine" in lower or "aktivierung" in lower)
+            and "500" not in lower
+            and "turnier" not in lower
+            and "speed" not in lower
+            and "konstanz" not in lower
+        )
+
+        if not full_puzzle:
+            row["puzzle"] = {
+                "available": False,
+                "not_required": True,
+                "name": None,
+                "reason": "Für diese Technik-/Routineeinheit ist kein vollständiges Puzzle nötig."
+            }
+            enriched.append(row)
+            continue
+
+        # Score each real candidate with the same principles as _next_puzzle,
+        # while excluding puzzles already assigned elsewhere this week.
+        ranked = []
+        for puzzle in candidates:
+            if _is_excluded_puzzle(puzzle, excluded_ids):
+                continue
+            key = str(puzzle.get("id") or puzzle.get("name"))
+            if key in used:
+                continue
+            history = _history_for_puzzle(all_results, puzzle)
+            solve_count = len(history)
+            days_since = _days_since_last_solve(history)
+            score = 50.0 + (35 if days_since is None else min(days_since, 120) / 4)
+
+            if ttype in ("Turniersimulation", "Speed-Run"):
+                score += max(0, 35 - solve_count * 10)
+                reason = (
+                    "für wettkampfnahes Tempo gewählt; wenig Wiederholung wird bevorzugt"
+                    if solve_count else
+                    "noch nie als Solo-Ergebnis erfasst – ideal für einen Lauf ohne Erinnerungsvorteil"
+                )
+            elif ttype == "Konstanztraining":
+                score += 22 if 1 <= solve_count <= 3 else 0
+                score -= max(0, solve_count - 3) * 6
+                reason = "für Konstanztraining gewählt: vorhandener Vergleichswert bei begrenzter Wiederholung"
+            elif ttype == "Recovery / Technik":
+                score += min(solve_count, 4) * 8
+                reason = "bekanntes Puzzle wird für Technikarbeit und einen kontrollierten Ablauf bevorzugt"
+            else:
+                score += 18 if solve_count <= 2 else 0
+                reason = "für einen kontrollierten 500er als Balance aus Vergleichbarkeit und Neuheit gewählt"
+
+            risk = puzzle.get("competition_risk") or {"score": 0}
+            if ttype in ("Turniersimulation", "Speed-Run", "Kontrollierter 500er"):
+                score -= risk.get("score", 0) * 8
+            else:
+                score -= risk.get("score", 0) * 1.5
+
+            median_signal=_msp_median_training_signal(puzzle,history)
+            if median_signal["needs_work"]:
+                score += 55
+                reason += (
+                    f" · Median-Ziel {median_signal['median']} noch nicht erreicht"
+                    f" (letzte Zeit {median_signal['last']})"
+                )
+            elif median_signal["median_reached"]:
+                score -= 28
+
+            if str(puzzle.get("manufacturer") or "").lower() == "ravensburger":
+                score += 4
+            ranked.append((score, puzzle, history, reason))
+
+        ranked.sort(key=lambda x: (-x[0], len(x[2]), x[1]["name"].lower()))
+        if ranked:
+            score, puzzle, history, reason = ranked[0]
+            key = str(puzzle.get("id") or puzzle.get("name"))
+            used.add(key)
+            row["puzzle"] = {
+                "available": True,
+                "id": puzzle.get("id"),
+                "name": puzzle.get("name"),
+                "manufacturer": puzzle.get("manufacturer"),
+                "pieces": puzzle.get("pieces"),
+                "image": puzzle.get("image"),
+                "image_url": puzzle.get("image_url"),
+                "collection": puzzle.get("collection"),
+                "competition_risk": puzzle.get("competition_risk"),
+                "wm_suitability": _wm_suitability(puzzle, len(history)),
+                "wm_fit": _wm_fit_score(puzzle, history, ttype),
+                "previous_solo_solves": len(history),
+                "days_since_last_solve": _days_since_last_solve(history),
+                "reason": reason,
+                "selection_score": round(score, 1),
+                "median_target": _msp_median_training_signal(puzzle,history),
+                "msp_insights": puzzle.get("msp_insights") or {},
+                "statistics": puzzle.get("statistics"),
+                "solves": puzzle.get("solves"),
+            }
+        else:
+            row["puzzle"] = {
+                "available": False,
+                "not_required": False,
+                "name": None,
+                "reason": f"Kein weiteres eindeutig benanntes {target_pieces}-Teile-Puzzle aus der Bibliothek verfügbar."
+            }
+        enriched.append(row)
+    return enriched
+
+def _median_normalized_performance(all_results, library_payload, target_pieces=500, limit=10):
+    """
+    Current form on a difficulty-neutral scale.
+
+    One sample per puzzle only: Nicole's latest Solo result is compared with
+    the official MSP Solo median for that exact puzzle. This prevents harder
+    puzzles from making form/readiness look worse merely because raw times are
+    naturally longer.
+    """
+    library=_extract_library_puzzles(library_payload or {})
+    samples=[]
+
+    for puzzle in library:
+        if not isinstance(puzzle,dict):
+            continue
+        try:
+            if int(puzzle.get("pieces") or 0) != int(target_pieces):
+                continue
+        except Exception:
+            continue
+
+        history=_history_for_puzzle(all_results,puzzle)
+        if not history:
+            continue
+        latest=history[0]
+        try:
+            seconds=float(latest.get("seconds"))
+        except Exception:
+            continue
+        if not seconds or seconds<=0:
+            continue
+
+        insights=puzzle.get("msp_insights") or {}
+        statistics=insights.get("statistics") or puzzle.get("statistics") or {}
+        solo_stats=statistics.get("solo") if isinstance(statistics,dict) else {}
+        try:
+            median_seconds=float((solo_stats or {}).get("median_seconds"))
+        except Exception:
+            median_seconds=None
+        if not median_seconds or median_seconds<=0:
+            continue
+
+        # Positive = faster than MSP median; negative = slower.
+        performance_percent=(median_seconds-seconds)/median_seconds*100.0
+        samples.append({
+            "puzzle_id":puzzle.get("id"),
+            "puzzle_name":puzzle.get("name"),
+            "finished_at":latest.get("finished_at"),
+            "seconds":round(seconds),
+            "median_seconds":round(median_seconds),
+            "performance_percent":round(performance_percent,2),
+            "median_reached":seconds<=median_seconds,
+        })
+
+    samples.sort(
+        key=lambda s:_dt(s.get("finished_at")) or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True
+    )
+    recent=samples[:max(1,int(limit or 10))]
+    if not recent:
+        return {
+            "available":False,
+            "samples":[],
+            "sample_count":0,
+            "form_percent":None,
+            "consistency_score":None,
+            "median_hit_rate":None,
+        }
+
+    vals=[s["performance_percent"] for s in recent]
+    form=mean(vals)
+
+    # WM form should react more strongly to the newest puzzles while still
+    # retaining context from all 10. Newest -> oldest weights.
+    # Moderate recency advantage: newest results matter, but 2-3 recent
+    # misses must not erase a strong 10-puzzle performance profile.
+    # Newest -> oldest weights across 10 samples.
+    recency_weights=[1.30,1.24,1.18,1.12,1.06,1.00,0.94,0.88,0.82,0.76][:len(recent)]
+    weight_sum=sum(recency_weights) or 1
+    weighted_form=sum(v*w for v,w in zip(vals,recency_weights))/weight_sum
+
+    # Stability is measured on the same difficulty-neutral MSP scale.
+    variability=pstdev(vals) if len(vals)>1 else 0
+    consistency=max(0,min(100,round(100-variability*2.5)))
+    hit_count=sum(1 for s in recent if s["median_reached"])
+    miss_count=len(recent)-hit_count
+    hit_rate=round(hit_count/len(recent)*100)
+
+    # Continuous quality score: not merely hit/miss. Strong performances above
+    # median earn proportionally more credit; misses lose proportionally more.
+    # 0% (exact median) = 50 quality points.
+    quality_scores=[max(0,min(100,50+v*2.5)) for v in vals]
+    weighted_quality=sum(q*w for q,w in zip(quality_scores,recency_weights))/weight_sum
+
+    return {
+        "available":True,
+        "samples":recent,
+        "sample_count":len(recent),
+        "form_percent":round(form,1),
+        "weighted_form_percent":round(weighted_form,1),
+        "performance_quality_score":round(weighted_quality,1),
+        "consistency_score":consistency,
+        "median_hit_count":hit_count,
+        "median_miss_count":miss_count,
+        "median_hit_rate":hit_rate,
+        "average_latest_vs_median_percent":round(form,1),
+    }
+
+def build_wm_plan(all_results, my_competitions, library_payload=None, target_pieces=500, excluded_puzzle_ids=None):
+    comps=(my_competitions or {}).get('competitions',[]); next_comp=comps[0] if comps else None
+    days=_days_until(next_comp.get('date_from')) if next_comp else None; phase=_phase(days)
+    rows=[r for r in all_results if r.get('mode')=='solo' and r.get('pieces')==target_pieces and isinstance(r.get('seconds'),(int,float))]
+    rows.sort(key=lambda r:_dt(r.get('finished_at')) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    load7=_training_load(all_results,7); load14=_training_load(all_results,14)
+    if not rows:
+        return {'target_pieces':target_pieces,'next_competition':next_comp,'days_until':days,'phase':phase,'readiness_score':None,'recommendation':f'Noch keine Solo-Ergebnisse mit {target_pieces} Teilen vorhanden.','weekly_plan':[],'training_load_7':load7,'training_load_14':load14,'next_puzzle':_next_puzzle(library_payload or {},all_results,target_pieces,'Kontrollierter 500er',excluded_puzzle_ids)}
+
+    times=[r['seconds'] for r in rows]; r5=rows[:5]; r10=rows[:10]; r20=rows[:20]; prev10=rows[10:20]
+    avg5=mean(r['seconds'] for r in r5); avg10=mean(r['seconds'] for r in r10); avg20=mean(r['seconds'] for r in r20)
+    trend=None
+    if len(prev10)>=5:
+        old=mean(r['seconds'] for r in prev10); trend=round((old-avg10)/old*100,1) if old else None
+    recent_times=sorted(r['seconds'] for r in r10); lo=recent_times[max(0,int(len(recent_times)*.2)-1)]; hi=recent_times[min(len(recent_times)-1,int(len(recent_times)*.8))]; recent_best=min(recent_times)
+    target=max(recent_best,avg10*.92); realistic=max(min(times),(avg5*.55+avg10*.45)*.94); stretch=max(min(times),realistic*.94)
+    # Raw-time consistency is retained only as fallback. Primary readiness is
+    # now difficulty-neutral: latest attempt per puzzle vs that puzzle's MSP median.
+    raw_cv=pstdev(recent_times)/avg10 if len(recent_times)>1 and avg10 else 1
+    raw_consistency=max(0,min(100,round(100-raw_cv*100)))
+
+    normalized=_median_normalized_performance(
+        all_results,
+        library_payload or {},
+        target_pieces=target_pieces,
+        limit=10
+    )
+
+    if normalized.get("available"):
+        consistency=normalized["consistency_score"]
+        normalized_form=normalized["form_percent"]
+        # 0% vs median = solid neutral base. Faster than median raises score,
+        # slower lowers it, independent of puzzle raw difficulty.
+        performance_score=max(0,min(100,55+normalized_form*2.5))
+        median_hit_score=normalized.get("median_hit_rate") or 0
+        volume_score=min(100,normalized.get("sample_count",0)/10*100)
+    else:
+        consistency=raw_consistency
+        normalized_form=None
+        performance_score=50 if trend is None else max(0,min(100,50+trend*3))
+        median_hit_score=50
+        volume_score=min(100,len(rows)/50*100)
+
+    last=_dt(rows[0].get('finished_at'))
+    age=max(0,(datetime.now(timezone.utc)-(last if last.tzinfo else last.replace(tzinfo=timezone.utc))).days) if last else 30
+    recency_score=max(0,100-age*5)
+
+    # V6.8.22 WM-Readiness:
+    # Primary signal = magnitude of performance vs the exact puzzle's MSP median,
+    # with newer puzzles weighted more strongly. Median hit-rate remains useful,
+    # but no longer treats +17% and +1% as equivalent successes.
+    if normalized.get("available"):
+        weighted_form=normalized.get("weighted_form_percent", normalized_form or 0)
+        quality_score=normalized.get("performance_quality_score", 50)
+        # 70% complete 10-puzzle form + 30% recency-weighted form.
+        # This preserves current-form sensitivity without overreacting.
+        readiness_form=(normalized_form or 0)*0.70 + weighted_form*0.30
+        base_readiness=50 + readiness_form*2.0
+        quality_modifier=(quality_score-50)*0.15
+    else:
+        weighted_form=normalized_form or 0
+        quality_score=50
+        base_readiness=50
+        quality_modifier=0
+
+    consistency_modifier=(consistency-70)*0.15
+    hit_modifier=((median_hit_score or 50)-50)*0.08
+    recency_modifier=(recency_score-70)*0.10
+    sample_modifier=(volume_score-50)*0.05
+
+    improvement_values=[]
+    if normalized.get("available"):
+        library_items=_extract_library_puzzles(library_payload or {})
+        for sample in normalized.get("samples",[]):
+            try:
+                pid=str(sample.get("puzzle_id") or "")
+                pname=(sample.get("puzzle_name") or "").strip().lower()
+                puzzle=next((c for c in library_items if (pid and str(c.get("id") or "")==pid) or (pname and (c.get("name") or "").strip().lower()==pname)),None)
+                if not puzzle: continue
+                hist=_history_for_puzzle(all_results,puzzle)
+                if len(hist)>=2:
+                    latest_s=float(hist[0].get("seconds")); prev_s=float(hist[1].get("seconds"))
+                    if prev_s>0: improvement_values.append((prev_s-latest_s)/prev_s*100)
+            except Exception:
+                continue
+
+    improvement_avg=mean(improvement_values) if improvement_values else 0
+    # Improvement may confirm readiness, but lack of improvement must never
+    # punish an athlete who is already performing strongly.
+    improvement_modifier=max(0,min(5,improvement_avg*0.35))
+
+    # Training load is deliberately NOT part of WM-Readiness. It remains a
+    # separate coaching/Recovery signal only.
+    readiness=max(0,min(100,round(
+        base_readiness
+        +quality_modifier
+        +consistency_modifier
+        +hit_modifier
+        +recency_modifier
+        +sample_modifier
+        +improvement_modifier
+    )))
+    recent_days=_recent_training_days(rows,7); training=_training_type(phase,trend,consistency,avg5,avg10,recent_days); weekly=_weekly_plan(phase,target,_fmt(realistic),_fmt(stretch)); weekly=_weekly_plan_with_puzzles(weekly,library_payload or {},all_results,target_pieces,excluded_puzzle_ids)
+    next_puzzle=_next_puzzle(library_payload or {},all_results,target_pieces,training['type'],excluded_puzzle_ids)
+    weekly_puzzle_ids=[
+        str(item.get('puzzle',{}).get('id'))
+        for item in weekly
+        if item.get('puzzle',{}).get('available') and item.get('puzzle',{}).get('id')
+    ]
+    sim_excluded=list({str(x) for x in (excluded_puzzle_ids or []) if x}.union(weekly_puzzle_ids))
+    simulation_puzzle=_next_puzzle(
+        library_payload or {},
+        all_results,
+        target_pieces,
+        'Turniersimulation',
+        sim_excluded,
+    )
+    if training['type']=='Turniersimulation': base=f'500er Turniersimulation. Ziel {_fmt(realistic)} oder schneller; Stretch {_fmt(stretch)} nur bei sauberem Flow.'
+    elif training['type']=='Speed-Run': base=f'500er Speed-Run. Zielbereich {_fmt(target)}–{_fmt(realistic)}.'
+    elif training['type']=='Konstanztraining': base=f'Kontrollierter 500er. Ziel {_fmt(avg10)} oder schneller; Schwankungen reduzieren.'
+    elif training['type']=='Recovery / Technik': base='Einheit leicht halten: Start-/Sortierroutine oder lockeres Puzzle.'
+    elif training['type']=='Regeneration': base='Kein vollständiger Speed-Run mehr. Frische und Start-Routine priorisieren.'
+    else: base=f'Kontrollierter 500er im Bereich {_fmt(target)}–{_fmt(target*1.06)}.'
+    recommendation=('Nächstes Puzzle: '+next_puzzle['name']+'. '+base) if next_puzzle.get('available') else base+' '+next_puzzle['reason']
+    # V6.7.4: Current-level First-Try model.
+    # Estimate Nicole's personal first-try disadvantage from paired histories,
+    # then apply it to her CURRENT known-puzzle level.
+    by_name={}
+    for r in reversed(rows):
+        key=(r.get('puzzle_name') or '').strip().lower()
+        if key:
+            by_name.setdefault(key,[]).append(r)
+
+    paired_penalties=[]
+    first_try_samples=0
+    repeat_samples=0
+    for attempts in by_name.values():
+        valid=[r['seconds'] for r in attempts if isinstance(r.get('seconds'),(int,float))]
+        if not valid:
+            continue
+        first_try_samples += 1
+        if len(valid) >= 2:
+            repeat_samples += len(valid)-1
+            later_ref=median(valid[1:])
+            if later_ref and valid[0] > 0:
+                ratio=valid[0]/later_ref
+                if 0.90 <= ratio <= 1.60:
+                    paired_penalties.append(ratio)
+
+    repeat_target=max(realistic,target)
+    first_try_factor=median(paired_penalties) if len(paired_penalties)>=3 else 1.08
+    first_try_factor=max(1.04,min(1.18,first_try_factor))
+    first_try_target=repeat_target*first_try_factor
+
+    pace100=avg10/5
+    weakness='Konstanz' if consistency<80 else ('Tempo' if trend is not None and trend<0 else ('Belastungssteuerung' if load7['units']>5 else 'Turnierroutine'))
+    progress_recent = [
+        {
+            'puzzle_name': r.get('puzzle_name'),
+            'finished_at': r.get('finished_at'),
+            'seconds': round(r.get('seconds')),
+            'time': _fmt(r.get('seconds')),
+        } for r in reversed(r10)
+    ]
+    return {'target_pieces':target_pieces,'next_competition':next_comp,'days_until':days,'phase':phase,'count':len(rows),'best':_fmt(min(times)),'median':_fmt(median(times)),'average_all':_fmt(mean(times)),'recent5':_fmt(avg5),'recent10':_fmt(avg10),'recent20':_fmt(avg20),'trend10_percent':trend,'current_zone':{'from':_fmt(lo),'to':_fmt(hi)},'dynamic_target':_fmt(target),'dynamic_target_seconds':round(target),'wm_goal_realistic':_fmt(realistic),'wm_goal_realistic_seconds':round(realistic),'wm_goal_first_try':_fmt(first_try_target),'wm_goal_first_try_seconds':round(first_try_target),'wm_goal_repeat':_fmt(repeat_target),'wm_goal_repeat_seconds':round(repeat_target),'wm_goal_first_try_samples':first_try_samples,'wm_goal_repeat_samples':repeat_samples,'wm_goal_first_try_factor':round(first_try_factor,3),'wm_goal_stretch':_fmt(stretch),'wm_goal_stretch_seconds':round(stretch),'recent10_seconds':round(avg10),'progress_recent':progress_recent,'consistency_500':consistency,'readiness_score':readiness,'median_normalized_form_percent':normalized_form,'median_normalized_sample_count':normalized.get('sample_count',0),'median_hit_rate':normalized.get('median_hit_rate'),'median_hit_count':normalized.get('median_hit_count',0),'median_miss_count':normalized.get('median_miss_count',0),'median_samples':normalized.get('samples',[]),'median_audit':{'hit_count':normalized.get('median_hit_count',0),'miss_count':normalized.get('median_miss_count',0),'sample_count':normalized.get('sample_count',0),'hit_rate':normalized.get('median_hit_rate')},'weighted_form_percent':normalized.get('weighted_form_percent'),'performance_quality_score':normalized.get('performance_quality_score'),'readiness_form_percent':round(readiness_form,1) if normalized.get('available') else None,
+        'readiness_base':round(base_readiness,1),
+        'readiness_consistency_modifier':round(consistency_modifier,1),
+        'readiness_hit_modifier':round(hit_modifier,1),
+        'readiness_recency_modifier':round(recency_modifier,1),
+        'readiness_sample_modifier':round(sample_modifier,1),
+        'readiness_improvement_modifier':round(improvement_modifier,1),
+        'readiness_load_penalty':0,
+        'readiness_definition':'50 = MSP-Median-Niveau; 100 = außergewöhnlich starke, stabile und aktuelle WM-Form.','next_training':training,'recent_training_days_7':recent_days,'weekly_plan':weekly,'recommendation':recommendation,'training_load_7':load7,'training_load_14':load14,'wm_pace_per_100':_fmt(pace100),'weakness_focus':weakness,'next_puzzle':next_puzzle,'simulation_puzzle':simulation_puzzle,'readiness_explanation':'50/100 entspricht ungefähr MSP-Median-Niveau. 100/100 steht für außergewöhnlich starke, stabile und aktuelle WM-Form. Hauptbasis sind die letzten 10 vergleichbaren 500er relativ zum jeweiligen offiziellen MSP-Median. 70% des Formsignals stammen aus dem normalen 10-Puzzle-Durchschnitt, 30% aus einem moderat aktualitätsgewichteten Durchschnitt. Die Höhe der Abweichung zählt direkt. Ergänzt wird um Konsistenz, Median-Trefferquote, Aktualität und Datenbreite. Verbesserung kann nur Bonuspunkte geben. Trainingsbelastung beeinflusst die WM-Readiness nicht.','goal_explanation':'Realistisches WM-Ziel basiert auf den letzten 5/10 500er-Solozeiten; Stretch Goal bleibt durch die historische Bestzeit begrenzt.'}
