@@ -32,7 +32,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.11.6",
+    version="6.11.7",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -281,7 +281,7 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.11.6","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.11.7","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 
 def _ensure_readiness_history_table(db):
@@ -363,7 +363,7 @@ def pwa_manifest():
 
 @app.get("/sw.js")
 def pwa_service_worker():
-    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v6116';
+    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v6117';
 const SHELL=['/manifest.webmanifest','/pwa/icon-192.png','/pwa/icon-512.png','/pwa/icon-maskable-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(SHELL)).catch(()=>{}));
@@ -401,7 +401,7 @@ def pwa_asset(filename:str):
     return FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.11.6"}
+def health(): return {"status":"ok","version":"6.11.7"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -416,7 +416,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.11.6",
+        "version":"6.11.7",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -612,15 +612,15 @@ async def msp_api_test(db:Session=Depends(get_db)):
         return {"ok":False,"mode":"pat","reason":"MSP_PERSONAL_ACCESS_TOKEN not configured"}
     try:
         profile=await get_profile(token)
-        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.11.6","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
+        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.11.7","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
     except Exception as exc:
-        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.11.6","error":str(exc)}
+        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.11.7","error":str(exc)}
 
 @app.get("/msp/sync-status")
 def msp_sync_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     return {
-        "version":"6.11.6",
+        "version":"6.11.7",
         "snapshot_id":snap.id if snap else None,
         "synced_at":snap.synced_at if snap else None,
         "data_available":snap is not None,
@@ -828,55 +828,160 @@ async def my_competitions(
 
 @app.get("/msp/tournament-diagnostics")
 async def msp_tournament_diagnostics(db:Session=Depends(get_db)):
-    """V6.11.6: crash-safe tournament diagnostics; always returns JSON."""
+    """V6.11.7: inspect the tournament pipeline before confirmed filtering."""
     import time as _time
     from datetime import datetime as _dt
     started=_time.monotonic()
-    diag={"version":"6.11.6","checked_at":_dt.utcnow().isoformat()+"Z","steps":[],"summary":{}}
+    diag={"version":"6.11.7","checked_at":_dt.utcnow().isoformat()+"Z","steps":[],"summary":{}}
 
     def step(name, ok, **kw):
         diag["steps"].append({"step":name,"ok":bool(ok),**kw})
 
-    # Auth: use the same token helper as the live application.
+    # 1) Auth
     try:
         t=_time.monotonic()
         token=await asyncio.wait_for(_valid_access_token(db), timeout=7.0)
         step("auth_token", True, elapsed_ms=round((_time.monotonic()-t)*1000))
     except Exception as exc:
         step("auth_token", False, error=f"{type(exc).__name__}: {exc}")
-        diag["summary"]={"stage":"auth","live_ok":False,"elapsed_ms":round((_time.monotonic()-started)*1000)}
+        diag["summary"]={"stage":"auth","elapsed_ms":round((_time.monotonic()-started)*1000)}
         return diag
 
-    # Confirmed competitions: call the exact same MSP helper used by the app.
+    # 2) Current confirmed helper result (baseline)
     confirmed=[]
     try:
         t=_time.monotonic()
-        result=await asyncio.wait_for(
-            get_my_confirmed_competitions(token, limit=30, cache=False),
+        res=await asyncio.wait_for(
+            get_my_confirmed_competitions(token,limit=30,cache=False),
             timeout=12.0
         )
-        if isinstance(result,dict):
-            confirmed=result.get("competitions") or []
-            meta={k:v for k,v in result.items() if k!="competitions"}
-        elif isinstance(result,list):
-            confirmed=result
+        if isinstance(res,dict):
+            confirmed=res.get("competitions") or []
+            meta={k:v for k,v in res.items() if k!="competitions"}
+        elif isinstance(res,list):
+            confirmed=res
             meta={}
         else:
-            meta={"returned_type":type(result).__name__}
+            meta={"type":type(res).__name__}
         step(
             "confirmed_competitions",
             True,
             elapsed_ms=round((_time.monotonic()-t)*1000),
             count=len(confirmed),
-            names=[str(c.get("name") or c.get("title") or c.get("id") or "?") for c in confirmed[:15] if isinstance(c,dict)],
-            meta=meta
+            names=[str(c.get("name") or c.get("title") or c.get("id") or "?") for c in confirmed[:20] if isinstance(c,dict)],
+            meta=meta,
         )
-    except asyncio.TimeoutError:
-        step("confirmed_competitions", False, error="TimeoutError: >12s")
     except Exception as exc:
         step("confirmed_competitions", False, error=f"{type(exc).__name__}: {exc}")
 
-    # Stored snapshot: independent of MSP network, useful to distinguish API vs persistence.
+    # 3) Raw competition listing, before registration filtering
+    raw_payload=None
+    raw=[]
+    try:
+        t=_time.monotonic()
+        raw_payload=await asyncio.wait_for(
+            get_competitions(token,status="all",online=False),
+            timeout=12.0
+        )
+        # Normalize common result envelopes without assuming a single API shape.
+        if isinstance(raw_payload,list):
+            raw=raw_payload
+        elif isinstance(raw_payload,dict):
+            for key in ("competitions","data","items","results"):
+                if isinstance(raw_payload.get(key),list):
+                    raw=raw_payload.get(key)
+                    break
+        top_keys=list(raw_payload.keys())[:40] if isinstance(raw_payload,dict) else []
+        step(
+            "raw_competitions",
+            True,
+            elapsed_ms=round((_time.monotonic()-t)*1000),
+            count=len(raw),
+            envelope_type=type(raw_payload).__name__,
+            top_level_keys=top_keys,
+            names=[str(c.get("name") or c.get("title") or c.get("id") or "?") for c in raw[:30] if isinstance(c,dict)],
+        )
+    except asyncio.TimeoutError:
+        step("raw_competitions", False, error="TimeoutError: >12s")
+    except Exception as exc:
+        step("raw_competitions", False, error=f"{type(exc).__name__}: {exc}")
+
+    # 4) Compact raw field map for relevant future tournaments.
+    # Avoid exposing unrelated personal data; only competition/registration-like keys.
+    field_rows=[]
+    interesting_tokens=("register","registration","participant","participation","attend","joined","entry","status","name","title","date","location","country","id","slug")
+    for c in raw[:50]:
+        if not isinstance(c,dict):
+            continue
+        name=str(c.get("name") or c.get("title") or "")
+        # Include likely puzzle/championship events, plus first 10 rows for shape visibility.
+        likely=any(x in name.lower() for x in ("puzzle","jigsaw","championship","world","swiss","valladolid"))
+        if not likely and len(field_rows)>=10:
+            continue
+        safe={}
+        for k,v in c.items():
+            lk=str(k).lower()
+            if any(tok in lk for tok in interesting_tokens):
+                if isinstance(v,(str,int,float,bool)) or v is None:
+                    safe[k]=v
+                elif isinstance(v,dict):
+                    safe[k]={kk:vv for kk,vv in list(v.items())[:20] if isinstance(vv,(str,int,float,bool)) or vv is None}
+                elif isinstance(v,list):
+                    safe[k]=f"[list:{len(v)}]"
+        field_rows.append({"name":name or str(c.get("id") or "?"),"fields":safe})
+        if len(field_rows)>=20:
+            break
+    step("raw_field_map", True, count=len(field_rows), rows=field_rows)
+
+    # 5) Detail + participation detection for relevant competitions.
+    likely=[]
+    for c in raw:
+        if not isinstance(c,dict):
+            continue
+        name=str(c.get("name") or c.get("title") or "").lower()
+        if any(x in name for x in ("puzzle","jigsaw","championship","world","swiss","valladolid")):
+            likely.append(c)
+    likely=likely[:10]
+
+    async def inspect_detail(c):
+        cid=c.get("id")
+        name=c.get("name") or c.get("title") or str(cid)
+        out={"id":cid,"name":name}
+        if not cid:
+            out.update({"ok":False,"error":"missing_id"})
+            return out
+        try:
+            d=await asyncio.wait_for(get_competition(token,cid),timeout=6.0)
+            signal=detect_participation(d)
+            out["ok"]=True
+            out["participation"]=signal
+            if isinstance(d,dict):
+                safe={}
+                for k,v in d.items():
+                    lk=str(k).lower()
+                    if any(tok in lk for tok in interesting_tokens):
+                        if isinstance(v,(str,int,float,bool)) or v is None:
+                            safe[k]=v
+                        elif isinstance(v,dict):
+                            safe[k]={kk:vv for kk,vv in list(v.items())[:20] if isinstance(vv,(str,int,float,bool)) or vv is None}
+                        elif isinstance(v,list):
+                            safe[k]=f"[list:{len(v)}]"
+                out["fields"]=safe
+        except asyncio.TimeoutError:
+            out.update({"ok":False,"error":"TimeoutError: >6s"})
+        except Exception as exc:
+            out.update({"ok":False,"error":f"{type(exc).__name__}: {exc}"})
+        return out
+
+    inspected=[]
+    if likely:
+        t=_time.monotonic()
+        inspected=await asyncio.gather(*(inspect_detail(c) for c in likely))
+        step("competition_details", True, elapsed_ms=round((_time.monotonic()-t)*1000), count=len(inspected), rows=inspected)
+    else:
+        step("competition_details", True, count=0, rows=[])
+
+    # 6) Persisted official snapshot state
     try:
         snap=_latest_snapshot(db)
         saved=[]
@@ -889,7 +994,7 @@ async def msp_tournament_diagnostics(db:Session=Depends(get_db)):
             True,
             snapshot_id=getattr(snap,"id",None) if snap else None,
             count=len(saved),
-            names=[str(c.get("name") or c.get("title") or c.get("id") or "?") for c in saved[:15] if isinstance(c,dict)]
+            names=[str(c.get("name") or c.get("title") or c.get("id") or "?") for c in saved[:20] if isinstance(c,dict)]
         )
     except Exception as exc:
         step("saved_snapshot", False, error=f"{type(exc).__name__}: {exc}")
@@ -897,8 +1002,9 @@ async def msp_tournament_diagnostics(db:Session=Depends(get_db)):
     diag["summary"]={
         "stage":"complete",
         "confirmed_count":len(confirmed),
-        "live_ok":any(x.get("ok") for x in diag["steps"] if x.get("step")=="confirmed_competitions"),
-        "elapsed_ms":round((_time.monotonic()-started)*1000)
+        "raw_count":len(raw),
+        "inspected_count":len(inspected),
+        "elapsed_ms":round((_time.monotonic()-started)*1000),
     }
     return diag
 

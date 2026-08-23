@@ -279,6 +279,14 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
     grid-template-columns:1fr 1fr
   }
 }
+
+.diagPre{
+ white-space:pre-wrap;word-break:break-word;
+ font-size:10px;line-height:1.35;
+ background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;
+ padding:9px;margin-top:8px;max-height:300px;overflow:auto
+}
+.diagDetails summary{cursor:pointer}
 </style></head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
@@ -939,31 +947,35 @@ async function runTournamentDiagnostics(){
        const r=await fetch('/msp/tournament-diagnostics',{cache:'no-store'});
        const txt=await r.text();
        let obj;
-       try{ obj=JSON.parse(txt); }
-       catch(_){ throw new Error(`HTTP ${r.status}: ${txt.slice(0,240)}`); }
-       if(!r.ok) throw new Error(`HTTP ${r.status}: ${JSON.stringify(obj).slice(0,240)}`);
+       try{obj=JSON.parse(txt)}catch(_){throw new Error(`HTTP ${r.status}: ${txt.slice(0,300)}`)}
+       if(!r.ok)throw new Error(`HTTP ${r.status}: ${JSON.stringify(obj).slice(0,300)}`);
        return obj;
      })(),
-     new Promise((_,reject)=>setTimeout(()=>reject(new Error('diagnostic_timeout')),25000))
+     new Promise((_,reject)=>setTimeout(()=>reject(new Error('diagnostic_timeout')),30000))
    ]);
-   status.innerHTML=`Version <strong>${d.version||'–'}</strong> · ${d.summary?.elapsed_ms??'–'} ms · bestätigte Turniere: <strong>${d.summary?.confirmed_count??'–'}</strong>`;
+   status.innerHTML=`Version <strong>${d.version||'–'}</strong> · ${d.summary?.elapsed_ms??'–'} ms · confirmed <strong>${d.summary?.confirmed_count??'–'}</strong> · raw <strong>${d.summary?.raw_count??'–'}</strong>`;
    list.innerHTML=(d.steps||[]).map(s=>{
      let extra='';
      if(s.count!=null)extra+=` · Count ${s.count}`;
-     if(s.names?.length)extra+=`<br><span class="small">${s.names.join(' · ')}</span>`;
-     if(s.player_name)extra+=` · ${s.player_name}`;
-     if(s.error)extra+=`<br><span class="small" style="color:#b91c1c">${s.error}</span>`;
-     if(s.results?.length){
-       extra+=s.results.map(r=>`<div class="small" style="margin-top:5px"><strong>${r.name||r.id||'Turnier'}</strong> · ${r.ok?'OK':'Fehler'}${r.participation?` · Teilnahme: ${JSON.stringify(r.participation)}`:''}${r.error?` · ${r.error}`:''}</div>`).join('');
+     if(s.names?.length)extra+=`<div class="small" style="margin-top:5px">${s.names.map(x=>readinessEsc(x)).join(' · ')}</div>`;
+     if(s.error)extra+=`<div class="small" style="color:#b91c1c;margin-top:5px">${readinessEsc(s.error)}</div>`;
+     if(s.top_level_keys?.length)extra+=`<div class="small">Keys: ${s.top_level_keys.map(readinessEsc).join(', ')}</div>`;
+     if(s.rows?.length){
+       extra+=s.rows.map(r=>{
+         const title=readinessEsc(r.name||r.id||'Eintrag');
+         let body='';
+         if(r.participation)body+=`<div class="small"><strong>Participation:</strong> ${readinessEsc(JSON.stringify(r.participation))}</div>`;
+         if(r.fields)body+=`<pre class="diagPre">${readinessEsc(JSON.stringify(r.fields,null,2))}</pre>`;
+         return `<details class="item diagDetails"><summary><strong>${title}</strong></summary>${body}</details>`;
+       }).join('');
      }
      return `<div class="item"><strong>${s.ok?'✅':'❌'} ${s.step}</strong>${extra}${s.elapsed_ms!=null?`<div class="small">${s.elapsed_ms} ms</div>`:''}</div>`;
    }).join('');
  }catch(e){
    status.textContent='Diagnose fehlgeschlagen oder Timeout.';
-   list.innerHTML=`<div class="item small">${e.message||e}</div>`;
+   list.innerHTML=`<div class="item small">${readinessEsc(e.message||e)}</div>`;
  }
 }
-
 async function loadAll(){renderUnavailable();
  let coreHasMspData=false;
  // Performance V6.9.6: independent API calls start immediately in parallel.
