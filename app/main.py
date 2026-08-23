@@ -29,7 +29,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.9.1",
+    version="6.9.3",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -360,7 +360,7 @@ def pwa_manifest():
 
 @app.get("/sw.js")
 def pwa_service_worker():
-    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v692';
+    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v693';
 const SHELL=['/manifest.webmanifest','/pwa/icon-192.png','/pwa/icon-512.png','/pwa/icon-maskable-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(SHELL)).catch(()=>{}));

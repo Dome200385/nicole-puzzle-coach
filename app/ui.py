@@ -124,21 +124,32 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
   .todayGrid{grid-template-columns:1fr 1fr!important;margin-top:10px}
   .todayAction{width:100%;margin-top:10px;min-height:44px}
 }
+
+@media(max-width:760px){
+  .grid>section[data-app-page]{display:none}
+  .grid>section[data-app-page].appPageActive{display:block}
+  .grid>section.card[data-app-page].appPageActive{grid-column:1/-1}
+  .grid>section.card.kpi[data-app-page="today"].appPageActive:nth-of-type(1),
+  .grid>section.card.kpi[data-app-page="today"].appPageActive:nth-of-type(3){grid-column:span 6}
+  .grid>section.card.kpi[data-app-page="today"].appPageActive:nth-of-type(2){grid-column:1/-1}
+  .appPageHeading{display:block;grid-column:1/-1;margin:3px 2px 0;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.08em}
+}
+@media(min-width:761px){.appPageHeading{display:none}}
 </style></head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
 
-<div class="grid">
-<section class="card kpi third"><div class="label">Form · vs MSP-Median <button class="infoBtn" onclick="showInfo('form')">i</button></div><div class="value" id="trendKpi">–</div><div class="small">letzter Solo-Versuch je vergleichbarem 500er</div></section>
-<section class="card kpi third"><div class="label">WM-Readiness <button class="infoBtn" onclick="document.getElementById('readinessInfoBox').open=true;document.getElementById('readinessInfoBox').scrollIntoView({behavior:'smooth',block:'center'})">i</button></div><div class="value" id="readinessTopKpi">–</div><div class="small">50 = MSP-Median-Niveau · 60+ = solide WM-Form</div></section>
-<section class="card kpi third"><div class="label">Konsistenz <button class="infoBtn" onclick="showInfo('consistency')">i</button></div><div class="value" id="consistencyKpi">–</div><div class="small">median-relative Stabilität · 0–100</div></section>
+<div class="grid"><div id="appPageHeading" class="appPageHeading">Heute</div>
+<section class="card kpi third" data-app-page="today"><div class="label">Form · vs MSP-Median <button class="infoBtn" onclick="showInfo('form')">i</button></div><div class="value" id="trendKpi">–</div><div class="small">letzter Solo-Versuch je vergleichbarem 500er</div></section>
+<section class="card kpi third" data-app-page="today"><div class="label">WM-Readiness <button class="infoBtn" onclick="document.getElementById('readinessInfoBox').open=true;document.getElementById('readinessInfoBox').scrollIntoView({behavior:'smooth',block:'center'})">i</button></div><div class="value" id="readinessTopKpi">–</div><div class="small">50 = MSP-Median-Niveau · 60+ = solide WM-Form</div></section>
+<section class="card kpi third" data-app-page="today"><div class="label">Konsistenz <button class="infoBtn" onclick="showInfo('consistency')">i</button></div><div class="value" id="consistencyKpi">–</div><div class="small">median-relative Stabilität · 0–100</div></section>
 
-<section id="resilientBanner" class="card full" style="display:none;background:#fff8e6;border-color:#f0d99b">
+<section id="resilientBanner" class="card full" data-app-page="today" style="display:none;background:#fff8e6;border-color:#f0d99b">
   <strong>🛡️ Resilient Mode</strong>
   <div id="resilientText" class="small" style="margin-top:4px"></div>
 </section>
 
-<section id="mobileTodayCard" class="card full mobileOnly todayCard">
+<section id="mobileTodayCard" class="card full mobileOnly todayCard" data-app-page="today">
 <h2>✨ Heute</h2>
 <div class="todayHero">
 <div id="todayPuzzleImage" class="todayPuzzleImage"></div>
@@ -154,12 +165,12 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 </div>
 <button type="button" class="primary todayAction" id="todayTrainingBtn">Training ansehen</button>
 </section>
-<section class="card half hero appSection" id="appToday"><h2>🏆 Mein nächstes Turnier</h2><div id="nextMspCompetition" class="small">Prüfe bestätigte Anmeldung…</div></section>
-<section class="card half hero"><h2>🎯 Coach-Empfehlung</h2><div id="coachRecommendation" class="small">Analysiere MySpeedPuzzling-Ergebnisse…</div></section>
+<section class="card half hero appSection" id="appToday" data-app-page="today"><h2>🏆 Mein nächstes Turnier</h2><div id="nextMspCompetition" class="small">Prüfe bestätigte Anmeldung…</div></section>
+<section class="card half hero" data-app-page="today"><h2>🎯 Coach-Empfehlung</h2><div id="coachRecommendation" class="small">Analysiere MySpeedPuzzling-Ergebnisse…</div></section>
 
-<section class="card full"><h2>✅ Meine bestätigten Turniere</h2><div id="mspCompetitions" class="list"></div></section>
+<section class="card full" data-app-page="today"><h2>✅ Meine bestätigten Turniere</h2><div id="mspCompetitions" class="list"></div></section>
 
-<section class="card full hero appSection" id="appTraining"><h2>🏁 WM Coach · Adaptive Preparation</h2>
+<section class="card full hero appSection" id="appTraining" data-app-page="training"><h2>🏁 WM Coach · Adaptive Preparation</h2>
 
 <div class="metricrow">
 <div class="metric"><div class="label">WM-Readiness · Detail</div><b id="wmReadiness">–</b><div class="small" id="wmPhase">–</div></div>
@@ -196,7 +207,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 </div>
 <div style="margin-top:9px"><strong>Kontrolle der letzten vergleichbaren 500er</strong><div id="readinessMedianAudit" class="small" style="margin-top:5px">–</div></div></details><div class="item" style="margin-top:12px"><strong>🧩 Nächstes empfohlenes Puzzle</strong><div id="wmNextPuzzle" class="small">Bibliothek wird ausgewertet…</div></div>
 <div class="item" style="margin-top:10px"><strong>📅 Plan für die aktuelle Trainingswoche</strong><div id="wmWeeklyPlan" class="list" style="margin-top:8px"></div></div>
-<div class="item simHero" id="wmSimulationCard" style="margin-top:10px"><h2>🏁 WM-Simulation <span class="pill">V6.9.1</span></h2>
+<div class="item simHero" id="wmSimulationCard" style="margin-top:10px"><h2>🏁 WM-Simulation <span class="pill">V6.9.3</span></h2>
 <div class="small">Eigenständige WM-Simulation mit einem <strong>anderen Puzzle als im normalen Wochenplan</strong>. Ausgeliehene Puzzles bleiben ausgeschlossen.</div>
 <div id="wmSimSuggestion" class="item" style="margin-top:10px">Simulations-Puzzle wird gewählt…</div>
 <div id="wmSimActive" class="item activeTraining" style="display:none;margin-top:10px">
@@ -235,7 +246,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 
 
 
-<section class="card full appSection" id="appWM"><h2>📈 Fortschritt bis zur WM</h2>
+<section class="card full appSection" id="appWM" data-app-page="wm"><h2>📈 Fortschritt bis zur WM</h2>
 <div class="small">Die letzten 10 500er-Solozeiten im Vergleich zu aktuellem Niveau und WM-Zielen. Entscheidend ist das wiederholbare Leistungsniveau, nicht eine einzelne Bestzeit.
 <div class="progressTargets">
 <div class="targetCard"><div class="label">Aktuelles Niveau</div><b id="progressCurrent">–</b><div class="small">Ø letzte 10</div></div>
@@ -247,34 +258,34 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div id="wmProgressChart" class="item" style="margin-top:8px"></div>
 </section>
 
-<section class="card full"><h2>🇨🇭 Schweizer Motivationsranking</h2>
+<section class="card full" data-app-page="wm"><h2>🇨🇭 Schweizer Motivationsranking</h2>
 <div class="small">Vergleich mit öffentlich verbundenen Schweizer Teilnehmern der Swiss Puzzle Championship. <strong>Kein offizielles Schweizer Ranking.</strong> Das Ranking dient nur als Motivation und beeinflusst den Trainingsplan nicht.</div>
 <div id="swissRankSummary" class="item" style="margin-top:10px">Ranking wird geladen…</div>
 <div id="swissRankList" class="list" style="margin-top:8px"></div>
 </section>
 
-<section class="card full"><h2>📈 Automatische Trainingsanalyse</h2>
+<section class="card full" data-app-page="progress"><h2>📈 Automatische Trainingsanalyse</h2>
 <div class="metricrow">
 <div class="metric"><div class="label">Ergebnisse gesamt</div><b id="autoTotal">–</b><div class="small" id="autoModes"></div></div>
 <div class="metric"><div class="label">Schnellste erfasste Zeit</div><b id="autoBest">–</b><div class="small" id="autoBestInfo"></div></div>
 <div class="metric"><div class="label">Letztes Ergebnis</div><b id="autoLatest">–</b><div class="small">automatisch aus MySpeedPuzzling</div></div>
 </div></section>
 
-<section class="card half"><h2>🧩 Leistung nach Teilezahl</h2><div id="piecePerformance" class="list"><div class="small">Analyse wird geladen…</div></div></section>
-<section class="card half"><h2>🏭 Leistung nach Hersteller</h2><div id="manufacturerPerformance" class="list"><div class="small">Analyse wird geladen…</div></div></section>
+<section class="card half" data-app-page="progress"><h2>🧩 Leistung nach Teilezahl</h2><div id="piecePerformance" class="list"><div class="small">Analyse wird geladen…</div></div></section>
+<section class="card half" data-app-page="progress"><h2>🏭 Leistung nach Hersteller</h2><div id="manufacturerPerformance" class="list"><div class="small">Analyse wird geladen…</div></div></section>
 
-<section class="card half"><h2>⏱️ Letzte MySpeedPuzzling-Ergebnisse</h2><div id="autoTrainings" class="list"></div></section>
-
-
+<section class="card half" data-app-page="progress"><h2>⏱️ Letzte MySpeedPuzzling-Ergebnisse</h2><div id="autoTrainings" class="list"></div></section>
 
 
-<section class="card full appSection" id="appProgress"><h2>📈 Fortschritt pro Puzzle</h2>
+
+
+<section class="card full appSection" id="appProgress" data-app-page="progress"><h2>📈 Fortschritt pro Puzzle</h2>
 <div class="small">Verlauf der wiederholt gelösten Puzzle im Vergleich zu vorheriger Zeit, Bestzeit und MSP-Median.</div>
 <div id="puzzleProgress" class="list" style="margin-top:8px">Fortschritt wird geladen…</div>
 </section>
 
-<section class="card full appSection" id="appMore"><h2>🧠 Tournament Intelligence</h2>
-<div class="small">V6.9.1 MSP-only Puzzle Predictions + Frontend Snapshot Recovery: konkrete Puzzle-Prognosen stammen ausschliesslich aus MySpeedPuzzling; WM-Ziele und Coach-Logik bleiben unverändert. Lokale Turnier-Fallbacks: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
+<section class="card full appSection" id="appMore" data-app-page="more"><h2>🧠 Tournament Intelligence</h2>
+<div class="small">V6.9.3 MSP-only Puzzle Predictions + Frontend Snapshot Recovery: konkrete Puzzle-Prognosen stammen ausschliesslich aus MySpeedPuzzling; WM-Ziele und Coach-Logik bleiben unverändert. Lokale Turnier-Fallbacks: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
 <div style="margin-top:12px"><a class="btn secondary" href="/docs" target="_blank">API-Dokumentation</a> <a class="btn secondary" href="/msp/my-competitions?refresh=true" target="_blank">Anmeldungen neu prüfen</a> <a class="btn secondary" href="/sync" target="_blank">MySpeedPuzzling neu synchronisieren</a> <a class="btn secondary" href="/msp/library" target="_blank">Puzzle-Bibliothek prüfen</a></div>
 </section>
 </div></div>
@@ -486,14 +497,12 @@ async function refreshFromMSP(){
     const r=await getj('/sync');
     const n=r.new_results_count||0;
     if(status)status.textContent='Daten geladen · Dashboard wird neu berechnet…';
-    // Reload independent dashboard areas in parallel.
-    await Promise.allSettled([
-      loadAll(),
-      loadMedianGapFocus(),
-      loadPuzzleProgress(),
-      loadRepeatPriority(),
-      loadUnsolvedLibrary()
-    ]);
+    // Refresh core first; heavy detail areas only if the user has opened them.
+    await loadAll();
+    const extraJobs=[];
+    if(trainingExtrasLoaded)extraJobs.push(loadMedianGapFocus(),loadRepeatPriority(),loadUnsolvedLibrary());
+    if(progressExtrasLoaded)extraJobs.push(loadPuzzleProgress());
+    if(extraJobs.length)await Promise.allSettled(extraJobs);
     if(btn)btn.textContent=n?`✓ ${n} neue Ergebnis${n===1?'':'se'}`:'✓ Aktuell';
     if(status)status.textContent='Synchronisierung abgeschlossen';
   }catch(e){
@@ -553,16 +562,32 @@ async function loadRepeatPriority(){
  }catch(e){el.textContent='Wiederholungs-Priorität derzeit nicht verfügbar.'}}
 
 
-function initAppNavigation(){
+function showAppPage(page,scrollTop=true){
+  const mobile=window.matchMedia('(max-width:760px)').matches;
+  const labels={today:'Heute',training:'Training',wm:'WM',progress:'Fortschritt',more:'Mehr'};
+  const targetMap={today:'appToday',training:'appTraining',wm:'appWM',progress:'appProgress',more:'appMore'};
   const buttons=[...document.querySelectorAll('.appBottomNav button')];
-  if(!buttons.length)return;
-  buttons.forEach(btn=>btn.addEventListener('click',()=>{
-    const id=btn.dataset.target;
-    const el=document.getElementById(id);
-    if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
-    buttons.forEach(b=>b.classList.toggle('active',b===btn));
-  }));
-  buttons[0]?.classList.add('active');
+  buttons.forEach(b=>b.classList.toggle('active',b.dataset.page===page));
+  if(!mobile){
+    document.getElementById(targetMap[page])?.scrollIntoView({behavior:'smooth',block:'start'});
+    return;
+  }
+  document.querySelectorAll('.grid>section[data-app-page]').forEach(el=>{
+    el.classList.toggle('appPageActive',el.dataset.appPage===page);
+  });
+  const h=document.getElementById('appPageHeading'); if(h)h.textContent=labels[page]||'';
+  if(scrollTop)window.scrollTo({top:0,behavior:'smooth'});
+  if(page==='training')loadTrainingExtrasOnce();
+  if(page==='progress')loadProgressExtrasOnce();
+}
+function initAppNavigation(){
+  const map={appToday:'today',appTraining:'training',appWM:'wm',appProgress:'progress',appMore:'more'};
+  const buttons=[...document.querySelectorAll('.appBottomNav button')];
+  buttons.forEach(btn=>{
+    btn.dataset.page=map[btn.dataset.target]||'today';
+    btn.addEventListener('click',()=>showAppPage(btn.dataset.page));
+  });
+  showAppPage('today',false);
 }
 function updateTodaySummary(w){
   const rp=document.getElementById('todayPuzzle');
@@ -580,14 +605,22 @@ function updateTodaySummary(w){
     ri.innerHTML=p.image_url?`<img src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.parentElement.textContent='🧩'">`:'🧩';
   }
   if(btn){
-    btn.onclick=()=>{
-      document.getElementById('appTraining')?.scrollIntoView({behavior:'smooth',block:'start'});
-      document.querySelectorAll('.appBottomNav button').forEach(b=>b.classList.toggle('active',b.dataset.target==='appTraining'));
-    };
+    btn.onclick=()=>showAppPage('training');
   }
 }
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+}
+let trainingExtrasLoaded=false,progressExtrasLoaded=false;
+function loadTrainingExtrasOnce(){
+  if(trainingExtrasLoaded)return;
+  trainingExtrasLoaded=true;
+  Promise.allSettled([loadMedianGapFocus(),loadRepeatPriority(),loadUnsolvedLibrary()]);
+}
+function loadProgressExtrasOnce(){
+  if(progressExtrasLoaded)return;
+  progressExtrasLoaded=true;
+  Promise.allSettled([loadPuzzleProgress()]);
 }
 function readinessEsc(value){
   return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -602,7 +635,7 @@ function readinessTime(seconds){
   return h>0?`${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`:`${m}:${String(sec).padStart(2,'0')}`;
 }
 async function loadAll(){renderUnavailable();
- // Performance V6.9.1: independent API calls start immediately in parallel.
+ // Performance V6.9.3: independent API calls start immediately in parallel.
  const exPrefetch=unavailableIds();
  const statusPromise=getj('/coach/status');
  const summaryPromise=getj('/coach/msp-training-summary');
@@ -848,13 +881,7 @@ async function loadAll(){renderUnavailable();
 
 }
 initAppNavigation();renderActiveWMSim();renderWMSimHistory();
-Promise.allSettled([
-  loadAll(),
-  loadMedianGapFocus(),
-  loadPuzzleProgress(),
-  loadRepeatPriority(),
-  loadUnsolvedLibrary()
-]);
+loadAll();
 </script><nav class="appBottomNav" aria-label="App Navigation">
 <button type="button" data-target="appToday"><span>🏠</span><small>Heute</small></button>
 <button type="button" data-target="appTraining"><span>🧩</span><small>Training</small></button>
