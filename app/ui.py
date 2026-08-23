@@ -217,6 +217,24 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
   body[data-app-current="today"] #appWM,
   body[data-app-current="today"] [data-app-page="progress"]{display:none!important}
 }
+
+@media(max-width:760px){
+  .trainingWeeklyPlan{margin-top:10px!important}
+  .trainingDropdown{padding:0!important;overflow:hidden;margin-top:8px!important}
+  .trainingDropdown summary{
+    list-style:none;cursor:pointer;padding:11px 12px;font-weight:800;
+    display:flex;align-items:center;justify-content:space-between;gap:10px
+  }
+  .trainingDropdown summary::-webkit-details-marker{display:none}
+  .trainingDropdown summary:after{
+    content:"⌄";font-size:16px;color:#94a3b8;transition:transform .15s ease
+  }
+  .trainingDropdown[open] summary:after{transform:rotate(180deg)}
+  .trainingDropdownBody{
+    border-top:1px solid var(--border);
+    padding:10px 12px 12px
+  }
+}
 </style></head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
@@ -254,10 +272,22 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 </div>
 
 <div id="unavailableBox" class="item loanBox" style="display:none;margin-top:10px"><strong>📦 Aktuell nicht verfügbare / ausgeliehene Puzzles</strong><div class="small">Diese Puzzles werden in allen Empfehlungen und im gesamten Wochenplan ausgeschlossen.</div><div id="unavailableList" style="margin-top:7px"></div><button class="secondary" style="margin-top:7px" onclick="restoreAllPuzzles()">Alle wieder verfügbar</button></div><div class="trainingAnalysisBottom trainingOnlyPuzzleLists" style="margin-top:16px">
-  <h2>🧠 Weitere Trainingsauswahl</h2>
-  <div class="item" style="margin-top:10px"><strong>🎯 Größte Abstände zum MSP-Median · Top 5</strong><div id="medianGapFocus" class="small">Medianvergleich wird berechnet…</div></div>
-  <div class="item" style="margin-top:10px"><strong>🔁 Wo lohnt sich die nächste Wiederholung am meisten?</strong><div id="repeatPriority" class="small">Wiederholungs-Priorität wird berechnet…</div></div>
-  <div class="item" style="margin-top:10px"><strong>🆕 Noch ungelöste Puzzle in meiner Library</strong><div id="unsolvedLibrary" class="small">Library wird geprüft…</div></div>
+<h2>🧠 Weitere Trainingsauswahl</h2>
+
+<details class="item trainingDropdown">
+<summary>🎯 Größte Abstände zum MSP-Median · Top 5</summary>
+<div id="medianGapFocus" class="small trainingDropdownBody">Medianvergleich wird berechnet…</div>
+</details>
+
+<details class="item trainingDropdown">
+<summary>🔁 Wo lohnt sich die nächste Wiederholung am meisten?</summary>
+<div id="repeatPriority" class="small trainingDropdownBody">Wiederholungs-Priorität wird berechnet…</div>
+</details>
+
+<details class="item trainingDropdown">
+<summary>🆕 Noch ungelöste Puzzle in meiner Library</summary>
+<div id="unsolvedLibrary" class="small trainingDropdownBody">Library wird geprüft…</div>
+</details>
 </div>
 
 
