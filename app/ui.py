@@ -454,9 +454,9 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div id="registrationDiagList" class="list" style="margin-top:8px"></div>
 </section>
 <section class="card full" data-app-page="more">
-<h2>🧭 MSP API Route Discovery</h2>
-<div class="small">Liest nur öffentlich bzw. authentifiziert zugängliche API-Schemata/OPTIONS. Keine Datenänderungen.</div>
-<button class="btn secondary" style="margin-top:10px" onclick="runRouteDiagnostics()">API-Routen suchen</button>
+<h2>🧭 MSP Datenstruktur-Diagnose</h2>
+<div class="small">Erkennt CrowdSec korrekt und untersucht nur lesend bereits funktionierende MSP-Antworten auf Turnier-/Registration-Beziehungen.</div>
+<button class="btn secondary" style="margin-top:10px" onclick="runRouteDiagnostics()">Datenstruktur prüfen</button>
 <div id="routeDiagStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
 <div id="routeDiagList" class="list" style="margin-top:8px"></div>
 </section>
@@ -1035,28 +1035,41 @@ async function runRouteDiagnostics(){
  const status=document.getElementById('routeDiagStatus');
  const list=document.getElementById('routeDiagList');
  if(!status||!list)return;
- status.textContent='API-Routen werden gesucht…'; list.innerHTML='';
+ status.textContent='MSP-Datenstrukturen werden geprüft…';
+ list.innerHTML='';
  try{
    const r=await fetch('/msp/api-route-diagnostics',{cache:'no-store'});
    const txt=await r.text();
    let d; try{d=JSON.parse(txt)}catch(_){throw new Error(`HTTP ${r.status}: ${txt.slice(0,300)}`)}
    if(!r.ok)throw new Error(`HTTP ${r.status}`);
-   status.innerHTML=`Version <strong>${d.version}</strong> · Schema-Treffer <strong>${d.summary?.schema_successes??0}</strong> · ${d.summary?.elapsed_ms??'–'} ms`;
-   const schema=(d.schemas||[]).map(s=>`<details class="item"><summary><strong>${s.status===200?'✅':'❌'} ${readinessEsc(s.url||'Schema')}</strong></summary>
+
+   status.innerHTML=`Version <strong>${d.version}</strong> · nutzbare Schemas <strong>${d.summary?.usable_schema_count??0}</strong> · CrowdSec <strong>${d.summary?.crowdsec_count??0}</strong> · Relation-Hits <strong>${d.summary?.relation_hit_count??0}</strong>`;
+
+   const schemas=(d.schema_checks||[]).map(s=>`<div class="item">
+     <strong>${s.usable_schema?'✅':'⚠️'} ${readinessEsc(s.url||'Schema')}</strong>
      <div class="small">HTTP ${s.status??'–'} · ${readinessEsc(s.content_type||'')}</div>
-     ${s.route_count!=null?`<div class="small">Routes: ${s.route_count}</div>`:''}
-     ${s.registration_routes?.length?`<pre class="diagPre">${readinessEsc(s.registration_routes.join('\n'))}</pre>`:''}
-     ${s.preview?`<div class="small">${readinessEsc(s.preview)}</div>`:''}
-   </details>`).join('');
-   const opts=(d.options||[]).map(o=>`<div class="item"><strong>OPTIONS ${readinessEsc(o.url||'')}</strong><div class="small">HTTP ${o.status??'–'} · Allow: ${readinessEsc(o.allow||o.access_control_allow_methods||'–')}</div></div>`).join('');
-   const discovered=d.summary?.discovered_routes||[];
-   list.innerHTML=(discovered.length?`<div class="item"><strong>🎯 Relevante gefundene Routen</strong><pre class="diagPre">${readinessEsc(discovered.join('\n'))}</pre></div>`:'')+schema+opts;
+     ${s.note?`<div class="small">${readinessEsc(s.note)}</div>`:''}
+   </div>`).join('');
+
+   const rels=(d.relation_checks||[]).map(x=>{
+     const hits=x.relation_like_fields||[];
+     return `<details class="item"><summary><strong>${x.error?'❌':'✅'} ${readinessEsc(x.label||'Quelle')}</strong></summary>
+       ${x.error?`<div class="small" style="color:#b91c1c">${readinessEsc(x.error)}</div>`:''}
+       ${x.type?`<div class="small">Typ: ${readinessEsc(x.type)}${x.count!=null?' · Count '+x.count:''}</div>`:''}
+       ${x.keys?.length?`<div class="small">Keys: ${x.keys.map(readinessEsc).join(', ')}</div>`:''}
+       ${hits.length?`<pre class="diagPre">${readinessEsc(JSON.stringify(hits,null,2))}</pre>`:'<div class="small">Keine turnierbezogenen Relationsfelder gefunden.</div>'}
+     </details>`;
+   }).join('');
+
+   const summaryHits=d.summary?.relation_hits||[];
+   const summary=summaryHits.length?`<div class="item"><strong>🎯 Gefundene Relationsfelder</strong><pre class="diagPre">${readinessEsc(JSON.stringify(summaryHits,null,2))}</pre></div>`:'<div class="item small">Keine offensichtlichen Registration-/Participation-Felder in den funktionierenden MSP-Antworten gefunden.</div>';
+
+   list.innerHTML=summary+rels+schemas;
  }catch(e){
-   status.textContent='Route Discovery fehlgeschlagen.';
+   status.textContent='Datenstruktur-Diagnose fehlgeschlagen.';
    list.innerHTML=`<div class="item small">${readinessEsc(e.message||e)}</div>`;
  }
 }
-
 async function loadAll(){renderUnavailable();
  let coreHasMspData=false;
  // Performance V6.9.6: independent API calls start immediately in parallel.
