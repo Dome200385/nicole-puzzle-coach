@@ -1,47 +1,42 @@
-# Nicole Puzzle Coach Backend V3
+# Nicole Puzzle Coach V6.8.13 – Sync + Progress + Cooldown
 
-## Was V3 neu kann
-- robuste Normalisierung der echten MySpeedPuzzling-Payloads
-- aktueller Besitz vs. historisch gelöst / nicht mehr im Besitz
-- Performance-Auswertung nach Modus und Teilezahl
-- persönliche Baseline und Trend
-- Consistency Score
-- Turnier-spezifischer Readiness Score
-- Next Puzzle Recommendation nur aus der aktuellen Bibliothek
-- optional nach geplantem Turnier gefiltert
-- automatische persönliche Zielzeit, sobald genügend Resultate vorhanden sind
-- `/coach/status` für schnellen Systemcheck
+This release addresses the case where results entered directly in
+MySpeedPuzzling did not appear in the coach until a manual backend sync.
 
-## Wichtige URLs nach Deploy
-- `/health`
-- `/db/health`
-- `/coach/status`
-- `/docs`
+New:
+1. Dashboard button: "↻ MySpeedPuzzling aktualisieren"
+   - calls the existing cache-bypassing `/sync`
+   - reports how many new result rows were detected
+   - reloads coach, median Top 5 and progress tiles
 
-Nach MySpeedPuzzling OAuth-Freigabe:
-- `/auth/myspeedpuzzling/login`
-- `/sync`
-- `/coach/performance?mode=solo&pieces=500`
-- `/coach/library`
-- `/coach/next-puzzle`
+2. `/sync` now returns:
+   - previous_results_count
+   - new_results_count
+   - new_results (up to 20)
+   This makes it immediately visible whether MySpeedPuzzling actually returned
+   the newly entered results.
 
-## GitHub Upload
-Diese Version ist absichtlich passend zu deiner aktuellen Struktur gebaut.
+3. Freshly solved recommendation puzzles get a 7-day cooldown.
+   They disappear from "Nächstes empfohlenes Puzzle" and the weekly puzzle
+   assignment instead of being proposed again immediately.
 
-Im Repository soll es so aussehen:
+4. New "📈 Fortschritt pro Puzzle" tile:
+   - latest time
+   - previous time
+   - personal best
+   - improvement / slowdown
+   - official MSP solo median where available
+   - number of solo attempts
 
-- app/
-  - __init__.py
-  - config.py
-  - database.py
-  - db_models.py
-  - schemas.py
-  - crypto.py
-  - myspeedpuzzling.py
-  - coach.py
-  - main.py
-- README.md
-- render.yaml
-- requirements.txt
+Important:
+- We intentionally do NOT auto-sync on every dashboard page load, because the
+  MySpeedPuzzling API owner explicitly requested caching/stable API behavior.
+- The user has an explicit refresh button when new MSP results are entered.
 
-Die alten Unterordner `app/models` und `app/services` werden nicht mehr benötigt.
+Deploy into `/app`:
+- main.py
+- ui.py
+- wm_coach.py
+- myspeedpuzzling.py
+
+No DB migration.
