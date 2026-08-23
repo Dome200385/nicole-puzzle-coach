@@ -628,13 +628,21 @@ function updateTrainingQuick(w){
  if(meta)meta.textContent=[p.manufacturer,p.pieces?`${p.pieces} Teile`:null].filter(Boolean).join(' · ');
  if(type)type.textContent=pick(w?.next_training?.type,w?.next_training_type,'–');
  if(target)target.textContent=pick(w?.dynamic_target,w?.wm_goal_first_try,p?.target_time,'–');
- const med=pick(p.msp_median,p.median_time,p.median,p.target_median);
- const lst=pick(p.last_time,p.latest_time,p.last_result);
- const dlt=pick(p.delta_vs_median,p.median_delta,p.vs_median);
- const wf=pick(p.wm_fit,p.wm_fit_score,p.fit_score);
+ const mt=(p.median_target&&typeof p.median_target==='object')?p.median_target:{};
+ const med=pick(mt.median,p.msp_median,p.median_time,p.median,p.target_median);
+ const lst=pick(mt.last,p.last_time,p.latest_time,p.last_result);
+ let dlt=pick(p.delta_vs_median,p.median_delta,p.vs_median);
+ if((dlt===undefined||dlt===null||dlt==='')&&mt.last_seconds!=null&&mt.median_seconds!=null&&Number(mt.median_seconds)>0){
+   dlt=((Number(mt.last_seconds)-Number(mt.median_seconds))/Number(mt.median_seconds))*100;
+ }
+ const wfRaw=pick(p.wm_fit,p.wm_fit_score,p.fit_score);
+ const wf=(wfRaw&&typeof wfRaw==='object')?pick(wfRaw.score,wfRaw.value,wfRaw.fit_score):wfRaw;
  if(median)median.textContent=med||'–';
  if(last)last.textContent=lst||'–';
- if(delta)delta.textContent=(typeof dlt==='number'?(dlt>0?'+':'')+dlt.toFixed(1)+'%':(dlt||'–'));
+ if(delta){
+   if(typeof dlt==='number'&&Number.isFinite(dlt)) delta.textContent=`${dlt>0?'+':''}${dlt.toFixed(1)}% ${dlt>0?'über Median':dlt<0?'unter Median':'vs. Median'}`;
+   else delta.textContent=dlt||'–';
+ }
  if(fit)fit.textContent=(wf!==undefined&&wf!==null&&wf!=='')?(String(wf).includes('/100')?wf:`${wf}/100`):'–';
  if(reason)reason.textContent=pick(p.reason,p.recommendation_reason,p.note,'');
  if(img)img.innerHTML=p.image_url?`<img src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.parentElement.textContent='🧩'">`:'🧩';
