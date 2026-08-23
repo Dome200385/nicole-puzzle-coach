@@ -2,7 +2,7 @@ import json
 import secrets
 import os
 from fastapi import FastAPI, HTTPException, Request, Depends
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.responses import RedirectResponse, HTMLResponse, Response, FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from starlette.middleware.sessions import SessionMiddleware
@@ -29,7 +29,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.8.26",
+    version="6.9.0",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -348,6 +348,23 @@ async def capture_readiness_history(request:Request, db:Session=Depends(get_db))
         """), values)
     db.commit()
     return {"status":"captured","items":_readiness_history_rows(db,180)}
+
+
+@app.get("/manifest.webmanifest")
+def pwa_manifest():
+    return Response(content='{"name": "Nicole Puzzle Coach", "short_name": "Puzzle Coach", "description": "Speed-Puzzling Training & Turniervorbereitung", "start_url": "/dashboard", "scope": "/", "display": "standalone", "display_override": ["window-controls-overlay", "standalone", "minimal-ui"], "background_color": "#f5f7fb", "theme_color": "#ffffff", "orientation": "portrait-primary", "icons": [{"src": "/pwa/icon-192.png", "sizes": "192x192", "type": "image/png"}, {"src": "/pwa/icon-512.png", "sizes": "512x512", "type": "image/png"}, {"src": "/pwa/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}', media_type="application/manifest+json")
+
+@app.get("/sw.js")
+def pwa_service_worker():
+    return Response(content="\nconst CACHE_NAME='nicole-puzzle-coach-v690';\nconst SHELL=['/dashboard','/manifest.webmanifest','/pwa/icon-192.png','/pwa/icon-512.png'];\nself.addEventListener('install',event=>{\n  event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(SHELL)).catch(()=>{}));\n  self.skipWaiting();\n});\nself.addEventListener('activate',event=>{\n  event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k)))));\n  self.clients.claim();\n});\nself.addEventListener('fetch',event=>{\n  const req=event.request;\n  if(req.method!=='GET') return;\n  const url=new URL(req.url);\n  if(url.origin!==self.location.origin) return;\n  if(url.pathname==='/dashboard'||url.pathname.startsWith('/pwa/')||url.pathname==='/manifest.webmanifest'){\n    event.respondWith(\n      fetch(req).then(resp=>{\n        const copy=resp.clone();\n        caches.open(CACHE_NAME).then(cache=>cache.put(req,copy)).catch(()=>{});\n        return resp;\n      }).catch(()=>caches.match(req))\n    );\n  }\n});\n", media_type="application/javascript", headers={"Service-Worker-Allowed":"/"})
+
+@app.get("/pwa/{filename}")
+def pwa_asset(filename:str):
+    allowed={"icon-192.png","icon-512.png","icon-maskable-512.png"}
+    if filename not in allowed:
+        raise HTTPException(status_code=404, detail="Not Found")
+    path=os.path.join(os.path.dirname(os.path.dirname(__file__)),"pwa_assets",filename)
+    return FileResponse(path)
 
 @app.get("/health")
 def health(): return {"status":"ok","version":"6.8.18"}
