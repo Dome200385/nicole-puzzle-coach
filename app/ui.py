@@ -919,18 +919,22 @@ function readinessTime(seconds){
   return h>0?`${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`:`${m}:${String(sec).padStart(2,'0')}`;
 }
 async function loadAll(){renderUnavailable();
+ let coreHasMspData=false;
  // Performance V6.9.6: independent API calls start immediately in parallel.
  const exPrefetch=unavailableIds();
  const statusPromise=getj('/coach/status');
  const summaryPromise=getj('/coach/msp-training-summary');
  const wmPlanPromise=getj('/coach/wm-plan'+(exPrefetch.length?'?exclude_puzzle_ids='+encodeURIComponent(exPrefetch.join(',')):''));
- const swissPromise=getj('/coach/swiss-ranking');
+ const swissPromise=Promise.race([
+   getj('/coach/swiss-ranking'),
+   new Promise((_,reject)=>setTimeout(()=>reject(new Error('swiss_timeout')),6000))
+ ]);
  const competitionsPromise=Promise.race([
    getj('/msp/my-competitions?limit=30'),
-   new Promise((_,reject)=>setTimeout(()=>reject(new Error('competition_timeout')),8000))
+   new Promise((_,reject)=>setTimeout(()=>reject(new Error('competition_timeout')),6500))
  ]);
 
- try{let st=await statusPromise;systemKpi.textContent='OK';systemText.textContent=`Backend V${st.version} · Datenbank ok`;systemBadge.textContent='🟢 System bereit';mspKpi.textContent=st.data_source==='legacy'?'LEGACY':(st.has_myspeedpuzzling_data?'DATA':(st.pat_configured?'PAT':(st.oauth_configured?'READY':'WAIT')));mspText.textContent=st.data_source==='legacy'?'Historische DB-Daten aktiv':(st.has_myspeedpuzzling_data?`Letzter Datenstand verfügbar · Snapshot #${st.latest_snapshot_id||'–'}`:(st.pat_configured?'PAT eingerichtet · noch kein Snapshot':'Verbindung möglich'))}catch(e){systemBadge.textContent='🔴 Fehler'}
+ try{let st=await statusPromise;coreHasMspData=!!st.has_myspeedpuzzling_data;systemKpi.textContent='OK';systemText.textContent=`Backend V${st.version} · Datenbank ok`;systemBadge.textContent='🟢 System bereit';mspKpi.textContent=st.has_myspeedpuzzling_data?'DATA':(st.pat_configured?'PAT':(st.oauth_configured?'READY':'WAIT'));mspText.textContent=st.data_source==='legacy'?'Historische DB-Daten aktiv':(st.has_myspeedpuzzling_data?`Letzter Datenstand verfügbar · Snapshot #${st.latest_snapshot_id||'–'}`:(st.pat_configured?'PAT eingerichtet · noch kein Snapshot':'Verbindung möglich'))}catch(e){systemBadge.textContent='🔴 Fehler'}
 
  try{
    let a=await summaryPromise;
@@ -1150,6 +1154,21 @@ async function loadAll(){renderUnavailable();
 
 
  try{
+   let data=await competitionsPromise;let rows=data.competitions||[];
+   if(rows.length){
+     let c=rows[0];
+     nextMspCompetition.innerHTML=`<strong>${c.name}</strong><br>${dateText(c.date_from)}${c.location?' · '+c.location:''}${c.country_code?' · '+c.country_code.toUpperCase():''}<br><span class="pill">✅ Angemeldet</span><span class="pill">⏳ ${countdownText(c.date_from)}</span>`;
+     mspCompetitions.innerHTML=rows.map(c=>`<div class="item"><strong>${c.name}</strong><div class="small">${dateText(c.date_from)}${c.date_to?' – '+dateText(c.date_to):''}${c.location?' · '+c.location:''}${c.country_code?' · '+c.country_code.toUpperCase():''}</div><span class="pill">✅ Angemeldet</span><span class="pill">⏳ ${countdownText(c.date_from)}</span>${c.link?`<br><a class="btn secondary" style="margin-top:8px" href="${c.link}" target="_blank">Turnier öffnen</a>`:''}</div>`).join('');
+   }else{
+     nextMspCompetition.textContent='Keine bestätigte zukünftige Anmeldung gefunden.';
+     mspCompetitions.innerHTML='<div class="small">Keine bestätigten zukünftigen Turniere.</div>';
+   }
+ }catch(e){
+   nextMspCompetition.textContent='Turnierdaten werden beim nächsten erfolgreichen Abruf erneut geladen.';
+   mspCompetitions.innerHTML='<div class="small">Bestätigte Turniere derzeit nicht abrufbar.</div>';
+ }
+
+ try{
    let r=await swissPromise;
    if(!r.players||!r.players.length){
      swissRankSummary.textContent=r.subtitle||'Vergleichsgruppe derzeit nicht verfügbar.';
@@ -1171,20 +1190,7 @@ async function loadAll(){renderUnavailable();
    swissRankList.innerHTML='';
  }
 
- try{
-   let data=await competitionsPromise;let rows=data.competitions||[];
-   if(rows.length){
-     let c=rows[0];
-     nextMspCompetition.innerHTML=`<strong>${c.name}</strong><br>${dateText(c.date_from)}${c.location?' · '+c.location:''}${c.country_code?' · '+c.country_code.toUpperCase():''}<br><span class="pill">✅ Angemeldet</span><span class="pill">⏳ ${countdownText(c.date_from)}</span>`;
-     mspCompetitions.innerHTML=rows.map(c=>`<div class="item"><strong>${c.name}</strong><div class="small">${dateText(c.date_from)}${c.date_to?' – '+dateText(c.date_to):''}${c.location?' · '+c.location:''}${c.country_code?' · '+c.country_code.toUpperCase():''}</div><span class="pill">✅ Angemeldet</span><span class="pill">⏳ ${countdownText(c.date_from)}</span>${c.link?`<br><a class="btn secondary" style="margin-top:8px" href="${c.link}" target="_blank">Turnier öffnen</a>`:''}</div>`).join('');
-   }else{
-     nextMspCompetition.textContent='Keine bestätigte zukünftige Anmeldung gefunden.';
-     mspCompetitions.innerHTML='<div class="small">Keine bestätigten zukünftigen Turniere.</div>';
-   }
- }catch(e){
-   nextMspCompetition.textContent='Turnierdaten werden beim nächsten erfolgreichen Abruf erneut geladen.';
-   mspCompetitions.innerHTML='<div class="small">Bestätigte Turniere derzeit nicht abrufbar.</div>';
- }
+
 
 }
 document.addEventListener('DOMContentLoaded',()=>{
