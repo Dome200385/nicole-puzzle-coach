@@ -925,7 +925,10 @@ async function loadAll(){renderUnavailable();
  const summaryPromise=getj('/coach/msp-training-summary');
  const wmPlanPromise=getj('/coach/wm-plan'+(exPrefetch.length?'?exclude_puzzle_ids='+encodeURIComponent(exPrefetch.join(',')):''));
  const swissPromise=getj('/coach/swiss-ranking');
- const competitionsPromise=getj('/msp/my-competitions?limit=30');
+ const competitionsPromise=Promise.race([
+   getj('/msp/my-competitions?limit=30'),
+   new Promise((_,reject)=>setTimeout(()=>reject(new Error('competition_timeout')),8000))
+ ]);
 
  try{let st=await statusPromise;systemKpi.textContent='OK';systemText.textContent=`Backend V${st.version} · Datenbank ok`;systemBadge.textContent='🟢 System bereit';mspKpi.textContent=st.data_source==='legacy'?'LEGACY':(st.has_myspeedpuzzling_data?'DATA':(st.pat_configured?'PAT':(st.oauth_configured?'READY':'WAIT')));mspText.textContent=st.data_source==='legacy'?'Historische DB-Daten aktiv':(st.has_myspeedpuzzling_data?`Letzter Datenstand verfügbar · Snapshot #${st.latest_snapshot_id||'–'}`:(st.pat_configured?'PAT eingerichtet · noch kein Snapshot':'Verbindung möglich'))}catch(e){systemBadge.textContent='🔴 Fehler'}
 
