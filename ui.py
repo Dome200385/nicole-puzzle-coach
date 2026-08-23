@@ -267,9 +267,10 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="wmHeroGrid">
 <div class="wmHeroReadiness"><div class="label">WM-Readiness</div><strong id="wmTabReadiness">–</strong><div class="small">Aktuelle Wettkampfform auf Basis vergleichbarer 500er</div></div>
 <div class="wmHeroGoal"><div class="label">First-Try-Ziel</div><strong id="wmTabFirstTry">–</strong><div class="small">realistisches Ziel bei unbekanntem Puzzle</div></div>
+<div class="wmHeroGoal"><div class="label">Bekannt / mehrfach</div><strong id="wmTabRepeat">–</strong><div class="small">Ziel bei bekanntem Puzzle</div></div>
 <div class="wmHeroGoal"><div class="label">Stretch Goal</div><strong id="wmTabStretch">–</strong><div class="small">ambitionierter Best-Case-Tag</div></div>
 </div>
-<div class="item simHero" id="wmSimulationCard" style="margin-top:10px"><h2>🏁 WM-Simulation <span class="pill">V6.10.1</span></h2>
+<div class="item simHero" id="wmSimulationCard" style="margin-top:10px"><h2>🏁 WM-Simulation <span class="pill">V6.10.2</span></h2>
 <div class="small">Eigenständige WM-Simulation mit einem <strong>anderen Puzzle als im normalen Wochenplan</strong>. Ausgeliehene Puzzles bleiben ausgeschlossen.</div>
 <div id="wmSimSuggestion" class="item" style="margin-top:10px">Simulations-Puzzle wird gewählt…</div>
 <div id="wmSimActive" class="item activeTraining" style="display:none;margin-top:10px">
@@ -290,8 +291,21 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
   <div id="wmSimSummary" class="small" style="margin-top:5px"></div>
   <div id="wmSimHistory" class="list" style="margin-top:8px"></div>
 </div>
+</div>
 
-<div class="wmMovedPanels"><details class="readinessInfo" id="readinessInfoBox"><summary>ℹ️ WM-Readiness: Definition & Berechnungsnachweis</summary>
+<div class="wmMovedPanels"><div id="readinessTrendPanel" class="item" style="margin-top:10px">
+<strong>📈 WM-Readiness-Verlauf</strong>
+<div class="small">Tägliche Entwicklung der Readiness bis zur WM. Pro Tag wird der aktuelle Wert gespeichert.</div>
+<div id="readinessTrendSummary" style="margin-top:6px;font-weight:700">Erster Verlaufspunkt wird gespeichert…</div>
+<div id="readinessTrendBars" style="display:flex;align-items:flex-end;gap:4px;height:82px;margin-top:8px"></div>
+<div id="readinessTrendChanges" class="small" style="margin-top:7px"></div>
+</div>
+<h2 style="margin-top:16px">📈 Fortschritt bis zur WM</h2>
+<div class="small">Die letzten 10 500er-Solozeiten im Vergleich zu aktuellem Niveau und WM-Zielen. Entscheidend ist das wiederholbare Leistungsniveau, nicht eine einzelne Bestzeit.
+</div>
+<div id="wmProgressSummary" class="item" style="margin-top:10px">Fortschritt wird berechnet…</div>
+<div id="wmProgressChart" class="item" style="margin-top:8px"></div>
+<details class="readinessInfo" id="readinessInfoBox"><summary>ℹ️ WM-Readiness: Definition & Berechnungsnachweis</summary>
 <div class="small" style="margin-top:7px"><strong>Skala:</strong> 50/100 = ungefähr MSP-Median-Niveau. 100/100 = außergewöhnlich starke, stabile und aktuelle WM-Form über mehrere unterschiedliche 500er. Schwierige Puzzle werden fair bewertet, weil nicht die Rohzeit zählt, sondern Nicoles letzter Versuch relativ zum MSP-Median genau dieses Puzzles. Trainingsbelastung hat keinen Einfluss auf diesen Wert.</div>
 <div class="readinessFormula">
 <div class="part"><strong>Basis</strong><div id="readinessBaseInfo" class="small">–</div></div>
@@ -311,22 +325,11 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="part"><strong>Aktualitätsgewichteter Ø</strong><div id="readinessWeightedFormInfo" class="small">–</div></div>
 <div class="part"><strong>Readiness-Formsignal</strong><div id="readinessBlendedFormInfo" class="small">–</div></div>
 </div>
-<div style="margin-top:9px"><strong>Kontrolle der letzten vergleichbaren 500er</strong><div id="readinessMedianAudit" class="small" style="margin-top:5px">–</div></div></details><div id="readinessTrendPanel" class="item" style="margin-top:10px">
-<strong>📈 WM-Readiness-Verlauf</strong>
-<div class="small">Tägliche Entwicklung der Readiness bis zur WM. Pro Tag wird der aktuelle Wert gespeichert.</div>
-<div id="readinessTrendSummary" style="margin-top:6px;font-weight:700">Erster Verlaufspunkt wird gespeichert…</div>
-<div id="readinessTrendBars" style="display:flex;align-items:flex-end;gap:4px;height:82px;margin-top:8px"></div>
-<div id="readinessTrendChanges" class="small" style="margin-top:7px"></div>
+<div style="margin-top:9px"><strong>Kontrolle der letzten vergleichbaren 500er</strong><div id="readinessMedianAudit" class="small" style="margin-top:5px">–</div></div></details>
 </div>
-</div>
-<h2 style="margin-top:16px">📈 Fortschritt bis zur WM</h2>
-<div class="small">Die letzten 10 500er-Solozeiten im Vergleich zu aktuellem Niveau und WM-Zielen. Entscheidend ist das wiederholbare Leistungsniveau, nicht eine einzelne Bestzeit.
-</div>
-<div id="wmProgressSummary" class="item" style="margin-top:10px">Fortschritt wird berechnet…</div>
-<div id="wmProgressChart" class="item" style="margin-top:8px"></div>
 </section>
 
-<section class="card full" data-app-page="wm"><h2>🇨🇭 Schweizer Motivationsranking</h2>
+<section class="card full" data-app-page="progress"><h2>🇨🇭 Schweizer Motivationsranking</h2>
 <div class="small">Vergleich mit öffentlich verbundenen Schweizer Teilnehmern der Swiss Puzzle Championship. <strong>Kein offizielles Schweizer Ranking.</strong> Das Ranking dient nur als Motivation und beeinflusst den Trainingsplan nicht.</div>
 <div id="swissRankSummary" class="item" style="margin-top:10px">Ranking wird geladen…</div>
 <div id="swissRankList" class="list" style="margin-top:8px"></div>
@@ -638,11 +641,14 @@ function showAppPage(page,scrollTop=true){
   const buttons=[...document.querySelectorAll('.appBottomNav button')];
   buttons.forEach(b=>b.classList.toggle('active',b.dataset.page===page));
   if(!mobile){
+    document.querySelectorAll('.grid>section[data-app-page]').forEach(el=>{el.style.display='';el.classList.remove('appPageActive')});
     document.getElementById(targetMap[page])?.scrollIntoView({behavior:'smooth',block:'start'});
     return;
   }
   document.querySelectorAll('.grid>section[data-app-page]').forEach(el=>{
-    el.classList.toggle('appPageActive',el.dataset.appPage===page);
+    const active=el.dataset.appPage===page;
+    el.classList.toggle('appPageActive',active);
+    el.style.display=active?'block':'none';
   });
   const h=document.getElementById('appPageHeading'); if(h)h.textContent=labels[page]||'';
   if(scrollTop)window.scrollTo({top:0,behavior:'smooth'});
@@ -912,7 +918,7 @@ async function loadAll(){renderUnavailable();
    wmPace100.textContent=w.wm_pace_per_100||'–'; wmWeakness.textContent=w.weakness_focus?`Aktueller Fokus: ${w.weakness_focus}`:'–';
    wmStats.textContent=w.count?`${w.count} × 500er Solo · Best ${w.best} · Median ${w.median} · Ø letzte 5 ${w.recent5} · Ø letzte 10 ${w.recent10} · Ø letzte 20 ${w.recent20}`:'Noch keine 500er-Daten.';
    
-   wmTabReadiness.textContent=(w.readiness_score!=null?w.readiness_score+'/100':(w.readiness!=null?w.readiness+'/100':'–'));wmTabFirstTry.textContent=w.wm_goal_first_try||w.wm_goal_realistic||'–';wmTabStretch.textContent=w.wm_goal_stretch||'–';
+   wmTabReadiness.textContent=(w.readiness_score!=null?w.readiness_score+'/100':(w.readiness!=null?w.readiness+'/100':'–'));wmTabFirstTry.textContent=w.wm_goal_first_try||w.wm_goal_realistic||'–';const wmTabRepeat=document.getElementById('wmTabRepeat');if(wmTabRepeat)wmTabRepeat.textContent=w.wm_goal_repeat||w.dynamic_target||'–';wmTabStretch.textContent=w.wm_goal_stretch||'–';
    let pr=w.progress_recent||[];
    if(pr.length){
      let vals=pr.map(x=>x.seconds), mn=Math.min(...vals,w.wm_goal_stretch_seconds||99999), mx=Math.max(...vals);
