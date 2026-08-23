@@ -235,6 +235,34 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
     padding:10px 12px 12px
   }
 }
+
+@media(max-width:760px){
+ .puzzleChoiceDetail{border-top:1px solid #e5e7eb}
+ .puzzleChoiceDetail:first-of-type{border-top:0}
+ .puzzleChoiceDetail summary{list-style:none;display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:9px;align-items:center;padding:9px 0;cursor:pointer}
+ .puzzleChoiceDetail summary::-webkit-details-marker{display:none}
+ .puzzleChoiceDetail summary:after{content:"›";font-size:20px;color:#94a3b8;transform:rotate(90deg)}
+ .puzzleChoiceDetail[open] summary:after{transform:rotate(-90deg)}
+ .puzzleChoiceThumb{width:52px;height:52px;border-radius:8px;object-fit:cover;background:#f1f5f9}
+ .puzzleChoiceDetail summary span{min-width:0}
+ .puzzleChoiceDetail summary strong{display:block;font-size:13px;line-height:1.2}
+ .puzzleChoiceDetail summary small{display:block;color:var(--muted);font-size:10px;margin-top:2px}
+ .puzzleChoiceBody{padding:0 0 10px 61px;font-size:11px;line-height:1.4;color:var(--muted)}
+}
+
+@media(max-width:760px){
+ .puzzleChoiceDetail{border-top:1px solid #e5e7eb}
+ .puzzleChoiceDetail:first-of-type{border-top:0}
+ .puzzleChoiceDetail summary{list-style:none;display:grid;grid-template-columns:54px minmax(0,1fr) auto;gap:9px;align-items:center;padding:9px 0;cursor:pointer}
+ .puzzleChoiceDetail summary::-webkit-details-marker{display:none}
+ .puzzleChoiceDetail summary:after{content:"›";font-size:20px;color:#94a3b8;transform:rotate(90deg)}
+ .puzzleChoiceDetail[open] summary:after{transform:rotate(-90deg)}
+ .puzzleChoiceThumb{width:54px;height:54px;border-radius:8px;object-fit:cover;background:#f1f5f9}
+ .puzzleChoiceDetail summary span{min-width:0}
+ .puzzleChoiceDetail summary strong{display:block;font-size:13px;line-height:1.2}
+ .puzzleChoiceDetail summary small{display:block;color:var(--muted);font-size:10px;margin-top:2px}
+ .puzzleChoiceBody{padding:0 0 10px 63px;font-size:11px;line-height:1.4;color:var(--muted)}
+}
 </style></head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
@@ -563,29 +591,19 @@ function renderActiveTraining(){
 
 
 async function loadMedianGapFocus(){
-  const el=document.getElementById('medianGapFocus');
-  if(!el)return;
-  el.textContent='Top-5-Medianvergleich wird berechnet…';
-  try{
-    const mg=await getj('/coach/median-gap-focus');
-    if(mg.available){
-      const items=(Array.isArray(mg.items)&&mg.items.length)?mg.items:[mg];
-      el.innerHTML=`<div class="small" style="margin:5px 0 8px">${mg.message||''}</div>`+
-        items.map((p,idx)=>`<div class="puzzleRow" style="margin-top:${idx?8:4}px;padding-top:${idx?8:0}px;${idx?'border-top:1px solid #e5e7eb;':''}">
-          ${p.image_url?`<img class="puzzleImg" src="${p.image_url}" alt="${p.name||'Puzzle'}" loading="lazy" onerror="this.style.display='none'">`:''}
-          <div class="puzzleInfo">
-            <strong>${idx+1}. ${p.name||'Puzzle'}</strong>${p.manufacturer?' · '+p.manufacturer:''}
-            <div class="small">Letzte Zeit <strong>${p.last_time||'–'}</strong> · MSP-Median <strong>${p.median||'–'}</strong> · Abstand <strong>${p.gap||'–'}</strong></div>
-          </div>
-        </div>`).join('');
-    }else{
-      el.textContent=mg.message||'Kein Median-Abstand verfügbar.';
-    }
-  }catch(e){
-    el.textContent='Medianvergleich derzeit nicht verfügbar.';
-  }
+ const el=document.getElementById('medianGapFocus'); if(!el)return;
+ el.textContent='Top-5-Medianvergleich wird berechnet…';
+ try{
+  const mg=await getj('/coach/median-gap-focus');
+  if(!mg.available){el.textContent=mg.message||'Kein Median-Abstand verfügbar.';return}
+  const items=(Array.isArray(mg.items)&&mg.items.length)?mg.items:[mg];
+  el.innerHTML=`<div class="small" style="margin:5px 0 8px">${mg.message||''}</div>`+
+   items.map((p,i)=>`<details class="puzzleChoiceDetail"><summary>
+    ${p.image_url?`<img class="puzzleChoiceThumb" src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.style.display='none'">`:''}
+    <span><strong>${i+1}. ${readinessEsc(p.name||'Puzzle')}</strong>${p.manufacturer?`<small>${readinessEsc(p.manufacturer)}</small>`:''}</span>
+   </summary><div class="puzzleChoiceBody">Letzte Zeit <strong>${p.last_time||'–'}</strong> · MSP-Median <strong>${p.median||'–'}</strong> · Abstand <strong>${p.gap||'–'}</strong></div></details>`).join('');
+ }catch(e){el.textContent='Medianvergleich derzeit nicht verfügbar.'}
 }
-
 
 async function refreshFromMSP(){
   const btn=document.getElementById('mspRefreshBtn');
@@ -645,25 +663,29 @@ async function loadPuzzleProgress(){
 }
 
 async function loadUnsolvedLibrary(){
- const el=document.getElementById('unsolvedLibrary');if(!el)return;
- try{const d=await getj('/coach/unsolved-library');
- if(!d.available||!d.items?.length){el.textContent=d.message||'Keine ungelösten Library-Puzzle gefunden.';return}
- el.innerHTML=`<div class="small" style="margin:5px 0 8px"><strong>${d.count}</strong> Puzzle ohne Solo-Ergebnis · ideal für First-Try-Training.</div>`+
- d.items.map((p,i)=>{const diff=p.difficulty_label?` · Difficulty <strong>${p.difficulty_label}</strong>${p.difficulty_percent!=null?' ('+Number(p.difficulty_percent).toFixed(2)+'%)':''}`:'';
- const pred=p.prediction?` · MSP Prediction <strong>${p.prediction}</strong>${p.prediction_low&&p.prediction_high?' ('+p.prediction_low+'–'+p.prediction_high+')':''}`:'';
- return `<div class="puzzleRow" style="margin-top:${i?8:4}px;padding-top:${i?8:0}px;${i?'border-top:1px solid #e5e7eb;':''}">${p.image_url?`<img class="puzzleImg" src="${p.image_url}" alt="${p.name||'Puzzle'}" loading="lazy" onerror="this.style.display='none'">`:''}<div class="puzzleInfo"><strong>${p.name||'Puzzle'}</strong>${p.manufacturer?' · '+p.manufacturer:''}<div class="small">${p.pieces?p.pieces+' Teile':'Teilezahl unbekannt'}${diff}${pred}</div><span class="pill">noch kein Solo-Ergebnis</span></div></div>`}).join('');
- }catch(e){el.textContent='Ungelöste Library derzeit nicht verfügbar.'}}
+ const el=document.getElementById('unsolvedLibrary'); if(!el)return;
+ try{
+  const d=await getj('/coach/unsolved-library');
+  if(!d.available||!d.items?.length){el.textContent=d.message||'Keine ungelösten Library-Puzzle gefunden.';return}
+  el.innerHTML=`<div class="small" style="margin:5px 0 8px"><strong>${d.count}</strong> Puzzle ohne Solo-Ergebnis.</div>`+
+   d.items.map((p,i)=>`<details class="puzzleChoiceDetail"><summary>
+    ${p.image_url?`<img class="puzzleChoiceThumb" src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.style.display='none'">`:''}
+    <span><strong>${readinessEsc(p.name||'Puzzle')}</strong>${p.manufacturer?`<small>${readinessEsc(p.manufacturer)}</small>`:''}</span>
+   </summary><div class="puzzleChoiceBody">${p.pieces?p.pieces+' Teile':'Teilezahl unbekannt'}${p.difficulty_label?`<br>Difficulty <strong>${p.difficulty_label}</strong>`:''}${p.prediction?`<br>MSP Prediction <strong>${displayPuzzleTime(p.prediction)}</strong>`:''}<br><span class="pill">noch kein Solo-Ergebnis</span></div></details>`).join('');
+ }catch(e){el.textContent='Ungelöste Library derzeit nicht verfügbar.'}
+}
 async function loadRepeatPriority(){
- const el=document.getElementById('repeatPriority');if(!el)return;
- try{const d=await getj('/coach/repeat-priority?limit=5');
- if(!d.available||!d.items?.length){el.textContent=d.message||'Keine geeigneten Wiederholungs-Puzzle gefunden.';return}
- el.innerHTML=`<div class="small" style="margin:5px 0 8px">${d.message||''}</div>`+d.items.map((p,i)=>{
- const med=p.median?` · MSP-Median <strong>${p.median}</strong>${p.median_gap?' · '+p.median_gap+' darüber':''}`:'';
- const prev=p.previous?` · vorher ${p.previous}`:'';
- const days=p.days_since_last_solve!=null?` · zuletzt vor ${p.days_since_last_solve} Tagen`:'';
- return `<div class="puzzleRow" style="margin-top:${i?8:4}px;padding-top:${i?8:0}px;${i?'border-top:1px solid #e5e7eb;':''}">${p.image_url?`<img class="puzzleImg" src="${p.image_url}" alt="${p.name||'Puzzle'}" loading="lazy" onerror="this.style.display='none'">`:''}<div class="puzzleInfo"><strong>${i+1}. ${p.name||'Puzzle'}</strong>${p.manufacturer?' · '+p.manufacturer:''}<div class="small">Priorität <strong>${p.score}/100</strong> · ${p.label}</div><div class="small">Letzte ${p.latest}${prev} · Best ${p.best}${med}${days}</div><div class="small">${(p.reasons||[]).join(' · ')}</div></div></div>`}).join('');
- }catch(e){el.textContent='Wiederholungs-Priorität derzeit nicht verfügbar.'}}
-
+ const el=document.getElementById('repeatPriority'); if(!el)return;
+ try{
+  const d=await getj('/coach/repeat-priority?limit=5');
+  if(!d.available||!d.items?.length){el.textContent=d.message||'Keine geeigneten Wiederholungs-Puzzle gefunden.';return}
+  el.innerHTML=`<div class="small" style="margin:5px 0 8px">${d.message||''}</div>`+
+   d.items.map((p,i)=>`<details class="puzzleChoiceDetail"><summary>
+    ${p.image_url?`<img class="puzzleChoiceThumb" src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.style.display='none'">`:''}
+    <span><strong>${i+1}. ${readinessEsc(p.name||'Puzzle')}</strong>${p.manufacturer?`<small>${readinessEsc(p.manufacturer)}</small>`:''}</span>
+   </summary><div class="puzzleChoiceBody">Priorität <strong>${p.score}/100</strong> · ${p.label}<br>Letzte ${p.latest||'–'} · Best ${p.best||'–'}${p.median?`<br>MSP-Median <strong>${p.median}</strong>`:''}${p.days_since_last_solve!=null?`<br>zuletzt vor ${p.days_since_last_solve} Tagen`:''}${p.reasons?.length?`<br>${p.reasons.join(' · ')}`:''}</div></details>`).join('');
+ }catch(e){el.textContent='Wiederholungs-Priorität derzeit nicht verfügbar.'}
+}
 
 function showAppPage(page,scrollTop=true){
   document.body.dataset.appCurrent=page;
@@ -703,6 +725,47 @@ function initAppNavigation(){
   });
   showAppPage('today',false);
 }
+
+function renderWeeklyPlanFallback(w){
+  const el=document.getElementById('wmWeeklyPlan');
+  if(!el)return;
+  try{
+    const rows=Array.isArray(w?.weekly_plan)?w.weekly_plan:[];
+    if(!rows.length){
+      el.innerHTML='<div class="small">Aktuell kein Wochenplan verfügbar. Bitte MySpeedPuzzling aktualisieren.</div>';
+      return;
+    }
+    el.innerHTML=rows.map((s,i)=>{
+      const p=s?.puzzle||{};
+      const has=!!p.available;
+      const image=has&&p.image_url?`<img class="weeklyThumb" src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.style.display='none'">`:`<div class="weeklyThumb weeklyThumbEmpty">🧩</div>`;
+      let details='';
+      if(has){
+        let delta='–';
+        if(p.msp_last_time_seconds!=null&&p.msp_median_seconds!=null&&Number(p.msp_median_seconds)>0){
+          const d=((Number(p.msp_last_time_seconds)/Number(p.msp_median_seconds))-1)*100;
+          delta=`${d>0?'+':''}${d.toFixed(1)}% ${d<=0?'unter':'über'} Median`;
+        }
+        details=`<div class="weeklyDetail"><div class="weeklyFacts">
+          <div class="weeklyFact"><span>MSP-Median</span><strong>${p.msp_median||'–'}</strong></div>
+          <div class="weeklyFact"><span>Letzte Zeit</span><strong>${p.msp_last_time||'–'}</strong></div>
+          <div class="weeklyFact"><span>vs. Median</span><strong>${delta}</strong></div>
+          <div class="weeklyFact"><span>WM-Fit</span><strong>${p.wm_fit?.score!=null?p.wm_fit.score+'/100':'–'}</strong></div>
+        </div><div class="weeklyCoachReason"><strong>Coach:</strong> ${p.reason||'Passend für diese Einheit.'}</div></div>`;
+      }else{
+        details=`<div class="weeklyDetail small">${p.reason||'Für diese Einheit ist kein vollständiges Puzzle nötig.'}</div>`;
+      }
+      return `<details class="item weeklySession"${i===0?' open':''}><summary>
+        <div class="weeklyIndex">${i+1}</div>${image}
+        <div class="weeklySummaryText"><div class="weeklySessionTitle"><strong>${s?.session||'Training'}</strong><span class="pill weeklyIntensity">${s?.intensity||''}</span></div>
+        ${has?`<div class="weeklyPuzzleName">${p.name||'Puzzle'}</div>`:''}<div class="small">${s?.goal||''}</div></div>
+      </summary>${details}</details>`;
+    }).join('');
+  }catch(e){
+    el.innerHTML='<div class="small">Wochenplan konnte nicht dargestellt werden.</div>';
+  }
+}
+
 function updateTrainingQuick(w){
  const p=w?.next_puzzle||{};
  const img=document.getElementById('trainingQuickImage'),name=document.getElementById('trainingQuickPuzzle'),meta=document.getElementById('trainingQuickMeta');
@@ -753,7 +816,18 @@ function updateTodaySummary(w){
   }
 }
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+  window.addEventListener('load',async()=>{
+    try{
+      const reg=await navigator.serviceWorker.register('/sw.js?v=6108');
+      await reg.update();
+      let reloading=false;
+      navigator.serviceWorker.addEventListener('controllerchange',()=>{
+        if(reloading)return;
+        reloading=true;
+        location.reload();
+      });
+    }catch(e){}
+  });
 }
 let trainingExtrasLoaded=false,progressExtrasLoaded=false;
 function loadTrainingExtrasOnce(){
@@ -873,6 +947,28 @@ async function loadAll(){renderUnavailable();
 
  try{
    let w=await wmPlanPromise;
+   setTimeout(()=>renderWeeklyPlanFallback(w),0);
+   const weeklyPlanEl=document.getElementById('wmWeeklyPlan');
+   if(weeklyPlanEl){
+   weeklyPlanEl.innerHTML=(w.weekly_plan||[]).map((s,i)=>{
+       let p=s.puzzle||{};
+       let compactImage=p.available&&p.image_url?`<img class="weeklyThumb" src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.style.display='none'">`:`<div class="weeklyThumb weeklyThumbEmpty">🧩</div>`;
+       let compactName=p.available?(p.name||'Puzzle'):(p.not_required?'Technik / Recovery':'Kein Puzzle');
+       let diff=p.msp_insights?.difficulty_label||'–';
+       if(p.msp_insights?.difficulty_percent!=null){let dp=Number(p.msp_insights.difficulty_percent);diff=`${diff.charAt(0).toUpperCase()+diff.slice(1)} · ${dp>0?'+':''}${dp.toFixed(1)}% ggü. Ø`;}
+       let medianDelta='–';
+       if(p.msp_last_time_seconds!=null&&p.msp_median_seconds!=null&&p.msp_median_seconds>0){
+         let d=((p.msp_last_time_seconds/p.msp_median_seconds)-1)*100;
+         medianDelta=`${d>0?'+':''}${d.toFixed(1)}% ${d<=0?'unter':'über'} Median`;
+       }else if(p.median_gap){medianDelta=p.median_gap+' über Median';}
+       let detail=p.available
+         ? `<div class="weeklyDetail"><div class="weeklyFacts"><div class="weeklyFact"><span>MSP-Median</span><strong>${p.msp_median||'–'}</strong></div><div class="weeklyFact"><span>Letzte Zeit</span><strong>${p.msp_last_time||'–'}</strong></div><div class="weeklyFact"><span>vs. Median</span><strong>${medianDelta}</strong></div><div class="weeklyFact"><span>MSP Prediction</span><strong>${displayPuzzleTime(p.msp_prediction)}</strong></div><div class="weeklyFact"><span>Difficulty</span><strong>${diff}</strong></div><div class="weeklyFact"><span>WM-Fit</span><strong>${p.wm_fit?.score!=null?p.wm_fit.score+'/100':'–'}</strong></div></div><div class="weeklyCoachReason"><strong>Coach:</strong> ${p.reason||p.wm_fit?.summary||'Passend für diese Trainingseinheit.'}</div><div class="weeklyPills"><span class="pill">${p.previous_solo_solves||0} Solo-Läufe</span>${p.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${p.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}${p.wm_suitability?`<span class="pill ${p.wm_suitability.level==='hoch'||p.wm_suitability.level==='gut'?'wmGood':''}">${p.wm_suitability.label}</span>`:''}</div>${p.competition_risk?.score>=80?`<div class="small riskHigh" style="padding:7px;border-radius:8px;margin-top:7px">⚠️ ${p.competition_risk.reason}</div>`:''}<button class="skipBtn" style="margin-top:8px" onclick='skipPuzzle(${JSON.stringify(p)})'>Skip – ausgeliehen</button></div>`
+         : `<div class="weeklyDetail small">${p.reason||'Für diese Technik-/Recovery-Einheit ist kein vollständiges Puzzle nötig.'}</div>`;
+       let displayName=p.available?compactName:'';
+       return `<details class="item weeklySession"${i===0?' open':''}><summary><div class="weeklyIndex">${i+1}</div>${compactImage}<div class="weeklySummaryText"><div class="weeklySessionTitle"><strong>${s.session}</strong><span class="pill weeklyIntensity">${s.intensity}</span></div>${displayName?`<div class="weeklyPuzzleName">${displayName}</div>`:''}<div class="small">${s.goal}</div></div></summary>${detail}</details>`;
+     }).join('')||'<div class="small">Kein Trainingsplan verfügbar.</div>';
+   }
+
    const resilientBannerEl=document.getElementById('resilientBanner');
    const resilientTextEl=document.getElementById('resilientText');
    if(w.data_mode==='snapshot'){
@@ -966,23 +1062,8 @@ async function loadAll(){renderUnavailable();
      wmProgressChart.innerHTML=`<div class="progressBars wmMobileBars">${pr.map((x,i)=>{let h=35+((mx-x.seconds)/span)*105;let d=x.finished_at?new Date(x.finished_at).toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'}):'';let show=(i===0||i===pr.length-1||i%3===0);return `<div class="pbar" title="${x.puzzle_name||''} · ${x.time}"><div class="pbarFill" style="height:${Math.max(20,h)}px"></div><div class="pbarTime">${show?displayPuzzleTime(x.time):''}</div><div class="pbarDate">${show?d:''}</div></div>`}).join('')}</div><div class="progressLegend"><span class="pill">WM-Ziel: ${w.wm_goal_realistic}</span><span class="pill">Stretch: ${w.wm_goal_stretch}</span></div>`;
    }else{wmProgressSummary.textContent='Noch nicht genügend 500er-Daten.';wmProgressChart.innerHTML='';}
 
-   wmWeeklyPlan.innerHTML=(w.weekly_plan||[]).map((s,i)=>{
-     let p=s.puzzle||{};
-     let compactImage=p.available&&p.image_url?`<img class="weeklyThumb" src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.style.display='none'">`:`<div class="weeklyThumb weeklyThumbEmpty">🧩</div>`;
-     let compactName=p.available?(p.name||'Puzzle'):(p.not_required?'Technik / Recovery':'Kein Puzzle');
-     let diff=p.msp_insights?.difficulty_label||'–';
-     if(p.msp_insights?.difficulty_percent!=null){let dp=Number(p.msp_insights.difficulty_percent);diff=`${diff.charAt(0).toUpperCase()+diff.slice(1)} · ${dp>0?'+':''}${dp.toFixed(1)}% ggü. Ø`;}
-     let medianDelta='–';
-     if(p.msp_last_time_seconds!=null&&p.msp_median_seconds!=null&&p.msp_median_seconds>0){
-       let d=((p.msp_last_time_seconds/p.msp_median_seconds)-1)*100;
-       medianDelta=`${d>0?'+':''}${d.toFixed(1)}% ${d<=0?'unter':'über'} Median`;
-     }else if(p.median_gap){medianDelta=p.median_gap+' über Median';}
-     let detail=p.available
-       ? `<div class="weeklyDetail"><div class="weeklyFacts"><div class="weeklyFact"><span>MSP-Median</span><strong>${p.msp_median||'–'}</strong></div><div class="weeklyFact"><span>Letzte Zeit</span><strong>${p.msp_last_time||'–'}</strong></div><div class="weeklyFact"><span>vs. Median</span><strong>${medianDelta}</strong></div><div class="weeklyFact"><span>MSP Prediction</span><strong>${displayPuzzleTime(p.msp_prediction)}</strong></div><div class="weeklyFact"><span>Difficulty</span><strong>${diff}</strong></div><div class="weeklyFact"><span>WM-Fit</span><strong>${p.wm_fit?.score!=null?p.wm_fit.score+'/100':'–'}</strong></div></div><div class="weeklyCoachReason"><strong>Coach:</strong> ${p.reason||p.wm_fit?.summary||'Passend für diese Trainingseinheit.'}</div><div class="weeklyPills"><span class="pill">${p.previous_solo_solves||0} Solo-Läufe</span>${p.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${p.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}${p.wm_suitability?`<span class="pill ${p.wm_suitability.level==='hoch'||p.wm_suitability.level==='gut'?'wmGood':''}">${p.wm_suitability.label}</span>`:''}</div>${p.competition_risk?.score>=80?`<div class="small riskHigh" style="padding:7px;border-radius:8px;margin-top:7px">⚠️ ${p.competition_risk.reason}</div>`:''}<button class="skipBtn" style="margin-top:8px" onclick='skipPuzzle(${JSON.stringify(p)})'>Skip – ausgeliehen</button></div>`
-       : `<div class="weeklyDetail small">${p.reason||'Für diese Technik-/Recovery-Einheit ist kein vollständiges Puzzle nötig.'}</div>`;
-     let displayName=p.available?compactName:'';
-     return `<details class="item weeklySession"${i===0?' open':''}><summary><div class="weeklyIndex">${i+1}</div>${compactImage}<div class="weeklySummaryText"><div class="weeklySessionTitle"><strong>${s.session}</strong><span class="pill weeklyIntensity">${s.intensity}</span></div>${displayName?`<div class="weeklyPuzzleName">${displayName}</div>`:''}<div class="small">${s.goal}</div></div></summary>${detail}</details>`;
-   }).join('')||'<div class="small">Kein Trainingsplan verfügbar.</div>';
+   // weekly plan is rendered immediately after wm-plan resolves (see above)
+
    let simCandidate=w.simulation_puzzle?.available?w.simulation_puzzle:null;
    let firstTrySec=w.wm_goal_first_try_seconds||w.wm_goal_realistic_seconds||goalTargetSeconds(w.wm_goal_realistic||'');
    let repeatSec=w.wm_goal_repeat_seconds||w.wm_goal_realistic_seconds||goalTargetSeconds(w.wm_goal_realistic||'');
