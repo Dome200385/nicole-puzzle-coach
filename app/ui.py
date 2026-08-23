@@ -154,7 +154,32 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 .trainingQuickFacts strong{display:block;font-size:15px;margin-top:2px}
 .trainingQuickReason{font-size:11px;line-height:1.35;color:var(--muted);margin-top:8px}
 .trainingPriorityGroup>.item:first-of-type+ .item{margin-top:8px!important}
-}</style></head>
+}
+@media(max-width:760px){
+  #wmWeeklyPlan{display:flex;flex-direction:column;gap:7px}
+  .weeklySession{padding:0!important;overflow:hidden;margin:0!important}
+  .weeklySession summary{
+    list-style:none;display:grid;grid-template-columns:30px 58px minmax(0,1fr) auto;
+    gap:9px;align-items:center;padding:10px;cursor:pointer
+  }
+  .weeklySession summary::-webkit-details-marker{display:none}
+  .weeklySession summary:after{content:"›";font-size:22px;color:#94a3b8;grid-column:4;grid-row:1;justify-self:end;transform:rotate(90deg)}
+  .weeklySession[open] summary:after{transform:rotate(-90deg)}
+  .weeklyIndex{
+    width:28px;height:28px;border-radius:50%;background:#f1f5f9;
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px
+  }
+  .weeklyThumb{width:58px;height:58px;border-radius:9px;object-fit:cover;background:#f1f5f9}
+  .weeklyThumbEmpty{display:flex;align-items:center;justify-content:center;font-size:22px}
+  .weeklySummaryText{min-width:0;padding-right:3px}
+  .weeklySummaryText>strong{display:block;font-size:14px;line-height:1.15}
+  .weeklyPuzzleName{font-size:13px;font-weight:700;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .weeklySummaryText .small{font-size:10px;line-height:1.2;margin-top:2px}
+  .weeklyIntensity{grid-column:4;grid-row:2;font-size:9px;align-self:start}
+  .weeklyDetail{border-top:1px solid var(--border);padding:10px 12px 12px}
+  .weeklyPills{margin-top:6px}
+}
+</style></head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
 
@@ -882,10 +907,12 @@ async function loadAll(){renderUnavailable();
 
    wmWeeklyPlan.innerHTML=(w.weekly_plan||[]).map((s,i)=>{
      let p=s.puzzle||{};
-     let puzzleLine=p.available
-       ? `<div class="puzzleRow" style="margin-top:9px">${puzzleImg(p)}<div class="puzzleInfo"><strong>🧩 ${p.name}</strong>${p.manufacturer?' · '+p.manufacturer:''}${p.pieces?' · '+p.pieces+' Teile':''}<div class="small">${p.reason||''}</div><span class="pill">${p.previous_solo_solves||0} bisherige Solo-Läufe</span>${p.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${p.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}${p.wm_fit?`<span class="pill wmFit">WM-Fit ${p.wm_fit.score}/100</span><div class="fitReason">${p.wm_fit.summary||''}</div>`:''}${puzzleInsightHtml(p)}${p.wm_suitability?`<span class="pill ${p.wm_suitability.level==='hoch'||p.wm_suitability.level==='gut'?'wmGood':''}">${p.wm_suitability.label}</span>`:''}${p.competition_risk?.score>=80?`<div class="small riskHigh" style="padding:7px;border-radius:8px;margin-top:7px">⚠️ ${p.competition_risk.reason}</div>`:''}<br><button class="skipBtn" style="margin-top:8px" onclick='skipPuzzle(${JSON.stringify(p)})'>Skip – ausgeliehen</button></div></div>`
-       : (p.not_required?`<div class="small" style="margin-top:7px">🧩 ${p.reason}</div>`:`<div class="small" style="margin-top:7px">🧩 ${p.reason||'Kein Bibliotheks-Puzzle verfügbar.'}</div>`);
-     return `<div class="item"><strong>${i+1}. ${s.session}</strong><div class="small">${s.goal}</div><span class="pill">${s.intensity}</span>${puzzleLine}</div>`;
+     let compactImage=p.available&&p.image_url?`<img class="weeklyThumb" src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.style.display='none'">`:`<div class="weeklyThumb weeklyThumbEmpty">🧩</div>`;
+     let compactName=p.available?(p.name||'Puzzle'):(p.not_required?'Technik / Recovery':'Kein Puzzle');
+     let detail=p.available
+       ? `<div class="weeklyDetail"><div class="small">${p.reason||''}</div><div class="weeklyPills"><span class="pill">${p.previous_solo_solves||0} bisherige Solo-Läufe</span>${p.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${p.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}${p.wm_fit?`<span class="pill wmFit">WM-Fit ${p.wm_fit.score}/100</span>`:''}${p.wm_suitability?`<span class="pill ${p.wm_suitability.level==='hoch'||p.wm_suitability.level==='gut'?'wmGood':''}">${p.wm_suitability.label}</span>`:''}</div>${p.wm_fit?.summary?`<div class="fitReason">${p.wm_fit.summary}</div>`:''}${puzzleInsightHtml(p)}${p.competition_risk?.score>=80?`<div class="small riskHigh" style="padding:7px;border-radius:8px;margin-top:7px">⚠️ ${p.competition_risk.reason}</div>`:''}<button class="skipBtn" style="margin-top:8px" onclick='skipPuzzle(${JSON.stringify(p)})'>Skip – ausgeliehen</button></div>`
+       : `<div class="weeklyDetail small">${p.reason||'Für diese Einheit ist kein vollständiges Puzzle nötig.'}</div>`;
+     return `<details class="item weeklySession"${i===0?' open':''}><summary><div class="weeklyIndex">${i+1}</div>${compactImage}<div class="weeklySummaryText"><strong>${s.session}</strong><div class="weeklyPuzzleName">${compactName}</div><div class="small">${s.goal}</div></div><span class="pill weeklyIntensity">${s.intensity}</span></summary>${detail}</details>`;
    }).join('')||'<div class="small">Kein Trainingsplan verfügbar.</div>';
    let simCandidate=w.simulation_puzzle?.available?w.simulation_puzzle:null;
    let firstTrySec=w.wm_goal_first_try_seconds||w.wm_goal_realistic_seconds||goalTargetSeconds(w.wm_goal_realistic||'');
