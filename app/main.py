@@ -33,7 +33,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.12.0",
+    version="6.12.1",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -1157,14 +1157,14 @@ async def msp_registration_diagnostics(db:Session=Depends(get_db)):
 @app.get("/msp/api-route-diagnostics")
 async def msp_api_route_diagnostics(db:Session=Depends(get_db)):
     """
-    V6.12.0: read-only MSP relation discovery.
+    V6.12.1: hardened read-only MSP relation discovery.
     CrowdSec HTML is classified correctly and not treated as a schema success.
     The endpoint inspects already-working MSP responses for relation-like fields
     that may encode personal tournament participation.
     """
     import time as _time
     started=_time.monotonic()
-    out={"version":"6.12.0","schema_checks":[],"relation_checks":[],"summary":{}}
+    out={"version":"6.12.1","schema_checks":[],"relation_checks":[],"summary":{}}
 
     try:
         token=await asyncio.wait_for(_valid_access_token(db), timeout=7.0)
@@ -1253,22 +1253,36 @@ async def msp_api_route_diagnostics(db:Session=Depends(get_db)):
     # 2) Inspect working MSP resources for participation-related relation fields.
     checks=[]
 
-    async def safe(label,coro,timeout=8.0):
+    async def safe_call(label, factory, timeout=8.0):
+        # The factory is intentionally invoked inside try. This also catches
+        # synchronous call/signature errors before a coroutine is created.
+        t=_time.monotonic()
         try:
-            data=await asyncio.wait_for(coro,timeout=timeout)
-            checks.append(inspect_shape(label,data))
+            awaitable=factory()
+            data=await asyncio.wait_for(awaitable,timeout=timeout)
+            shaped=inspect_shape(label,data)
+            shaped["elapsed_ms"]=round((_time.monotonic()-t)*1000)
+            checks.append(shaped)
             return data
         except Exception as exc:
-            checks.append({"label":label,"error":f"{type(exc).__name__}: {exc}"})
+            checks.append({
+                "label":label,
+                "stage":"call_or_await",
+                "error_type":type(exc).__name__,
+                "error":f"{type(exc).__name__}: {exc}",
+                "elapsed_ms":round((_time.monotonic()-t)*1000),
+            })
             return None
 
-    profile=await safe("profile", get_profile(token))
-    await safe("statistics", get_statistics(token))
-    await safe("results", get_results(token,limit=50))
-    await safe("collections", get_collections(token))
-    await safe("library", get_library(token))
+    profile=await safe_call("profile", lambda: get_profile(token))
+    await safe_call("statistics", lambda: get_statistics(token))
+    # get_results() has no limit parameter; V6.12.0 passed limit=50 here and
+    # raised TypeError before the old safe() helper could catch it, causing HTTP 500.
+    await safe_call("results", lambda: get_results(token))
+    await safe_call("collections", lambda: get_collections(token))
+    await safe_call("library", lambda: get_library(token), timeout=12.0)
 
-    comps=await safe("competitions_list", get_competitions(token,status="all",online=False,cache=False),timeout=12.0)
+    comps=await safe_call("competitions_list", lambda: get_competitions(token,status="all",online=False,cache=False),timeout=12.0)
 
     # 3) Inspect the two known target competition detail payloads.
     targets=[]
@@ -1288,7 +1302,7 @@ async def msp_api_route_diagnostics(db:Session=Depends(get_db)):
     for c in targets:
         cid=c.get("id")
         if cid:
-            await safe(f"competition_detail:{c.get('name')}", get_competition(token,cid), timeout=8.0)
+            await safe_call(f"competition_detail:{c.get('name')}", lambda cid=cid: get_competition(token,cid), timeout=8.0)
 
     out["relation_checks"]=checks
     all_hits=[]
