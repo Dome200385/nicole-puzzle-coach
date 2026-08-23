@@ -348,27 +348,35 @@ _MY_COMP_CACHE={"ts":0.0,"player_id":None,"data":None}
 _MY_COMP_CACHE_SECONDS=30*60
 
 async def get_my_confirmed_competitions(token, limit=30, cache=True):
-    profile=await get_profile(token)
+    """Return confirmed upcoming tournaments without serial detail-call blocking."""
+    import asyncio
+    profile=await asyncio.wait_for(get_profile(token), timeout=5.0)
     player_id=profile.get("id") if isinstance(profile,dict) else None
     now=time.time()
     if cache and _MY_COMP_CACHE["data"] is not None and _MY_COMP_CACHE["player_id"]==player_id and now-_MY_COMP_CACHE["ts"]<_MY_COMP_CACHE_SECONDS:
         out=dict(_MY_COMP_CACHE["data"]); out["cached"]=True; return out
-    payload=await get_competitions(token,status="all",online=False,cache=cache)
+    payload=await asyncio.wait_for(get_competitions(token,status="all",online=False,cache=cache), timeout=6.0)
     candidates=upcoming_competitions(payload,limit=max(1,min(int(limit),60)))
-    confirmed=[]; checked=[]
-    for comp in candidates:
+
+    async def inspect(comp):
         cid=comp.get("id")
-        if not cid: continue
+        if not cid: return None, {"name":comp.get("name"),"error":"missing_id"}
         try:
-            detail=await get_competition(token,cid,cache=cache)
+            detail=await asyncio.wait_for(get_competition(token,cid,cache=cache), timeout=4.0)
             signal=detect_participation(detail)
+            checked={"id":cid,"name":comp.get("name"),"registered":bool(signal.get("detected")),"participation":signal}
+            if signal.get("detected"):
+                clean={k:v for k,v in comp.items() if k!="raw"}; clean["registered"]=True; clean["registration_source"]="competition_api"
+                return clean, checked
+            return None, checked
         except Exception as exc:
-            checked.append({"id":cid,"name":comp.get("name"),"error":str(exc)})
-            if "403" in str(exc) or "cooldown" in str(exc).lower(): break
-            continue
-        checked.append({"id":cid,"name":comp.get("name"),"registered":bool(signal.get("detected")),"participation":signal})
-        if signal.get("detected"):
-            clean={k:v for k,v in comp.items() if k!="raw"}; clean["registered"]=True; clean["registration_source"]="competition_api"; confirmed.append(clean)
+            return None, {"id":cid,"name":comp.get("name"),"error":str(exc)}
+
+    # Inspect a bounded upcoming set concurrently; one slow competition can no longer block all others.
+    inspected=await asyncio.gather(*(inspect(c) for c in candidates[:12]))
+    confirmed=[c for c,_ in inspected if c]
+    checked=[x for _,x in inspected]
+    confirmed.sort(key=lambda c:str(c.get("date_from") or "9999"))
     result={"player_id":player_id,"player_name":profile.get("name") if isinstance(profile,dict) else None,"competitions":confirmed,"count":len(confirmed),"checked":len(checked),"cached":False,"source":"official_api"}
     _MY_COMP_CACHE.update({"ts":now,"player_id":player_id,"data":result})
     return result

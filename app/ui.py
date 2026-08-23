@@ -1040,7 +1040,7 @@ async function loadAll(){renderUnavailable();
 
    const resilientBannerEl=document.getElementById('resilientBanner');
    const resilientTextEl=document.getElementById('resilientText');
-   if(w.data_mode==='snapshot'){
+   if(false && w.data_mode==='snapshot'){
      if(resilientBannerEl) resilientBannerEl.style.display='block';
      if(resilientTextEl) resilientTextEl.innerHTML=`MySpeedPuzzling ist von Render aktuell nicht live erreichbar. Der Coach verwendet Snapshot <strong>#${w.snapshot_id||'–'}</strong>. Trainingsdaten, WM-Ziele und Wochenplan bleiben nutzbar. Bekannte Turnierdaten werden lokal ergänzt.${w.live_warning?`<br>${w.live_warning}`:''}`;
      mspKpi.textContent='CACHE';
@@ -1144,8 +1144,8 @@ async function loadAll(){renderUnavailable();
 
  }catch(e){
    wmRecommendation.textContent='WM-Coach konnte nicht live aktualisiert werden. Der letzte Server-Snapshot bleibt erhalten.';
-   if(resilientBannerEl) resilientBannerEl.style.display='block';
-   resilientText.textContent='Live-Aktualisierung fehlgeschlagen. Vorhandene Trainingsanalyse bleibt verfügbar.';
+   if(resilientBannerEl) resilientBannerEl.style.display='none';
+   // A UI/rendering or auxiliary live error must never falsely label current MSP data as Resilient Mode.
  }
 
 
