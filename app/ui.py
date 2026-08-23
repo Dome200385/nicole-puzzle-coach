@@ -460,6 +460,14 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div id="routeDiagStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
 <div id="routeDiagList" class="list" style="margin-top:8px"></div>
 </section>
+<section class="card full" data-app-page="more">
+<h2>🧬 MSP Registration Fingerprint</h2>
+<div class="small">Sucht rekursiv in bereits funktionierenden MSP-Antworten nach User-/Player-/Team-/Entry-/Participant-Beziehungen. Nur lesend.</div>
+<button class="btn secondary" style="margin-top:10px" onclick="runRegistrationFingerprint()">Fingerprint prüfen</button>
+<div id="fingerprintStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
+<div id="fingerprintList" class="list" style="margin-top:8px"></div>
+</section>
+
 
 
 <section class="card full appSection" id="appMore" data-app-page="more"><h2>🧠 Tournament Intelligence</h2>
@@ -1070,6 +1078,44 @@ async function runRouteDiagnostics(){
    list.innerHTML=`<div class="item small">${readinessEsc(e.message||e)}</div>`;
  }
 }
+
+async function runRegistrationFingerprint(){
+ const status=document.getElementById('fingerprintStatus');
+ const list=document.getElementById('fingerprintList');
+ if(!status||!list)return;
+ status.textContent='Fingerprint wird geprüft…';
+ list.innerHTML='';
+ try{
+   const r=await fetch('/msp/registration-fingerprint',{cache:'no-store'});
+   const txt=await r.text();
+   let d; try{d=JSON.parse(txt)}catch(_){throw new Error(`HTTP ${r.status}: ${txt.slice(0,300)}`)}
+   if(!r.ok)throw new Error(`HTTP ${r.status}`);
+   const s=d.summary||{};
+   status.innerHTML=`Version <strong>${d.version||'–'}</strong> · Relations <strong>${s.relation_hit_count??0}</strong> · Nicole-ID-Matches <strong>${s.player_match_count??0}</strong> · ${s.elapsed_ms??'–'} ms`;
+
+   const rows=(d.sources||[]).map(src=>{
+     const rel=src.relation_hits||[];
+     const matches=src.player_matches||[];
+     return `<details class="item"><summary><strong>${src.error?'❌':'✅'} ${readinessEsc(src.label||'Quelle')}</strong></summary>
+       ${src.error?`<div class="small" style="color:#b91c1c">${readinessEsc(src.error)}</div>`:''}
+       ${src.relation_hit_count!=null?`<div class="small">Relations: ${src.relation_hit_count} · Nicole-ID-Matches: ${src.player_match_count||0}</div>`:''}
+       ${matches.length?`<div class="small"><strong>🎯 Nicole-ID gefunden</strong></div><pre class="diagPre">${readinessEsc(JSON.stringify(matches,null,2))}</pre>`:''}
+       ${rel.length?`<pre class="diagPre">${readinessEsc(JSON.stringify(rel,null,2))}</pre>`:'<div class="small">Keine relevanten Relationspfade.</div>'}
+     </details>`;
+   }).join('');
+
+   const matchSources=s.player_match_sources||[];
+   const summary=matchSources.length
+      ? `<div class="item"><strong>🎯 Nicole-ID gefunden in:</strong><div class="small">${matchSources.map(readinessEsc).join(' · ')}</div></div>`
+      : `<div class="item small"><strong>Kein persönlicher Player-ID-Fingerprint in den geprüften MSP-Antworten gefunden.</strong></div>`;
+
+   list.innerHTML=summary+rows;
+ }catch(e){
+   status.textContent='Fingerprint-Diagnose fehlgeschlagen.';
+   list.innerHTML=`<div class="item small">${readinessEsc(e.message||e)}</div>`;
+ }
+}
+
 async function loadAll(){renderUnavailable();
  let coreHasMspData=false;
  // Performance V6.9.6: independent API calls start immediately in parallel.
