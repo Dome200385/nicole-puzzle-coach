@@ -439,65 +439,20 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 </section>
 
 
-<section class="card full" data-app-page="more">
-<h2>🧪 MSP Turnier-Diagnose</h2>
-<div class="small">Nur Diagnose. Keine Daten werden verändert und die Coach-Berechnungen bleiben unverändert.</div>
-<button class="btn secondary" style="margin-top:10px" onclick="runTournamentDiagnostics()">Diagnose starten</button>
-<div id="tournamentDiagStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
-<div id="tournamentDiagSteps" class="list" style="margin-top:8px"></div>
-</section>
-<section class="card full" data-app-page="more">
-<h2>🔎 MSP Registration-Diagnose</h2>
-<div class="small">Prüft ausschließlich lesend mögliche offizielle MSP-Endpunkte für persönliche Turnier-Anmeldungen.</div>
-<button class="btn secondary" style="margin-top:10px" onclick="runRegistrationDiagnostics()">Registration prüfen</button>
-<div id="registrationDiagStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
-<div id="registrationDiagList" class="list" style="margin-top:8px"></div>
-</section>
-<section class="card full" data-app-page="more">
-<h2>🧭 MSP Datenstruktur-Diagnose</h2>
-<div class="small">Erkennt CrowdSec korrekt und untersucht nur lesend bereits funktionierende MSP-Antworten auf Turnier-/Registration-Beziehungen.</div>
-<button class="btn secondary" style="margin-top:10px" onclick="runRouteDiagnostics()">Datenstruktur prüfen</button>
-<div id="routeDiagStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
-<div id="routeDiagList" class="list" style="margin-top:8px"></div>
-</section>
-<section class="card full" data-app-page="more">
-<h2>🧬 MSP Registration Fingerprint</h2>
-<div class="small">Sucht rekursiv in bereits funktionierenden MSP-Antworten nach User-/Player-/Team-/Entry-/Participant-Beziehungen. Nur lesend.</div>
-<button class="btn secondary" style="margin-top:10px" onclick="runRegistrationFingerprint()">Fingerprint prüfen</button>
-<div id="fingerprintStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
-<div id="fingerprintList" class="list" style="margin-top:8px"></div>
-</section>
-<section class="card full" data-app-page="more">
-<h2>🧵 Nicole Competition Trace</h2>
-<div class="small">Zeigt nur den direkten Kontext rund um Nicoles echte Player-ID in MSP-Resultaten: Competition/Event, Datum, Modus und Status.</div>
-<button class="btn secondary" style="margin-top:10px" onclick="runNicoleCompetitionTrace()">Trace starten</button>
-<div id="traceStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
-<div id="traceList" class="list" style="margin-top:8px"></div>
-</section>
-<section class="card full" data-app-page="more">
-<h2>🗺️ Competition Structure Mapper</h2>
-<div class="small">Kartiert alle MSP-Competition-Datensätze und zeigt Feldunterschiede, Schemas sowie mögliche Registration-/Participant-Strukturen. Nur lesend.</div>
-<button class="btn secondary" style="margin-top:10px" onclick="runCompetitionStructureMap()">Struktur kartieren</button>
-<div id="structureMapStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
-<div id="structureMapList" class="list" style="margin-top:8px"></div>
-</section>
-<section class="card full" data-app-page="more">
-<h2>🔁 Result → Competition Reverse Mapper</h2>
-<div class="small">Versucht Nicoles Solo-/Duo-/Team-Ergebnisse anhand von IDs, Namen, Datum und Kontext mit den bekannten MSP-Competitions zu verbinden. Nur lesend.</div>
-<button class="btn secondary" style="margin-top:10px" onclick="runResultCompetitionReverseMap()">Reverse Mapping starten</button>
-<div id="reverseMapStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
-<div id="reverseMapList" class="list" style="margin-top:8px"></div>
-</section>
 
 
 
 
 
 
-<section class="card full appSection" id="appMore" data-app-page="more"><h2>🧠 Tournament Intelligence</h2>
-<div class="small">V6.9.6 MSP-only Puzzle Predictions + Frontend Snapshot Recovery: konkrete Puzzle-Prognosen stammen ausschliesslich aus MySpeedPuzzling; WM-Ziele und Coach-Logik bleiben unverändert. Lokale Turnier-Fallbacks: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
-<div style="margin-top:12px"><a class="btn secondary" href="/docs" target="_blank">API-Dokumentation</a> <a class="btn secondary" href="/msp/my-competitions?refresh=true" target="_blank">Anmeldungen neu prüfen</a> <a class="btn secondary" href="/sync" target="_blank">MySpeedPuzzling neu synchronisieren</a> <a class="btn secondary" href="/msp/library" target="_blank">Puzzle-Bibliothek prüfen</a></div>
-</section>
+
+
+
+
+
+
+
+
 </div></div>
 
 <div id="infoModal" class="modal" onclick="if(event.target===this)closeInfo()"><div class="modalbox"><div id="infoContent"></div><button class="secondary" onclick="closeInfo()">Schliessen</button></div></div>

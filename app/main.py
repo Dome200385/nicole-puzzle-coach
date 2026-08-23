@@ -33,7 +33,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.12.5",
+    version="6.12.6",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -282,7 +282,7 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.12.5","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.12.6","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 
 def _ensure_readiness_history_table(db):
@@ -364,7 +364,7 @@ def pwa_manifest():
 
 @app.get("/sw.js")
 def pwa_service_worker():
-    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v6125';
+    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v6126';
 const SHELL=['/manifest.webmanifest','/pwa/icon-192.png','/pwa/icon-512.png','/pwa/icon-maskable-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(SHELL)).catch(()=>{}));
@@ -402,7 +402,7 @@ def pwa_asset(filename:str):
     return FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.12.5"}
+def health(): return {"status":"ok","version":"6.12.6"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -417,7 +417,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.12.5",
+        "version":"6.12.6",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -535,10 +535,13 @@ async def sync(db:Session=Depends(get_db)):
 
         confirmed=[]
         try:
-            confirmed_payload=await get_my_confirmed_competitions(token,limit=30,cache=False)
-            confirmed=(confirmed_payload or {}).get("competitions",[]) if isinstance(confirmed_payload,dict) else []
+            comp_payload=await get_competitions(token,status="all",online=False,cache=False)
+            comp_rows=comp_payload.get("competitions",[]) if isinstance(comp_payload,dict) else (comp_payload if isinstance(comp_payload,list) else [])
+            confirmed_slugs={"world-jigsaw-puzzle-championship-2026","swiss-championship-2026"}
+            for c in comp_rows:
+                if isinstance(c,dict) and str(c.get("slug") or "").lower() in confirmed_slugs:
+                    item=dict(c); item["registered"]=True; item["registration_source"]="confirmed_config_live_metadata"; confirmed.append(item)
         except Exception:
-            # Local tournament fallback remains responsible for continuity.
             confirmed=[]
 
         stored_statistics={
@@ -613,15 +616,15 @@ async def msp_api_test(db:Session=Depends(get_db)):
         return {"ok":False,"mode":"pat","reason":"MSP_PERSONAL_ACCESS_TOKEN not configured"}
     try:
         profile=await get_profile(token)
-        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.12.5","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
+        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.12.6","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
     except Exception as exc:
-        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.12.5","error":str(exc)}
+        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.12.6","error":str(exc)}
 
 @app.get("/msp/sync-status")
 def msp_sync_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     return {
-        "version":"6.12.5",
+        "version":"6.12.6",
         "snapshot_id":snap.id if snap else None,
         "synced_at":snap.synced_at if snap else None,
         "data_available":snap is not None,
@@ -772,68 +775,84 @@ async def my_competitions(
     db:Session=Depends(get_db)
 ):
     """
-    API-first tournament list with stable local fallback.
-    Live API-confirmed registrations win; known local confirmed tournaments are
-    retained whenever the API returns none or incomplete participation data.
+    V6.12.6 stable confirmed-tournament bridge.
+
+    MSP's exposed Competition API provides live tournament metadata but currently
+    exposes no personal registration flag. Therefore:
+    - name/date/location/status are always refreshed from the official MSP competition list;
+    - only the known confirmed-registration identity (slug) is configured locally;
+    - registration lookup failure does NOT put the whole coach into resilient mode.
     """
-    api_list=[]
-    api_meta={}
+    configured_slugs={
+        "world-jigsaw-puzzle-championship-2026",
+        "swiss-championship-2026",
+    }
+
+    live_rows=[]
+    api_error=None
     try:
         token=await _valid_access_token(db)
-        result=await asyncio.wait_for(get_my_confirmed_competitions(
-            token,
-            limit=max(1,min(limit,60)),
-            cache=not refresh
-        ), timeout=7.0)
-        if isinstance(result,dict):
-            api_list=result.get("competitions") or []
-            api_meta={k:v for k,v in result.items() if k!="competitions"}
-        elif isinstance(result,list):
-            api_list=result
+        payload=await asyncio.wait_for(
+            get_competitions(token,status="all",online=False,cache=not refresh),
+            timeout=10.0
+        )
+        if isinstance(payload,dict):
+            live_rows=payload.get("competitions") or payload.get("data") or payload.get("items") or []
+        elif isinstance(payload,list):
+            live_rows=payload
     except Exception as exc:
-        api_meta={"api_error":str(exc)}
+        api_error=str(exc)
+        live_rows=[]
 
-    # If only the competition sub-request is unavailable, prefer competitions
-    # saved by the last successful official sync before using local continuity.
-    snapshot_list=[]
-    if not api_list:
+    confirmed=[]
+    for row in live_rows:
+        if not isinstance(row,dict):
+            continue
+        slug=str(row.get("slug") or "").strip().lower()
+        if slug not in configured_slugs:
+            continue
+        item=dict(row)
+        item["registered"]=True
+        item["registration_source"]="confirmed_config_live_metadata"
+        confirmed.append(item)
+
+    # If live metadata is temporarily unavailable, use the last official snapshot.
+    if not confirmed:
         try:
             snap=_latest_snapshot(db)
             if snap:
-                snap_payload=_snapshot_payload(snap)
-                snapshot_list=snap_payload.get("confirmed_competitions") or []
+                payload=_snapshot_payload(snap)
+                for row in payload.get("confirmed_competitions") or []:
+                    if not isinstance(row,dict):
+                        continue
+                    slug=str(row.get("slug") or "").strip().lower()
+                    if slug in configured_slugs:
+                        item=dict(row)
+                        item["registered"]=True
+                        item["registration_source"]="last_official_snapshot"
+                        confirmed.append(item)
         except Exception:
-            snapshot_list=[]
-    base_list=api_list or snapshot_list
-    merged=_merge_competitions(base_list,[])
-    live_ok=not bool(api_meta.get("api_error"))
-    fallback_keys={
-        str(c.get("slug") or c.get("name") or "").strip().lower()
-        for c in _local_confirmed_competitions()
-    }
-    api_keys={
-        str(c.get("slug") or c.get("name") or "").strip().lower()
-        for c in api_list if isinstance(c,dict)
-    }
-    fallback_used=sum(1 for k in fallback_keys if k and k not in api_keys)
+            pass
+
+    confirmed.sort(key=lambda c:str(c.get("date_from") or "9999"))
     return {
-        **api_meta,
-        "competitions":merged,
-        "count":len(merged),
-        "api_count":len(api_list),
-        "live_ok":live_ok,
-        "fallback_used":fallback_used,
-        "source":"live" if live_ok else ("last_official_sync_plus_local" if snapshot_list else "local_continuity"),
+        "competitions":confirmed[:max(1,min(limit,60))],
+        "count":len(confirmed),
+        "api_count":len(live_rows),
+        "live_ok":api_error is None,
+        "api_error":api_error,
+        "registration_capability":"not_exposed_by_current_msp_competition_api",
+        "source":"live_msp_metadata_plus_confirmed_registration_config" if live_rows else "last_official_snapshot",
     }
 
 
 @app.get("/msp/tournament-diagnostics")
 async def msp_tournament_diagnostics(db:Session=Depends(get_db)):
-    """V6.12.5: inspect the tournament pipeline before confirmed filtering."""
+    """V6.12.6: inspect the tournament pipeline before confirmed filtering."""
     import time as _time
     from datetime import datetime as _dt
     started=_time.monotonic()
-    diag={"version":"6.12.5","checked_at":_dt.utcnow().isoformat()+"Z","steps":[],"summary":{}}
+    diag={"version":"6.12.6","checked_at":_dt.utcnow().isoformat()+"Z","steps":[],"summary":{}}
 
     def step(name, ok, **kw):
         diag["steps"].append({"step":name,"ok":bool(ok),**kw})
@@ -1014,12 +1033,12 @@ async def msp_tournament_diagnostics(db:Session=Depends(get_db)):
 @app.get("/msp/registration-diagnostics")
 async def msp_registration_diagnostics(db:Session=Depends(get_db)):
     """
-    V6.12.5 read-only endpoint discovery for personal competition registrations.
+    V6.12.6 read-only endpoint discovery for personal competition registrations.
     No writes, no registration actions, and no coach calculations are changed.
     """
     import time as _time
     started=_time.monotonic()
-    out={"version":"6.12.5","probes":[],"targets":[],"summary":{}}
+    out={"version":"6.12.6","probes":[],"targets":[],"summary":{}}
 
     try:
         token=await asyncio.wait_for(_valid_access_token(db), timeout=7.0)
@@ -1157,14 +1176,14 @@ async def msp_registration_diagnostics(db:Session=Depends(get_db)):
 @app.get("/msp/api-route-diagnostics")
 async def msp_api_route_diagnostics(db:Session=Depends(get_db)):
     """
-    V6.12.5: hardened read-only MSP relation discovery.
+    V6.12.6: hardened read-only MSP relation discovery.
     CrowdSec HTML is classified correctly and not treated as a schema success.
     The endpoint inspects already-working MSP responses for relation-like fields
     that may encode personal tournament participation.
     """
     import time as _time
     started=_time.monotonic()
-    out={"version":"6.12.5","schema_checks":[],"relation_checks":[],"summary":{}}
+    out={"version":"6.12.6","schema_checks":[],"relation_checks":[],"summary":{}}
 
     try:
         token=await asyncio.wait_for(_valid_access_token(db), timeout=7.0)
@@ -1276,7 +1295,7 @@ async def msp_api_route_diagnostics(db:Session=Depends(get_db)):
 
     profile=await safe_call("profile", lambda: get_profile(token))
     await safe_call("statistics", lambda: get_statistics(token))
-    # get_results() has no limit parameter; V6.12.5 passed limit=50 here and
+    # get_results() has no limit parameter; V6.12.6 passed limit=50 here and
     # raised TypeError before the old safe() helper could catch it, causing HTTP 500.
     await safe_call("results", lambda: get_results(token))
     await safe_call("collections", lambda: get_collections(token))
@@ -1325,13 +1344,13 @@ async def msp_api_route_diagnostics(db:Session=Depends(get_db)):
 @app.get("/msp/registration-fingerprint")
 async def msp_registration_fingerprint(db:Session=Depends(get_db)):
     """
-    V6.12.5 read-only recursive fingerprint diagnostics.
+    V6.12.6 read-only recursive fingerprint diagnostics.
     Searches already-working MSP payloads for user/player/team/entry/participant
     relations and whether the authenticated player id appears anywhere nested.
     """
     import time as _time
     started=_time.monotonic()
-    out={"version":"6.12.5","sources":[],"summary":{}}
+    out={"version":"6.12.6","sources":[],"summary":{}}
 
     try:
         token=await asyncio.wait_for(_valid_access_token(db), timeout=7.0)
@@ -1463,12 +1482,12 @@ async def msp_registration_fingerprint(db:Session=Depends(get_db)):
 @app.get("/msp/nicole-competition-trace")
 async def nicole_competition_trace(db:Session=Depends(get_db)):
     """
-    V6.12.5 read-only context trace around the authenticated player's real ID
+    V6.12.6 read-only context trace around the authenticated player's real ID
     inside MSP results. Extracts nearby competition/event/date/category/status fields.
     """
     import time as _time
     started=_time.monotonic()
-    out={"version":"6.12.5","traces":[],"summary":{}}
+    out={"version":"6.12.6","traces":[],"summary":{}}
 
     try:
         token=await asyncio.wait_for(_valid_access_token(db),timeout=7.0)
@@ -1649,12 +1668,12 @@ async def nicole_competition_trace(db:Session=Depends(get_db)):
 @app.get("/msp/competition-structure-map")
 async def competition_structure_map(db:Session=Depends(get_db)):
     """
-    V6.12.5 read-only structural mapper across all MSP competitions.
+    V6.12.6 read-only structural mapper across all MSP competitions.
     Maps field presence/types and highlights registration/participant/event/url/id differences.
     """
     import time as _time
     started=_time.monotonic()
-    out={"version":"6.12.5","fields":[],"targets":[],"samples":[],"summary":{}}
+    out={"version":"6.12.6","fields":[],"targets":[],"samples":[],"summary":{}}
 
     try:
         token=await asyncio.wait_for(_valid_access_token(db),timeout=7.0)
@@ -1814,14 +1833,14 @@ async def competition_structure_map(db:Session=Depends(get_db)):
 @app.get("/msp/result-competition-reverse-map")
 async def result_competition_reverse_map(db:Session=Depends(get_db)):
     """
-    V6.12.5 read-only reverse mapper.
+    V6.12.6 read-only reverse mapper.
     Tries to connect Nicole's solo/duo/team result structures to known MSP competitions
     using explicit ids/names/dates and nearby nested context.
     """
     import time as _time
     from datetime import datetime as _dt
     started=_time.monotonic()
-    out={"version":"6.12.5","modes":[],"summary":{}}
+    out={"version":"6.12.6","modes":[],"summary":{}}
 
     try:
         token=await asyncio.wait_for(_valid_access_token(db),timeout=7.0)
