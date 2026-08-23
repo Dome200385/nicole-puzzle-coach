@@ -33,7 +33,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.12.4",
+    version="6.12.5",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -282,7 +282,7 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.12.4","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.12.5","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 
 def _ensure_readiness_history_table(db):
@@ -364,7 +364,7 @@ def pwa_manifest():
 
 @app.get("/sw.js")
 def pwa_service_worker():
-    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v6124';
+    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v6125';
 const SHELL=['/manifest.webmanifest','/pwa/icon-192.png','/pwa/icon-512.png','/pwa/icon-maskable-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(SHELL)).catch(()=>{}));
@@ -402,7 +402,7 @@ def pwa_asset(filename:str):
     return FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.12.4"}
+def health(): return {"status":"ok","version":"6.12.5"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -417,7 +417,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.12.4",
+        "version":"6.12.5",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -613,15 +613,15 @@ async def msp_api_test(db:Session=Depends(get_db)):
         return {"ok":False,"mode":"pat","reason":"MSP_PERSONAL_ACCESS_TOKEN not configured"}
     try:
         profile=await get_profile(token)
-        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.12.4","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
+        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.12.5","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
     except Exception as exc:
-        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.12.4","error":str(exc)}
+        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.12.5","error":str(exc)}
 
 @app.get("/msp/sync-status")
 def msp_sync_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     return {
-        "version":"6.12.4",
+        "version":"6.12.5",
         "snapshot_id":snap.id if snap else None,
         "synced_at":snap.synced_at if snap else None,
         "data_available":snap is not None,
@@ -829,11 +829,11 @@ async def my_competitions(
 
 @app.get("/msp/tournament-diagnostics")
 async def msp_tournament_diagnostics(db:Session=Depends(get_db)):
-    """V6.12.4: inspect the tournament pipeline before confirmed filtering."""
+    """V6.12.5: inspect the tournament pipeline before confirmed filtering."""
     import time as _time
     from datetime import datetime as _dt
     started=_time.monotonic()
-    diag={"version":"6.12.4","checked_at":_dt.utcnow().isoformat()+"Z","steps":[],"summary":{}}
+    diag={"version":"6.12.5","checked_at":_dt.utcnow().isoformat()+"Z","steps":[],"summary":{}}
 
     def step(name, ok, **kw):
         diag["steps"].append({"step":name,"ok":bool(ok),**kw})
@@ -1014,12 +1014,12 @@ async def msp_tournament_diagnostics(db:Session=Depends(get_db)):
 @app.get("/msp/registration-diagnostics")
 async def msp_registration_diagnostics(db:Session=Depends(get_db)):
     """
-    V6.12.4 read-only endpoint discovery for personal competition registrations.
+    V6.12.5 read-only endpoint discovery for personal competition registrations.
     No writes, no registration actions, and no coach calculations are changed.
     """
     import time as _time
     started=_time.monotonic()
-    out={"version":"6.12.4","probes":[],"targets":[],"summary":{}}
+    out={"version":"6.12.5","probes":[],"targets":[],"summary":{}}
 
     try:
         token=await asyncio.wait_for(_valid_access_token(db), timeout=7.0)
@@ -1157,14 +1157,14 @@ async def msp_registration_diagnostics(db:Session=Depends(get_db)):
 @app.get("/msp/api-route-diagnostics")
 async def msp_api_route_diagnostics(db:Session=Depends(get_db)):
     """
-    V6.12.4: hardened read-only MSP relation discovery.
+    V6.12.5: hardened read-only MSP relation discovery.
     CrowdSec HTML is classified correctly and not treated as a schema success.
     The endpoint inspects already-working MSP responses for relation-like fields
     that may encode personal tournament participation.
     """
     import time as _time
     started=_time.monotonic()
-    out={"version":"6.12.4","schema_checks":[],"relation_checks":[],"summary":{}}
+    out={"version":"6.12.5","schema_checks":[],"relation_checks":[],"summary":{}}
 
     try:
         token=await asyncio.wait_for(_valid_access_token(db), timeout=7.0)
@@ -1276,7 +1276,7 @@ async def msp_api_route_diagnostics(db:Session=Depends(get_db)):
 
     profile=await safe_call("profile", lambda: get_profile(token))
     await safe_call("statistics", lambda: get_statistics(token))
-    # get_results() has no limit parameter; V6.12.4 passed limit=50 here and
+    # get_results() has no limit parameter; V6.12.5 passed limit=50 here and
     # raised TypeError before the old safe() helper could catch it, causing HTTP 500.
     await safe_call("results", lambda: get_results(token))
     await safe_call("collections", lambda: get_collections(token))
@@ -1325,13 +1325,13 @@ async def msp_api_route_diagnostics(db:Session=Depends(get_db)):
 @app.get("/msp/registration-fingerprint")
 async def msp_registration_fingerprint(db:Session=Depends(get_db)):
     """
-    V6.12.4 read-only recursive fingerprint diagnostics.
+    V6.12.5 read-only recursive fingerprint diagnostics.
     Searches already-working MSP payloads for user/player/team/entry/participant
     relations and whether the authenticated player id appears anywhere nested.
     """
     import time as _time
     started=_time.monotonic()
-    out={"version":"6.12.4","sources":[],"summary":{}}
+    out={"version":"6.12.5","sources":[],"summary":{}}
 
     try:
         token=await asyncio.wait_for(_valid_access_token(db), timeout=7.0)
@@ -1463,12 +1463,12 @@ async def msp_registration_fingerprint(db:Session=Depends(get_db)):
 @app.get("/msp/nicole-competition-trace")
 async def nicole_competition_trace(db:Session=Depends(get_db)):
     """
-    V6.12.4 read-only context trace around the authenticated player's real ID
+    V6.12.5 read-only context trace around the authenticated player's real ID
     inside MSP results. Extracts nearby competition/event/date/category/status fields.
     """
     import time as _time
     started=_time.monotonic()
-    out={"version":"6.12.4","traces":[],"summary":{}}
+    out={"version":"6.12.5","traces":[],"summary":{}}
 
     try:
         token=await asyncio.wait_for(_valid_access_token(db),timeout=7.0)
@@ -1649,12 +1649,12 @@ async def nicole_competition_trace(db:Session=Depends(get_db)):
 @app.get("/msp/competition-structure-map")
 async def competition_structure_map(db:Session=Depends(get_db)):
     """
-    V6.12.4 read-only structural mapper across all MSP competitions.
+    V6.12.5 read-only structural mapper across all MSP competitions.
     Maps field presence/types and highlights registration/participant/event/url/id differences.
     """
     import time as _time
     started=_time.monotonic()
-    out={"version":"6.12.4","fields":[],"targets":[],"samples":[],"summary":{}}
+    out={"version":"6.12.5","fields":[],"targets":[],"samples":[],"summary":{}}
 
     try:
         token=await asyncio.wait_for(_valid_access_token(db),timeout=7.0)
@@ -1805,6 +1805,208 @@ async def competition_structure_map(db:Session=Depends(get_db)):
         "competitions_with_personal_like_fields":len(suspicious),
         "personal_like_samples":suspicious[:40],
         "target_schema_differences":target_diffs,
+        "elapsed_ms":round((_time.monotonic()-started)*1000),
+    }
+    return out
+
+
+
+@app.get("/msp/result-competition-reverse-map")
+async def result_competition_reverse_map(db:Session=Depends(get_db)):
+    """
+    V6.12.5 read-only reverse mapper.
+    Tries to connect Nicole's solo/duo/team result structures to known MSP competitions
+    using explicit ids/names/dates and nearby nested context.
+    """
+    import time as _time
+    from datetime import datetime as _dt
+    started=_time.monotonic()
+    out={"version":"6.12.5","modes":[],"summary":{}}
+
+    try:
+        token=await asyncio.wait_for(_valid_access_token(db),timeout=7.0)
+        profile=await asyncio.wait_for(get_profile(token),timeout=7.0)
+        results=await asyncio.wait_for(get_results(token),timeout=12.0)
+        comps_payload=await asyncio.wait_for(get_competitions(token,status="all",online=False,cache=False),timeout=12.0)
+    except Exception as exc:
+        out["summary"]={"ok":False,"stage":"load","error":f"{type(exc).__name__}: {exc}"}
+        return out
+
+    player_id=str(profile.get("id")) if isinstance(profile,dict) and profile.get("id") else None
+
+    if isinstance(comps_payload,dict):
+        competitions=comps_payload.get("competitions") or comps_payload.get("data") or comps_payload.get("items") or []
+    elif isinstance(comps_payload,list):
+        competitions=comps_payload
+    else:
+        competitions=[]
+
+    comp_by_id={}
+    comp_by_name={}
+    for c in competitions:
+        if not isinstance(c,dict):
+            continue
+        cid=c.get("id")
+        name=str(c.get("name") or "").strip()
+        if cid:
+            comp_by_id[str(cid)]=c
+        if name:
+            comp_by_name[name.lower()]=c
+
+    interesting_keys=(
+        "competition_id","event_id","tournament_id","championship_id",
+        "competition","event","tournament","championship",
+        "competition_name","event_name","tournament_name","championship_name",
+        "name","title","date","date_from","date_to","created_at","started_at",
+        "location","country","country_code","status","round","category","division",
+        "format","type","result_id","time_id","id"
+    )
+
+    def parse_dt(v):
+        if not isinstance(v,str) or len(v)<8:
+            return None
+        try:
+            return _dt.fromisoformat(v.replace("Z","+00:00"))
+        except Exception:
+            return None
+
+    def gather_context(obj, path="$", depth=0, rows=None):
+        if rows is None: rows=[]
+        if depth>8: return rows
+        if isinstance(obj,dict):
+            picked={}
+            for k,v in obj.items():
+                lk=str(k).lower()
+                if lk in interesting_keys or any(tok in lk for tok in ("competition","event","tournament","championship","round","category","division","format","date","location","country","status")):
+                    if isinstance(v,(str,int,float,bool)) or v is None:
+                        picked[k]=v
+                    elif isinstance(v,dict):
+                        picked[k]=f"{{dict:{len(v)}}}"
+                    elif isinstance(v,list):
+                        picked[k]=f"[list:{len(v)}]"
+            if picked:
+                rows.append({"path":path,"fields":picked})
+            for k,v in obj.items():
+                if isinstance(v,(dict,list)):
+                    gather_context(v,f"{path}.{k}",depth+1,rows)
+        elif isinstance(obj,list):
+            for i,v in enumerate(obj[:1000]):
+                if isinstance(v,(dict,list)):
+                    gather_context(v,f"{path}[{i}]",depth+1,rows)
+        return rows
+
+    def extract_mode_block(data, mode):
+        if isinstance(data,dict) and isinstance(data.get(mode),dict):
+            return data.get(mode)
+        return None
+
+    def score_competition(ctx, comp):
+        score=0
+        reasons=[]
+        cid=str(comp.get("id") or "")
+        cname=str(comp.get("name") or "").strip().lower()
+        cslug=str(comp.get("slug") or "").strip().lower()
+        cfrom=parse_dt(comp.get("date_from"))
+        cto=parse_dt(comp.get("date_to"))
+
+        flat=[]
+        for row in ctx:
+            for k,v in row.get("fields",{}).items():
+                flat.append((str(k).lower(),v))
+
+        for k,v in flat:
+            sv=str(v)
+            sl=sv.lower()
+            if cid and sv==cid:
+                score+=100; reasons.append(f"ID-Match über {k}")
+            if cname and sl==cname:
+                score+=80; reasons.append(f"Name-Match über {k}")
+            if cslug and sl==cslug:
+                score+=60; reasons.append(f"Slug-Match über {k}")
+
+            dt=parse_dt(v) if isinstance(v,str) else None
+            if dt and cfrom and cto:
+                try:
+                    if cfrom <= dt <= cto:
+                        score+=25; reasons.append(f"Datum innerhalb Turnierfenster über {k}")
+                except Exception:
+                    pass
+                try:
+                    if abs((dt-cfrom).total_seconds()) <= 86400*2:
+                        score+=10; reasons.append(f"Datum nahe Turnierstart über {k}")
+                except Exception:
+                    pass
+        return score,reasons
+
+    for mode in ("solo","duo","team"):
+        block=extract_mode_block(results,mode)
+        if not isinstance(block,dict):
+            out["modes"].append({"mode":mode,"error":"mode_block_missing"})
+            continue
+
+        ctx=gather_context(block)
+        scored=[]
+        for c in competitions:
+            if not isinstance(c,dict): continue
+            score,reasons=score_competition(ctx,c)
+            if score>0:
+                scored.append({
+                    "competition_id":c.get("id"),
+                    "competition_name":c.get("name"),
+                    "date_from":c.get("date_from"),
+                    "score":score,
+                    "reasons":list(dict.fromkeys(reasons))[:10],
+                })
+        scored.sort(key=lambda x:-x["score"])
+
+        # Inspect individual results too, to see whether any one result has a stronger local match.
+        local_matches=[]
+        rlist=block.get("results") if isinstance(block.get("results"),list) else []
+        for i,r in enumerate(rlist[:300]):
+            if not isinstance(r,dict): continue
+            rctx=gather_context(r)
+            rs=[]
+            for c in competitions:
+                if not isinstance(c,dict): continue
+                score,reasons=score_competition(rctx,c)
+                if score>0:
+                    rs.append({
+                        "competition_id":c.get("id"),
+                        "competition_name":c.get("name"),
+                        "score":score,
+                        "reasons":list(dict.fromkeys(reasons))[:8],
+                    })
+            rs.sort(key=lambda x:-x["score"])
+            if rs:
+                local_matches.append({
+                    "result_index":i,
+                    "time_id":r.get("time_id"),
+                    "puzzle_name":r.get("puzzle_name"),
+                    "time_seconds":r.get("time_seconds"),
+                    "best_matches":rs[:5],
+                    "context":rctx[:30],
+                })
+
+        out["modes"].append({
+            "mode":mode,
+            "player_id_match": bool(player_id and str(block.get("player_id"))==player_id),
+            "result_count":len(rlist),
+            "context_rows":ctx[:120],
+            "best_competition_matches":scored[:20],
+            "local_result_matches":local_matches[:40],
+        })
+
+    strong=[]
+    for m in out["modes"]:
+        for x in m.get("best_competition_matches") or []:
+            if x.get("score",0)>=60:
+                strong.append({"mode":m.get("mode"),**x})
+
+    out["summary"]={
+        "ok":True,
+        "competition_count":len(competitions),
+        "strong_match_count":len(strong),
+        "strong_matches":strong[:50],
         "elapsed_ms":round((_time.monotonic()-started)*1000),
     }
     return out

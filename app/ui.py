@@ -481,6 +481,14 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div id="structureMapStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
 <div id="structureMapList" class="list" style="margin-top:8px"></div>
 </section>
+<section class="card full" data-app-page="more">
+<h2>🔁 Result → Competition Reverse Mapper</h2>
+<div class="small">Versucht Nicoles Solo-/Duo-/Team-Ergebnisse anhand von IDs, Namen, Datum und Kontext mit den bekannten MSP-Competitions zu verbinden. Nur lesend.</div>
+<button class="btn secondary" style="margin-top:10px" onclick="runResultCompetitionReverseMap()">Reverse Mapping starten</button>
+<div id="reverseMapStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
+<div id="reverseMapList" class="list" style="margin-top:8px"></div>
+</section>
+
 
 
 
@@ -1199,6 +1207,43 @@ async function runCompetitionStructureMap(){
    list.innerHTML=targetHtml+diffHtml+personal+fieldHtml+schemaHtml;
  }catch(e){
    status.textContent='Structure Mapper fehlgeschlagen.';
+   list.innerHTML=`<div class="item small">${readinessEsc(e.message||e)}</div>`;
+ }
+}
+
+
+async function runResultCompetitionReverseMap(){
+ const status=document.getElementById('reverseMapStatus');
+ const list=document.getElementById('reverseMapList');
+ if(!status||!list)return;
+ status.textContent='Reverse Mapping läuft…';
+ list.innerHTML='';
+ try{
+   const r=await fetch('/msp/result-competition-reverse-map',{cache:'no-store'});
+   const txt=await r.text();
+   let d; try{d=JSON.parse(txt)}catch(_){throw new Error(`HTTP ${r.status}: ${txt.slice(0,300)}`)}
+   if(!r.ok)throw new Error(`HTTP ${r.status}`);
+   const s=d.summary||{};
+   status.innerHTML=`Version <strong>${d.version||'–'}</strong> · Competitions <strong>${s.competition_count??0}</strong> · starke Matches <strong>${s.strong_match_count??0}</strong> · ${s.elapsed_ms??'–'} ms`;
+
+   const strong=(s.strong_matches||[]).length
+      ? `<div class="item"><strong>🎯 Starke Zuordnungen</strong><pre class="diagPre">${readinessEsc(JSON.stringify(s.strong_matches,null,2))}</pre></div>`
+      : `<div class="item small"><strong>Keine starke direkte Result→Competition-Zuordnung gefunden.</strong></div>`;
+
+   const modes=(d.modes||[]).map(m=>{
+     const best=m.best_competition_matches||[];
+     const locals=m.local_result_matches||[];
+     return `<details class="item"><summary><strong>${readinessEsc((m.mode||'unknown').toUpperCase())} · ${m.result_count??0} Resultate</strong></summary>
+       <div class="small">Player-ID-Match: ${m.player_id_match?'ja':'nein'}</div>
+       ${best.length?`<div class="small"><strong>Beste globalen Competition-Matches</strong></div><pre class="diagPre">${readinessEsc(JSON.stringify(best,null,2))}</pre>`:'<div class="small">Keine globalen Matches.</div>'}
+       ${locals.length?`<div class="small"><strong>Lokale Result-Matches</strong></div><pre class="diagPre">${readinessEsc(JSON.stringify(locals,null,2))}</pre>`:'<div class="small">Keine lokalen Result-Matches.</div>'}
+       <details><summary class="small">Kontext anzeigen</summary><pre class="diagPre">${readinessEsc(JSON.stringify(m.context_rows||[],null,2))}</pre></details>
+     </details>`;
+   }).join('');
+
+   list.innerHTML=strong+modes;
+ }catch(e){
+   status.textContent='Reverse Mapper fehlgeschlagen.';
    list.innerHTML=`<div class="item small">${readinessEsc(e.message||e)}</div>`;
  }
 }
