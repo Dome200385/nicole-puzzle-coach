@@ -146,7 +146,15 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 #appTraining>.metricrow{grid-template-columns:1fr 1fr;gap:8px}#appTraining>.metricrow .metric{padding:10px}#appTraining>.metricrow .metric .label{font-size:10px}
 #appTraining>.metricrow .metric b{font-size:18px}#appTraining>.metricrow .metric .small{font-size:9px;line-height:1.25}#appTraining>.metricrow .metric:nth-child(3){grid-column:1/-1}
 #readinessInfoBox{margin-top:10px}#readinessInfoBox summary{font-size:12px}#wmSimulationCard h2{font-size:15px}}
-</style></head>
+@media(max-width:760px){
+.trainingDuplicatePuzzle{display:none!important}
+.trainingQuickFacts{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
+.trainingQuickFacts>div{background:#f8fafc;border-radius:9px;padding:8px 9px}
+.trainingQuickFacts span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+.trainingQuickFacts strong{display:block;font-size:15px;margin-top:2px}
+.trainingQuickReason{font-size:11px;line-height:1.35;color:var(--muted);margin-top:8px}
+.trainingPriorityGroup>.item:first-of-type+ .item{margin-top:8px!important}
+}</style></head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
 
@@ -184,9 +192,16 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <section class="card full hero appSection" id="appTraining" data-app-page="training"><h2>🏁 WM Coach · Adaptive Preparation</h2><div class="mobileOnly trainingQuick">
 <div class="trainingQuickHero"><div id="trainingQuickImage" class="trainingQuickImage">🧩</div><div class="trainingQuickMain"><div class="label">Heute trainieren</div><strong id="trainingQuickPuzzle">Wird geladen…</strong><div id="trainingQuickMeta" class="small"></div></div></div>
 <div class="trainingQuickStats"><div><span class="label">Training</span><strong id="trainingQuickType">–</strong></div><div><span class="label">Ziel</span><strong id="trainingQuickTarget">–</strong></div></div>
-</div><div class="trainingPriorityGroup"><div class="item" style="margin-top:12px"><strong>🧩 Nächstes empfohlenes Puzzle</strong><div id="wmNextPuzzle" class="small">Bibliothek wird ausgewertet…</div></div>
+<div class="trainingQuickFacts">
+  <div><span>MSP-Median</span><strong id="trainingQuickMedian">–</strong></div>
+  <div><span>Letzte Zeit</span><strong id="trainingQuickLast">–</strong></div>
+  <div><span>vs. Median</span><strong id="trainingQuickDelta">–</strong></div>
+  <div><span>WM-Fit</span><strong id="trainingQuickFit">–</strong></div>
+</div>
+<div id="trainingQuickReason" class="trainingQuickReason"></div>
+</div><div class="trainingPriorityGroup"><div class="item trainingDuplicatePuzzle" style="margin-top:12px"><strong>🧩 Nächstes empfohlenes Puzzle</strong><div id="wmNextPuzzle" class="small">Bibliothek wird ausgewertet…</div></div>
 <div class="item" style="margin-top:10px"><strong>📅 Plan für die aktuelle Trainingswoche</strong><div id="wmWeeklyPlan" class="list" style="margin-top:8px"></div></div>
-<div class="item simHero" id="wmSimulationCard" style="margin-top:10px"><h2>🏁 WM-Simulation <span class="pill">V6.9.5</span></h2>
+<div class="item simHero" id="wmSimulationCard" style="margin-top:10px"><h2>🏁 WM-Simulation <span class="pill">V6.9.6</span></h2>
 <div class="small">Eigenständige WM-Simulation mit einem <strong>anderen Puzzle als im normalen Wochenplan</strong>. Ausgeliehene Puzzles bleiben ausgeschlossen.</div>
 <div id="wmSimSuggestion" class="item" style="margin-top:10px">Simulations-Puzzle wird gewählt…</div>
 <div id="wmSimActive" class="item activeTraining" style="display:none;margin-top:10px">
@@ -299,7 +314,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 </section>
 
 <section class="card full appSection" id="appMore" data-app-page="more"><h2>🧠 Tournament Intelligence</h2>
-<div class="small">V6.9.5 MSP-only Puzzle Predictions + Frontend Snapshot Recovery: konkrete Puzzle-Prognosen stammen ausschliesslich aus MySpeedPuzzling; WM-Ziele und Coach-Logik bleiben unverändert. Lokale Turnier-Fallbacks: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
+<div class="small">V6.9.6 MSP-only Puzzle Predictions + Frontend Snapshot Recovery: konkrete Puzzle-Prognosen stammen ausschliesslich aus MySpeedPuzzling; WM-Ziele und Coach-Logik bleiben unverändert. Lokale Turnier-Fallbacks: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
 <div style="margin-top:12px"><a class="btn secondary" href="/docs" target="_blank">API-Dokumentation</a> <a class="btn secondary" href="/msp/my-competitions?refresh=true" target="_blank">Anmeldungen neu prüfen</a> <a class="btn secondary" href="/sync" target="_blank">MySpeedPuzzling neu synchronisieren</a> <a class="btn secondary" href="/msp/library" target="_blank">Puzzle-Bibliothek prüfen</a></div>
 </section>
 </div></div>
@@ -604,13 +619,27 @@ function initAppNavigation(){
   showAppPage('today',false);
 }
 function updateTrainingQuick(w){
- const p=w?.next_puzzle||{},img=document.getElementById('trainingQuickImage'),name=document.getElementById('trainingQuickPuzzle'),meta=document.getElementById('trainingQuickMeta'),type=document.getElementById('trainingQuickType'),target=document.getElementById('trainingQuickTarget');
+ const p=w?.next_puzzle||{};
+ const img=document.getElementById('trainingQuickImage'),name=document.getElementById('trainingQuickPuzzle'),meta=document.getElementById('trainingQuickMeta');
+ const type=document.getElementById('trainingQuickType'),target=document.getElementById('trainingQuickTarget');
+ const median=document.getElementById('trainingQuickMedian'),last=document.getElementById('trainingQuickLast'),delta=document.getElementById('trainingQuickDelta'),fit=document.getElementById('trainingQuickFit'),reason=document.getElementById('trainingQuickReason');
+ const pick=(...v)=>v.find(x=>x!==undefined&&x!==null&&x!=='');
  if(name)name.textContent=p.name||'Noch keine Empfehlung';
  if(meta)meta.textContent=[p.manufacturer,p.pieces?`${p.pieces} Teile`:null].filter(Boolean).join(' · ');
- if(type)type.textContent=w?.next_training?.type||'–';
- if(target)target.textContent=w?.dynamic_target||w?.wm_goal_first_try||'–';
+ if(type)type.textContent=pick(w?.next_training?.type,w?.next_training_type,'–');
+ if(target)target.textContent=pick(w?.dynamic_target,w?.wm_goal_first_try,p?.target_time,'–');
+ const med=pick(p.msp_median,p.median_time,p.median,p.target_median);
+ const lst=pick(p.last_time,p.latest_time,p.last_result);
+ const dlt=pick(p.delta_vs_median,p.median_delta,p.vs_median);
+ const wf=pick(p.wm_fit,p.wm_fit_score,p.fit_score);
+ if(median)median.textContent=med||'–';
+ if(last)last.textContent=lst||'–';
+ if(delta)delta.textContent=(typeof dlt==='number'?(dlt>0?'+':'')+dlt.toFixed(1)+'%':(dlt||'–'));
+ if(fit)fit.textContent=(wf!==undefined&&wf!==null&&wf!=='')?(String(wf).includes('/100')?wf:`${wf}/100`):'–';
+ if(reason)reason.textContent=pick(p.reason,p.recommendation_reason,p.note,'');
  if(img)img.innerHTML=p.image_url?`<img src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.parentElement.textContent='🧩'">`:'🧩';
 }
+
 function updateTodaySummary(w){
   const rp=document.getElementById('todayPuzzle');
   const rt=document.getElementById('todayTraining');
@@ -657,7 +686,7 @@ function readinessTime(seconds){
   return h>0?`${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`:`${m}:${String(sec).padStart(2,'0')}`;
 }
 async function loadAll(){renderUnavailable();
- // Performance V6.9.5: independent API calls start immediately in parallel.
+ // Performance V6.9.6: independent API calls start immediately in parallel.
  const exPrefetch=unavailableIds();
  const statusPromise=getj('/coach/status');
  const summaryPromise=getj('/coach/msp-training-summary');
