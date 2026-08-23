@@ -474,6 +474,14 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div id="traceStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
 <div id="traceList" class="list" style="margin-top:8px"></div>
 </section>
+<section class="card full" data-app-page="more">
+<h2>🗺️ Competition Structure Mapper</h2>
+<div class="small">Kartiert alle MSP-Competition-Datensätze und zeigt Feldunterschiede, Schemas sowie mögliche Registration-/Participant-Strukturen. Nur lesend.</div>
+<button class="btn secondary" style="margin-top:10px" onclick="runCompetitionStructureMap()">Struktur kartieren</button>
+<div id="structureMapStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
+<div id="structureMapList" class="list" style="margin-top:8px"></div>
+</section>
+
 
 
 
@@ -1155,6 +1163,42 @@ async function runNicoleCompetitionTrace(){
    list.innerHTML=headline+rows;
  }catch(e){
    status.textContent='Competition Trace fehlgeschlagen.';
+   list.innerHTML=`<div class="item small">${readinessEsc(e.message||e)}</div>`;
+ }
+}
+
+
+async function runCompetitionStructureMap(){
+ const status=document.getElementById('structureMapStatus');
+ const list=document.getElementById('structureMapList');
+ if(!status||!list)return;
+ status.textContent='Competition-Strukturen werden kartiert…';
+ list.innerHTML='';
+ try{
+   const r=await fetch('/msp/competition-structure-map',{cache:'no-store'});
+   const txt=await r.text();
+   let d; try{d=JSON.parse(txt)}catch(_){throw new Error(`HTTP ${r.status}: ${txt.slice(0,300)}`)}
+   if(!r.ok)throw new Error(`HTTP ${r.status}`);
+   const s=d.summary||{};
+   status.innerHTML=`Version <strong>${d.version||'–'}</strong> · Competitions <strong>${s.competition_count??0}</strong> · Schemas <strong>${s.unique_schema_count??0}</strong> · relevante Felder <strong>${s.interesting_field_count??0}</strong>`;
+
+   const targetHtml=(d.targets||[]).map(t=>`<details class="item"><summary><strong>🎯 ${readinessEsc(t.name||'Target')}</strong></summary><pre class="diagPre">${readinessEsc(JSON.stringify(t.fields,null,2))}</pre></details>`).join('');
+
+   const diffHtml=(s.target_schema_differences||[]).map(x=>`<div class="item"><strong>🔬 ${readinessEsc(x.name||'Target')}</strong>
+      <div class="small">Extra vs. common: ${readinessEsc((x.extra_vs_common||[]).join(', ')||'–')}</div>
+      <div class="small">Fehlt vs. common: ${readinessEsc((x.missing_vs_common||[]).join(', ')||'–')}</div>
+   </div>`).join('');
+
+   const personal=(s.personal_like_samples||[]).length
+      ? `<details class="item"><summary><strong>👤 Competitions mit personal-/registration-ähnlichen Feldern (${s.competitions_with_personal_like_fields||0})</strong></summary><pre class="diagPre">${readinessEsc(JSON.stringify(s.personal_like_samples,null,2))}</pre></details>`
+      : `<div class="item small"><strong>Keine Competition enthält eindeutige persönliche Registration-/Participant-Felder.</strong></div>`;
+
+   const fieldHtml=`<details class="item"><summary><strong>🧩 Relevante Felder</strong></summary><pre class="diagPre">${readinessEsc(JSON.stringify(d.fields||[],null,2))}</pre></details>`;
+   const schemaHtml=`<details class="item"><summary><strong>🧱 Schema-Signaturen</strong></summary><pre class="diagPre">${readinessEsc(JSON.stringify(d.samples||[],null,2))}</pre></details>`;
+
+   list.innerHTML=targetHtml+diffHtml+personal+fieldHtml+schemaHtml;
+ }catch(e){
+   status.textContent='Structure Mapper fehlgeschlagen.';
    list.innerHTML=`<div class="item small">${readinessEsc(e.message||e)}</div>`;
  }
 }
