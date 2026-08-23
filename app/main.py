@@ -352,11 +352,42 @@ async def capture_readiness_history(request:Request, db:Session=Depends(get_db))
 
 @app.get("/manifest.webmanifest")
 def pwa_manifest():
-    return Response(content='{"name": "Nicole Puzzle Coach", "short_name": "Puzzle Coach", "description": "Speed-Puzzling Training & Turniervorbereitung", "start_url": "/dashboard", "scope": "/", "display": "standalone", "display_override": ["window-controls-overlay", "standalone", "minimal-ui"], "background_color": "#f5f7fb", "theme_color": "#ffffff", "orientation": "portrait-primary", "icons": [{"src": "/pwa/icon-192.png", "sizes": "192x192", "type": "image/png"}, {"src": "/pwa/icon-512.png", "sizes": "512x512", "type": "image/png"}, {"src": "/pwa/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}', media_type="application/manifest+json")
+    return Response(
+        content='{"id": "/dashboard", "name": "Nicole Puzzle Coach", "short_name": "Puzzle Coach", "description": "Speed-Puzzling Training & Turniervorbereitung", "start_url": "/dashboard?source=pwa", "scope": "/", "display": "standalone", "background_color": "#f5f7fb", "theme_color": "#f5f7fb", "orientation": "portrait-primary", "icons": [{"src": "/pwa/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"}, {"src": "/pwa/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"}, {"src": "/pwa/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}',
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "no-cache"},
+    )
 
 @app.get("/sw.js")
 def pwa_service_worker():
-    return Response(content="\nconst CACHE_NAME='nicole-puzzle-coach-v690';\nconst SHELL=['/dashboard','/manifest.webmanifest','/pwa/icon-192.png','/pwa/icon-512.png'];\nself.addEventListener('install',event=>{\n  event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(SHELL)).catch(()=>{}));\n  self.skipWaiting();\n});\nself.addEventListener('activate',event=>{\n  event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k)))));\n  self.clients.claim();\n});\nself.addEventListener('fetch',event=>{\n  const req=event.request;\n  if(req.method!=='GET') return;\n  const url=new URL(req.url);\n  if(url.origin!==self.location.origin) return;\n  if(url.pathname==='/dashboard'||url.pathname.startsWith('/pwa/')||url.pathname==='/manifest.webmanifest'){\n    event.respondWith(\n      fetch(req).then(resp=>{\n        const copy=resp.clone();\n        caches.open(CACHE_NAME).then(cache=>cache.put(req,copy)).catch(()=>{});\n        return resp;\n      }).catch(()=>caches.match(req))\n    );\n  }\n});\n", media_type="application/javascript", headers={"Service-Worker-Allowed":"/"})
+    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v692';
+const SHELL=['/manifest.webmanifest','/pwa/icon-192.png','/pwa/icon-512.png','/pwa/icon-maskable-512.png'];
+self.addEventListener('install',event=>{
+  event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(SHELL)).catch(()=>{}));
+  self.skipWaiting();
+});
+self.addEventListener('activate',event=>{
+  event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k)))));
+  self.clients.claim();
+});
+self.addEventListener('fetch',event=>{
+  const req=event.request;
+  if(req.method!=='GET') return;
+  const url=new URL(req.url);
+  if(url.origin!==self.location.origin) return;
+  if(req.mode==='navigate'){
+    event.respondWith(fetch(req).catch(()=>caches.match('/dashboard')));
+    return;
+  }
+  if(url.pathname.startsWith('/pwa/')||url.pathname==='/manifest.webmanifest'){
+    event.respondWith(caches.match(req).then(hit=>hit||fetch(req).then(resp=>{
+      const copy=resp.clone();
+      caches.open(CACHE_NAME).then(cache=>cache.put(req,copy)).catch(()=>{});
+      return resp;
+    })));
+  }
+});""", media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"})
 
 @app.get("/pwa/{filename}")
 def pwa_asset(filename:str):
@@ -364,7 +395,7 @@ def pwa_asset(filename:str):
     if filename not in allowed:
         raise HTTPException(status_code=404, detail="Not Found")
     path=os.path.join(os.path.dirname(os.path.dirname(__file__)),"pwa_assets",filename)
-    return FileResponse(path)
+    return FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
 
 @app.get("/health")
 def health(): return {"status":"ok","version":"6.8.18"}
