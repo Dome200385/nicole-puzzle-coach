@@ -263,6 +263,22 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
  .puzzleChoiceDetail summary small{display:block;color:var(--muted);font-size:10px;margin-top:2px}
  .puzzleChoiceBody{padding:0 0 10px 63px;font-size:11px;line-height:1.4;color:var(--muted)}
 }
+
+@media(max-width:760px){
+  .trainingDropdownBody{padding:8px 9px 10px!important}
+  .trainingListIntro{margin:2px 2px 8px!important}
+  .trainingPuzzleSession{margin-top:7px!important}
+  .trainingPuzzleSession:first-of-type{margin-top:0!important}
+  .trainingPuzzleSession .weeklySessionTitle strong{
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    overflow:hidden
+  }
+  .trainingPuzzleSession .weeklyFacts{
+    grid-template-columns:1fr 1fr
+  }
+}
 </style></head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
@@ -597,11 +613,23 @@ async function loadMedianGapFocus(){
   const mg=await getj('/coach/median-gap-focus');
   if(!mg.available){el.textContent=mg.message||'Kein Median-Abstand verfügbar.';return}
   const items=(Array.isArray(mg.items)&&mg.items.length)?mg.items:[mg];
-  el.innerHTML=`<div class="small" style="margin:5px 0 8px">${mg.message||''}</div>`+
-   items.map((p,i)=>`<details class="puzzleChoiceDetail"><summary>
-    ${p.image_url?`<img class="puzzleChoiceThumb" src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.style.display='none'">`:''}
-    <span><strong>${i+1}. ${readinessEsc(p.name||'Puzzle')}</strong>${p.manufacturer?`<small>${readinessEsc(p.manufacturer)}</small>`:''}</span>
-   </summary><div class="puzzleChoiceBody">Letzte Zeit <strong>${p.last_time||'–'}</strong> · MSP-Median <strong>${p.median||'–'}</strong> · Abstand <strong>${p.gap||'–'}</strong></div></details>`).join('');
+  el.innerHTML=`<div class="small trainingListIntro">${mg.message||''}</div>`+
+   items.map((p,i)=>`<details class="item weeklySession trainingPuzzleSession"><summary>
+    <div class="weeklyIndex">${i+1}</div>
+    ${p.image_url?`<img class="weeklyThumb" src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.style.display='none'">`:`<div class="weeklyThumb weeklyThumbEmpty">🧩</div>`}
+    <div class="weeklySummaryText">
+      <div class="weeklySessionTitle"><strong>${readinessEsc(p.name||'Puzzle')}</strong></div>
+      <div class="weeklyPuzzleName">${p.manufacturer?readinessEsc(p.manufacturer):'Puzzle'}</div>
+      <div class="small">Abstand zum MSP-Median ${p.gap||'–'}</div>
+    </div>
+   </summary>
+   <div class="weeklyDetail">
+     <div class="weeklyFacts">
+       <div class="weeklyFact"><span>Letzte Zeit</span><strong>${p.last_time||'–'}</strong></div>
+       <div class="weeklyFact"><span>MSP-Median</span><strong>${p.median||'–'}</strong></div>
+       <div class="weeklyFact"><span>Abstand</span><strong>${p.gap||'–'}</strong></div>
+     </div>
+   </div></details>`).join('');
  }catch(e){el.textContent='Medianvergleich derzeit nicht verfügbar.'}
 }
 
@@ -667,11 +695,34 @@ async function loadUnsolvedLibrary(){
  try{
   const d=await getj('/coach/unsolved-library');
   if(!d.available||!d.items?.length){el.textContent=d.message||'Keine ungelösten Library-Puzzle gefunden.';return}
-  el.innerHTML=`<div class="small" style="margin:5px 0 8px"><strong>${d.count}</strong> Puzzle ohne Solo-Ergebnis.</div>`+
-   d.items.map((p,i)=>`<details class="puzzleChoiceDetail"><summary>
-    ${p.image_url?`<img class="puzzleChoiceThumb" src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.style.display='none'">`:''}
-    <span><strong>${readinessEsc(p.name||'Puzzle')}</strong>${p.manufacturer?`<small>${readinessEsc(p.manufacturer)}</small>`:''}</span>
-   </summary><div class="puzzleChoiceBody">${p.pieces?p.pieces+' Teile':'Teilezahl unbekannt'}${p.difficulty_label?`<br>Difficulty <strong>${p.difficulty_label}</strong>`:''}${p.prediction?`<br>MSP Prediction <strong>${displayPuzzleTime(p.prediction)}</strong>`:''}<br><span class="pill">noch kein Solo-Ergebnis</span></div></details>`).join('');
+  el.innerHTML=`<div class="small trainingListIntro"><strong>${d.count}</strong> Puzzle ohne Solo-Ergebnis.</div>`+
+   d.items.map((p,i)=>{
+     let diff='–';
+     if(p.difficulty_label){
+       diff=p.difficulty_label;
+       if(p.difficulty_percent!=null){
+         const dp=Number(p.difficulty_percent);
+         if(Number.isFinite(dp)) diff+=` · ${dp>0?'+':''}${dp.toFixed(1)}% ggü. Ø`;
+       }
+     }
+     return `<details class="item weeklySession trainingPuzzleSession"><summary>
+      <div class="weeklyIndex">${i+1}</div>
+      ${p.image_url?`<img class="weeklyThumb" src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.style.display='none'">`:`<div class="weeklyThumb weeklyThumbEmpty">🧩</div>`}
+      <div class="weeklySummaryText">
+        <div class="weeklySessionTitle"><strong>${readinessEsc(p.name||'Puzzle')}</strong></div>
+        <div class="weeklyPuzzleName">${p.manufacturer?readinessEsc(p.manufacturer):'Puzzle'}</div>
+        <div class="small">Noch kein Solo-Ergebnis</div>
+      </div>
+     </summary>
+     <div class="weeklyDetail">
+       <div class="weeklyFacts">
+         <div class="weeklyFact"><span>Teile</span><strong>${p.pieces||'–'}</strong></div>
+         <div class="weeklyFact"><span>Difficulty</span><strong>${diff}</strong></div>
+         <div class="weeklyFact"><span>MSP Prediction</span><strong>${p.prediction?displayPuzzleTime(p.prediction):'–'}</strong></div>
+         <div class="weeklyFact"><span>Status</span><strong>First Try</strong></div>
+       </div>
+     </div></details>`;
+   }).join('');
  }catch(e){el.textContent='Ungelöste Library derzeit nicht verfügbar.'}
 }
 async function loadRepeatPriority(){
@@ -679,11 +730,25 @@ async function loadRepeatPriority(){
  try{
   const d=await getj('/coach/repeat-priority?limit=5');
   if(!d.available||!d.items?.length){el.textContent=d.message||'Keine geeigneten Wiederholungs-Puzzle gefunden.';return}
-  el.innerHTML=`<div class="small" style="margin:5px 0 8px">${d.message||''}</div>`+
-   d.items.map((p,i)=>`<details class="puzzleChoiceDetail"><summary>
-    ${p.image_url?`<img class="puzzleChoiceThumb" src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.style.display='none'">`:''}
-    <span><strong>${i+1}. ${readinessEsc(p.name||'Puzzle')}</strong>${p.manufacturer?`<small>${readinessEsc(p.manufacturer)}</small>`:''}</span>
-   </summary><div class="puzzleChoiceBody">Priorität <strong>${p.score}/100</strong> · ${p.label}<br>Letzte ${p.latest||'–'} · Best ${p.best||'–'}${p.median?`<br>MSP-Median <strong>${p.median}</strong>`:''}${p.days_since_last_solve!=null?`<br>zuletzt vor ${p.days_since_last_solve} Tagen`:''}${p.reasons?.length?`<br>${p.reasons.join(' · ')}`:''}</div></details>`).join('');
+  el.innerHTML=`<div class="small trainingListIntro">${d.message||''}</div>`+
+   d.items.map((p,i)=>`<details class="item weeklySession trainingPuzzleSession"><summary>
+    <div class="weeklyIndex">${i+1}</div>
+    ${p.image_url?`<img class="weeklyThumb" src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.style.display='none'">`:`<div class="weeklyThumb weeklyThumbEmpty">🧩</div>`}
+    <div class="weeklySummaryText">
+      <div class="weeklySessionTitle"><strong>${readinessEsc(p.name||'Puzzle')}</strong><span class="pill weeklyIntensity">${p.label||''}</span></div>
+      <div class="weeklyPuzzleName">${p.manufacturer?readinessEsc(p.manufacturer):'Puzzle'}</div>
+      <div class="small">Priorität ${p.score!=null?p.score+'/100':'–'}</div>
+    </div>
+   </summary>
+   <div class="weeklyDetail">
+     <div class="weeklyFacts">
+       <div class="weeklyFact"><span>Letzte Zeit</span><strong>${p.latest||'–'}</strong></div>
+       <div class="weeklyFact"><span>Best</span><strong>${p.best||'–'}</strong></div>
+       <div class="weeklyFact"><span>MSP-Median</span><strong>${p.median||'–'}</strong></div>
+       <div class="weeklyFact"><span>Zuletzt</span><strong>${p.days_since_last_solve!=null?'vor '+p.days_since_last_solve+' Tagen':'–'}</strong></div>
+     </div>
+     ${p.reasons?.length?`<div class="weeklyCoachReason"><strong>Coach:</strong> ${p.reasons.join(' · ')}</div>`:''}
+   </div></details>`).join('');
  }catch(e){el.textContent='Wiederholungs-Priorität derzeit nicht verfügbar.'}
 }
 
@@ -818,7 +883,7 @@ function updateTodaySummary(w){
 if('serviceWorker' in navigator){
   window.addEventListener('load',async()=>{
     try{
-      const reg=await navigator.serviceWorker.register('/sw.js?v=6108');
+      const reg=await navigator.serviceWorker.register('/sw.js?v=6109');
       await reg.update();
       let reloading=false;
       navigator.serviceWorker.addEventListener('controllerchange',()=>{
