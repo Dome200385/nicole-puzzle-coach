@@ -187,7 +187,8 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 }
 
 .wmHeroGrid{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:10px;margin:4px 0 12px}.wmHeroReadiness,.wmHeroGoal{border:1px solid var(--line);border-radius:14px;background:#fafafa;padding:14px}.wmHeroReadiness strong{display:block;font-size:34px;margin-top:4px}.wmHeroGoal strong{display:block;font-size:24px;margin-top:4px}.wmMovedPanels{display:grid;gap:10px}.wmMovedPanels .readinessInfo,.wmMovedPanels #readinessTrendPanel{margin:0}
-@media(max-width:760px){.wmDashboard>h2{font-size:19px}.wmHeroGrid{grid-template-columns:1fr 1fr}.wmHeroReadiness{grid-column:1/-1}.wmHeroReadiness strong{font-size:40px}.wmHeroGoal strong{font-size:22px}.wmMovedPanels .readinessInfo{padding:10px}.wmMovedPanels .readinessFormula{grid-template-columns:1fr 1fr}.wmMovedPanels #readinessTrendBars{height:70px}}
+.wmDashboard .simHero{margin:10px 0 0}.wmProgressCompact{display:flex;gap:8px;flex-wrap:wrap}.wmProgressCompact span{background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:8px 10px;font-size:12px}.wmProgressCompact b{display:block;font-size:9px;text-transform:uppercase;color:var(--muted);letter-spacing:.04em}.wmMobileBars .pbarTime,.wmMobileBars .pbarDate{font-size:9px;white-space:nowrap}
+@media(max-width:760px){.wmDashboard>h2{font-size:19px}.wmHeroGrid{grid-template-columns:1fr 1fr}.wmHeroReadiness{grid-column:1/-1}.wmHeroReadiness strong{font-size:40px}.wmHeroGoal strong{font-size:22px}.wmMovedPanels .readinessInfo{padding:10px}.wmMovedPanels .readinessFormula{grid-template-columns:1fr 1fr}.wmMovedPanels #readinessTrendBars{height:70px}.wmMobileBars{gap:7px}.wmMobileBars .pbarTime,.wmMobileBars .pbarDate{font-size:8px}.wmDashboard .simHero h2{font-size:18px}}
 </style></head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
@@ -235,27 +236,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div id="trainingQuickReason" class="trainingQuickReason"></div>
 </div><div class="trainingPriorityGroup"><div class="item trainingDuplicatePuzzle" style="margin-top:12px"><strong>🧩 Nächstes empfohlenes Puzzle</strong><div id="wmNextPuzzle" class="small">Bibliothek wird ausgewertet…</div></div>
 <div class="item" style="margin-top:10px"><strong>📅 Plan für die aktuelle Trainingswoche</strong><div id="wmWeeklyPlan" class="list" style="margin-top:8px"></div></div>
-<div class="item simHero" id="wmSimulationCard" style="margin-top:10px"><h2>🏁 WM-Simulation <span class="pill">V6.10.0</span></h2>
-<div class="small">Eigenständige WM-Simulation mit einem <strong>anderen Puzzle als im normalen Wochenplan</strong>. Ausgeliehene Puzzles bleiben ausgeschlossen.</div>
-<div id="wmSimSuggestion" class="item" style="margin-top:10px">Simulations-Puzzle wird gewählt…</div>
-<div id="wmSimActive" class="item activeTraining" style="display:none;margin-top:10px">
-  <strong>▶️ Laufende WM-Simulation</strong>
-  <div class="puzzleRow" style="margin-top:8px">
-    <div id="wmSimImage"></div>
-    <div class="puzzleInfo">
-      <strong id="wmSimName"></strong>
-      <div id="wmSimGoals" class="small"></div>
-      <div id="wmSimResult" class="small" style="margin-top:6px"></div>
-      <button class="primary" style="margin-top:8px" onclick="checkWMSimulation()">Ergebnis synchronisieren & auswerten</button>
-      <button class="secondary" style="margin-top:8px" onclick="cancelWMSimulation()">Abbrechen</button>
-    </div>
-  </div>
-</div>
-<div class="item" style="margin-top:10px">
-  <strong>📚 Simulationshistorie</strong>
-  <div id="wmSimSummary" class="small" style="margin-top:5px"></div>
-  <div id="wmSimHistory" class="list" style="margin-top:8px"></div>
-</div>
+
 </div>
 </div>
 
@@ -288,6 +269,28 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div class="wmHeroGoal"><div class="label">First-Try-Ziel</div><strong id="wmTabFirstTry">–</strong><div class="small">realistisches Ziel bei unbekanntem Puzzle</div></div>
 <div class="wmHeroGoal"><div class="label">Stretch Goal</div><strong id="wmTabStretch">–</strong><div class="small">ambitionierter Best-Case-Tag</div></div>
 </div>
+<div class="item simHero" id="wmSimulationCard" style="margin-top:10px"><h2>🏁 WM-Simulation <span class="pill">V6.10.1</span></h2>
+<div class="small">Eigenständige WM-Simulation mit einem <strong>anderen Puzzle als im normalen Wochenplan</strong>. Ausgeliehene Puzzles bleiben ausgeschlossen.</div>
+<div id="wmSimSuggestion" class="item" style="margin-top:10px">Simulations-Puzzle wird gewählt…</div>
+<div id="wmSimActive" class="item activeTraining" style="display:none;margin-top:10px">
+  <strong>▶️ Laufende WM-Simulation</strong>
+  <div class="puzzleRow" style="margin-top:8px">
+    <div id="wmSimImage"></div>
+    <div class="puzzleInfo">
+      <strong id="wmSimName"></strong>
+      <div id="wmSimGoals" class="small"></div>
+      <div id="wmSimResult" class="small" style="margin-top:6px"></div>
+      <button class="primary" style="margin-top:8px" onclick="checkWMSimulation()">Ergebnis synchronisieren & auswerten</button>
+      <button class="secondary" style="margin-top:8px" onclick="cancelWMSimulation()">Abbrechen</button>
+    </div>
+  </div>
+</div>
+<div class="item" style="margin-top:10px">
+  <strong>📚 Simulationshistorie</strong>
+  <div id="wmSimSummary" class="small" style="margin-top:5px"></div>
+  <div id="wmSimHistory" class="list" style="margin-top:8px"></div>
+</div>
+
 <div class="wmMovedPanels"><details class="readinessInfo" id="readinessInfoBox"><summary>ℹ️ WM-Readiness: Definition & Berechnungsnachweis</summary>
 <div class="small" style="margin-top:7px"><strong>Skala:</strong> 50/100 = ungefähr MSP-Median-Niveau. 100/100 = außergewöhnlich starke, stabile und aktuelle WM-Form über mehrere unterschiedliche 500er. Schwierige Puzzle werden fair bewertet, weil nicht die Rohzeit zählt, sondern Nicoles letzter Versuch relativ zum MSP-Median genau dieses Puzzles. Trainingsbelastung hat keinen Einfluss auf diesen Wert.</div>
 <div class="readinessFormula">
@@ -318,12 +321,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 </div>
 <h2 style="margin-top:16px">📈 Fortschritt bis zur WM</h2>
 <div class="small">Die letzten 10 500er-Solozeiten im Vergleich zu aktuellem Niveau und WM-Zielen. Entscheidend ist das wiederholbare Leistungsniveau, nicht eine einzelne Bestzeit.
-<div class="progressTargets">
-<div class="targetCard"><div class="label">Aktuelles Niveau</div><b id="progressCurrent">–</b><div class="small">Ø letzte 10</div></div>
-<div class="targetCard"><div class="label">Trainingsziel</div><b id="progressTraining">–</b></div>
-<div class="targetCard"><div class="label">First-Try-Ziel</div><b id="progressGoal">–</b></div>
-<div class="targetCard"><div class="label">Stretch Goal</div><b id="progressStretch">–</b></div>
-</div></div>
+</div>
 <div id="wmProgressSummary" class="item" style="margin-top:10px">Fortschritt wird berechnet…</div>
 <div id="wmProgressChart" class="item" style="margin-top:8px"></div>
 </section>
@@ -913,14 +911,14 @@ async function loadAll(){renderUnavailable();
    wmLoad14.textContent=w.training_load_14?w.training_load_14.units.toFixed(1):'–'; wmLoad14Info.textContent=w.training_load_14?`${w.training_load_14.sessions} Einheiten · 500er-Äquivalente`:'–';
    wmPace100.textContent=w.wm_pace_per_100||'–'; wmWeakness.textContent=w.weakness_focus?`Aktueller Fokus: ${w.weakness_focus}`:'–';
    wmStats.textContent=w.count?`${w.count} × 500er Solo · Best ${w.best} · Median ${w.median} · Ø letzte 5 ${w.recent5} · Ø letzte 10 ${w.recent10} · Ø letzte 20 ${w.recent20}`:'Noch keine 500er-Daten.';
-   progressCurrent.textContent=w.recent10||'–';progressTraining.textContent=w.dynamic_target||'–';progressGoal.textContent=w.wm_goal_first_try||w.wm_goal_realistic||'–';progressStretch.textContent=w.wm_goal_stretch||'–';
+   
    wmTabReadiness.textContent=(w.readiness_score!=null?w.readiness_score+'/100':(w.readiness!=null?w.readiness+'/100':'–'));wmTabFirstTry.textContent=w.wm_goal_first_try||w.wm_goal_realistic||'–';wmTabStretch.textContent=w.wm_goal_stretch||'–';
    let pr=w.progress_recent||[];
    if(pr.length){
      let vals=pr.map(x=>x.seconds), mn=Math.min(...vals,w.wm_goal_stretch_seconds||99999), mx=Math.max(...vals);
      let span=Math.max(1,mx-mn);
-     wmProgressSummary.innerHTML=`<strong>Aktuelles Niveau: Ø ${w.recent10}</strong> · realistisches WM-Ziel <strong>${w.wm_goal_realistic}</strong> · Trainingsziel <strong>${w.dynamic_target}</strong>${w.trend10_percent!=null?`<div class="small">Trend gegenüber dem vorherigen Vergleichsfenster: <strong>${pct(w.trend10_percent)}</strong>. Ziele werden nach jeder Synchronisation neu berechnet.</div>`:''}`;
-     wmProgressChart.innerHTML=`<div class="progressBars">${pr.map(x=>{let h=35+((mx-x.seconds)/span)*105;let d=x.finished_at?new Date(x.finished_at).toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'}):'';return `<div class="pbar" title="${x.puzzle_name||''}"><div class="pbarFill" style="height:${Math.max(20,h)}px"></div><div class="pbarTime">${x.time}</div><div class="pbarDate">${d}</div></div>`}).join('')}</div><div class="progressLegend"><span class="pill">Ø letzte 10: ${w.recent10}</span><span class="pill">WM-Ziel: ${w.wm_goal_realistic}</span><span class="pill">Stretch: ${w.wm_goal_stretch}</span></div>`;
+     wmProgressSummary.innerHTML=`<div class="wmProgressCompact"><span><b>Ø letzte 10</b> ${w.recent10||'–'}</span><span><b>Trainingsziel</b> ${w.dynamic_target||'–'}</span>${w.trend10_percent!=null?`<span><b>Trend</b> ${pct(w.trend10_percent)}</span>`:''}</div>`;
+     wmProgressChart.innerHTML=`<div class="progressBars wmMobileBars">${pr.map((x,i)=>{let h=35+((mx-x.seconds)/span)*105;let d=x.finished_at?new Date(x.finished_at).toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'}):'';let show=(i===0||i===pr.length-1||i%3===0);return `<div class="pbar" title="${x.puzzle_name||''} · ${x.time}"><div class="pbarFill" style="height:${Math.max(20,h)}px"></div><div class="pbarTime">${show?displayPuzzleTime(x.time):''}</div><div class="pbarDate">${show?d:''}</div></div>`}).join('')}</div><div class="progressLegend"><span class="pill">WM-Ziel: ${w.wm_goal_realistic}</span><span class="pill">Stretch: ${w.wm_goal_stretch}</span></div>`;
    }else{wmProgressSummary.textContent='Noch nicht genügend 500er-Daten.';wmProgressChart.innerHTML='';}
 
    wmWeeklyPlan.innerHTML=(w.weekly_plan||[]).map((s,i)=>{
