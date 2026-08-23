@@ -430,6 +430,14 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div id="puzzleProgress" class="list" style="margin-top:8px">Fortschritt wird geladen…</div>
 </section>
 
+
+<section class="card full" data-app-page="more">
+<h2>🧪 MSP Turnier-Diagnose</h2>
+<div class="small">Nur Diagnose. Keine Daten werden verändert und die Coach-Berechnungen bleiben unverändert.</div>
+<button class="btn secondary" style="margin-top:10px" onclick="runTournamentDiagnostics()">Diagnose starten</button>
+<div id="tournamentDiagStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
+<div id="tournamentDiagSteps" class="list" style="margin-top:8px"></div>
+</section>
 <section class="card full appSection" id="appMore" data-app-page="more"><h2>🧠 Tournament Intelligence</h2>
 <div class="small">V6.9.6 MSP-only Puzzle Predictions + Frontend Snapshot Recovery: konkrete Puzzle-Prognosen stammen ausschliesslich aus MySpeedPuzzling; WM-Ziele und Coach-Logik bleiben unverändert. Lokale Turnier-Fallbacks: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
 <div style="margin-top:12px"><a class="btn secondary" href="/docs" target="_blank">API-Dokumentation</a> <a class="btn secondary" href="/msp/my-competitions?refresh=true" target="_blank">Anmeldungen neu prüfen</a> <a class="btn secondary" href="/sync" target="_blank">MySpeedPuzzling neu synchronisieren</a> <a class="btn secondary" href="/msp/library" target="_blank">Puzzle-Bibliothek prüfen</a></div>
@@ -918,6 +926,36 @@ function readinessTime(seconds){
   const sec=s%60;
   return h>0?`${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`:`${m}:${String(sec).padStart(2,'0')}`;
 }
+
+async function runTournamentDiagnostics(){
+ const status=document.getElementById('tournamentDiagStatus');
+ const list=document.getElementById('tournamentDiagSteps');
+ if(!status||!list)return;
+ status.textContent='Diagnose läuft…';
+ list.innerHTML='';
+ try{
+   const d=await Promise.race([
+     getj('/msp/tournament-diagnostics'),
+     new Promise((_,reject)=>setTimeout(()=>reject(new Error('diagnostic_timeout')),25000))
+   ]);
+   status.innerHTML=`Version <strong>${d.version||'–'}</strong> · ${d.summary?.elapsed_ms??'–'} ms · bestätigte Turniere: <strong>${d.summary?.confirmed_count??'–'}</strong>`;
+   list.innerHTML=(d.steps||[]).map(s=>{
+     let extra='';
+     if(s.count!=null)extra+=` · Count ${s.count}`;
+     if(s.names?.length)extra+=`<br><span class="small">${s.names.join(' · ')}</span>`;
+     if(s.player_name)extra+=` · ${s.player_name}`;
+     if(s.error)extra+=`<br><span class="small" style="color:#b91c1c">${s.error}</span>`;
+     if(s.results?.length){
+       extra+=s.results.map(r=>`<div class="small" style="margin-top:5px"><strong>${r.name||r.id||'Turnier'}</strong> · ${r.ok?'OK':'Fehler'}${r.participation?` · Teilnahme: ${JSON.stringify(r.participation)}`:''}${r.error?` · ${r.error}`:''}</div>`).join('');
+     }
+     return `<div class="item"><strong>${s.ok?'✅':'❌'} ${s.step}</strong>${extra}${s.elapsed_ms!=null?`<div class="small">${s.elapsed_ms} ms</div>`:''}</div>`;
+   }).join('');
+ }catch(e){
+   status.textContent='Diagnose fehlgeschlagen oder Timeout.';
+   list.innerHTML=`<div class="item small">${e.message||e}</div>`;
+ }
+}
+
 async function loadAll(){renderUnavailable();
  let coreHasMspData=false;
  // Performance V6.9.6: independent API calls start immediately in parallel.
