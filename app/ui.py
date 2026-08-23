@@ -172,12 +172,18 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
   .weeklyThumb{width:58px;height:58px;border-radius:9px;object-fit:cover;background:#f1f5f9}
   .weeklyThumbEmpty{display:flex;align-items:center;justify-content:center;font-size:22px}
   .weeklySummaryText{min-width:0;padding-right:3px}
-  .weeklySummaryText>strong{display:block;font-size:14px;line-height:1.15}
-  .weeklyPuzzleName{font-size:13px;font-weight:700;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .weeklySummaryText .small{font-size:10px;line-height:1.2;margin-top:2px}
-  .weeklyIntensity{grid-column:4;grid-row:2;font-size:9px;align-self:start}
+  .weeklySessionTitle{display:flex;align-items:center;gap:6px;min-width:0}
+  .weeklySessionTitle strong{font-size:14px;line-height:1.15}
+  .weeklyPuzzleName{font-size:13px;font-weight:700;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.18}
+  .weeklySummaryText .small{font-size:10px;line-height:1.2;margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .weeklyIntensity{font-size:8px;white-space:nowrap;flex:0 0 auto}
   .weeklyDetail{border-top:1px solid var(--border);padding:10px 12px 12px}
-  .weeklyPills{margin-top:6px}
+  .weeklyFacts{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:2px}
+  .weeklyFact{background:#f8fafc;border:1px solid #eef2f7;border-radius:9px;padding:8px 9px;min-width:0}
+  .weeklyFact span{display:block;font-size:9px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+  .weeklyFact strong{display:block;font-size:13px;line-height:1.2;margin-top:2px;overflow-wrap:anywhere}
+  .weeklyCoachReason{font-size:10px;line-height:1.35;color:var(--muted);margin-top:8px}
+  .weeklyPills{margin-top:7px}
 }
 </style></head>
 <body><div class="wrap">
@@ -226,7 +232,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div id="trainingQuickReason" class="trainingQuickReason"></div>
 </div><div class="trainingPriorityGroup"><div class="item trainingDuplicatePuzzle" style="margin-top:12px"><strong>🧩 Nächstes empfohlenes Puzzle</strong><div id="wmNextPuzzle" class="small">Bibliothek wird ausgewertet…</div></div>
 <div class="item" style="margin-top:10px"><strong>📅 Plan für die aktuelle Trainingswoche</strong><div id="wmWeeklyPlan" class="list" style="margin-top:8px"></div></div>
-<div class="item simHero" id="wmSimulationCard" style="margin-top:10px"><h2>🏁 WM-Simulation <span class="pill">V6.9.6</span></h2>
+<div class="item simHero" id="wmSimulationCard" style="margin-top:10px"><h2>🏁 WM-Simulation <span class="pill">V6.9.9</span></h2>
 <div class="small">Eigenständige WM-Simulation mit einem <strong>anderen Puzzle als im normalen Wochenplan</strong>. Ausgeliehene Puzzles bleiben ausgeschlossen.</div>
 <div id="wmSimSuggestion" class="item" style="margin-top:10px">Simulations-Puzzle wird gewählt…</div>
 <div id="wmSimActive" class="item activeTraining" style="display:none;margin-top:10px">
@@ -909,10 +915,18 @@ async function loadAll(){renderUnavailable();
      let p=s.puzzle||{};
      let compactImage=p.available&&p.image_url?`<img class="weeklyThumb" src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.style.display='none'">`:`<div class="weeklyThumb weeklyThumbEmpty">🧩</div>`;
      let compactName=p.available?(p.name||'Puzzle'):(p.not_required?'Technik / Recovery':'Kein Puzzle');
+     let diff=p.msp_insights?.difficulty_label||'–';
+     if(p.msp_insights?.difficulty_percent!=null) diff+=` (${p.msp_insights.difficulty_percent>0?'+':''}${p.msp_insights.difficulty_percent}% ggü. Ø)`;
+     let medianDelta='–';
+     if(p.msp_last_time_seconds!=null&&p.msp_median_seconds!=null&&p.msp_median_seconds>0){
+       let d=((p.msp_last_time_seconds/p.msp_median_seconds)-1)*100;
+       medianDelta=`${d>0?'+':''}${d.toFixed(1)}% ${d<=0?'unter':'über'} Median`;
+     }else if(p.median_gap){medianDelta=p.median_gap+' über Median';}
      let detail=p.available
-       ? `<div class="weeklyDetail"><div class="small">${p.reason||''}</div><div class="weeklyPills"><span class="pill">${p.previous_solo_solves||0} bisherige Solo-Läufe</span>${p.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${p.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}${p.wm_fit?`<span class="pill wmFit">WM-Fit ${p.wm_fit.score}/100</span>`:''}${p.wm_suitability?`<span class="pill ${p.wm_suitability.level==='hoch'||p.wm_suitability.level==='gut'?'wmGood':''}">${p.wm_suitability.label}</span>`:''}</div>${p.wm_fit?.summary?`<div class="fitReason">${p.wm_fit.summary}</div>`:''}${puzzleInsightHtml(p)}${p.competition_risk?.score>=80?`<div class="small riskHigh" style="padding:7px;border-radius:8px;margin-top:7px">⚠️ ${p.competition_risk.reason}</div>`:''}<button class="skipBtn" style="margin-top:8px" onclick='skipPuzzle(${JSON.stringify(p)})'>Skip – ausgeliehen</button></div>`
-       : `<div class="weeklyDetail small">${p.reason||'Für diese Einheit ist kein vollständiges Puzzle nötig.'}</div>`;
-     return `<details class="item weeklySession"${i===0?' open':''}><summary><div class="weeklyIndex">${i+1}</div>${compactImage}<div class="weeklySummaryText"><strong>${s.session}</strong><div class="weeklyPuzzleName">${compactName}</div><div class="small">${s.goal}</div></div><span class="pill weeklyIntensity">${s.intensity}</span></summary>${detail}</details>`;
+       ? `<div class="weeklyDetail"><div class="weeklyFacts"><div class="weeklyFact"><span>MSP-Median</span><strong>${p.msp_median||'–'}</strong></div><div class="weeklyFact"><span>Letzte Zeit</span><strong>${p.msp_last_time||'–'}</strong></div><div class="weeklyFact"><span>vs. Median</span><strong>${medianDelta}</strong></div><div class="weeklyFact"><span>MSP Prediction</span><strong>${p.msp_prediction||'–'}</strong></div><div class="weeklyFact"><span>Difficulty</span><strong>${diff}</strong></div><div class="weeklyFact"><span>WM-Fit</span><strong>${p.wm_fit?.score!=null?p.wm_fit.score+'/100':'–'}</strong></div></div><div class="weeklyCoachReason"><strong>Coach:</strong> ${p.reason||p.wm_fit?.summary||'Passend für diese Trainingseinheit.'}</div><div class="weeklyPills"><span class="pill">${p.previous_solo_solves||0} Solo-Läufe</span>${p.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${p.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}${p.wm_suitability?`<span class="pill ${p.wm_suitability.level==='hoch'||p.wm_suitability.level==='gut'?'wmGood':''}">${p.wm_suitability.label}</span>`:''}</div>${p.competition_risk?.score>=80?`<div class="small riskHigh" style="padding:7px;border-radius:8px;margin-top:7px">⚠️ ${p.competition_risk.reason}</div>`:''}<button class="skipBtn" style="margin-top:8px" onclick='skipPuzzle(${JSON.stringify(p)})'>Skip – ausgeliehen</button></div>`
+       : `<div class="weeklyDetail small">${p.reason||'Für diese Technik-/Recovery-Einheit ist kein vollständiges Puzzle nötig.'}</div>`;
+     let displayName=p.available?compactName:'';
+     return `<details class="item weeklySession"${i===0?' open':''}><summary><div class="weeklyIndex">${i+1}</div>${compactImage}<div class="weeklySummaryText"><div class="weeklySessionTitle"><strong>${s.session}</strong><span class="pill weeklyIntensity">${s.intensity}</span></div>${displayName?`<div class="weeklyPuzzleName">${displayName}</div>`:''}<div class="small">${s.goal}</div></div></summary>${detail}</details>`;
    }).join('')||'<div class="small">Kein Trainingsplan verfügbar.</div>';
    let simCandidate=w.simulation_puzzle?.available?w.simulation_puzzle:null;
    let firstTrySec=w.wm_goal_first_try_seconds||w.wm_goal_realistic_seconds||goalTargetSeconds(w.wm_goal_realistic||'');
