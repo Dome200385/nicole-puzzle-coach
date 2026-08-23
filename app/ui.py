@@ -935,7 +935,15 @@ async function runTournamentDiagnostics(){
  list.innerHTML='';
  try{
    const d=await Promise.race([
-     getj('/msp/tournament-diagnostics'),
+     (async()=>{
+       const r=await fetch('/msp/tournament-diagnostics',{cache:'no-store'});
+       const txt=await r.text();
+       let obj;
+       try{ obj=JSON.parse(txt); }
+       catch(_){ throw new Error(`HTTP ${r.status}: ${txt.slice(0,240)}`); }
+       if(!r.ok) throw new Error(`HTTP ${r.status}: ${JSON.stringify(obj).slice(0,240)}`);
+       return obj;
+     })(),
      new Promise((_,reject)=>setTimeout(()=>reject(new Error('diagnostic_timeout')),25000))
    ]);
    status.innerHTML=`Version <strong>${d.version||'–'}</strong> · ${d.summary?.elapsed_ms??'–'} ms · bestätigte Turniere: <strong>${d.summary?.confirmed_count??'–'}</strong>`;
