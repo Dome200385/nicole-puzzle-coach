@@ -467,6 +467,14 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div id="fingerprintStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
 <div id="fingerprintList" class="list" style="margin-top:8px"></div>
 </section>
+<section class="card full" data-app-page="more">
+<h2>🧵 Nicole Competition Trace</h2>
+<div class="small">Zeigt nur den direkten Kontext rund um Nicoles echte Player-ID in MSP-Resultaten: Competition/Event, Datum, Modus und Status.</div>
+<button class="btn secondary" style="margin-top:10px" onclick="runNicoleCompetitionTrace()">Trace starten</button>
+<div id="traceStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
+<div id="traceList" class="list" style="margin-top:8px"></div>
+</section>
+
 
 
 
@@ -1112,6 +1120,41 @@ async function runRegistrationFingerprint(){
    list.innerHTML=summary+rows;
  }catch(e){
    status.textContent='Fingerprint-Diagnose fehlgeschlagen.';
+   list.innerHTML=`<div class="item small">${readinessEsc(e.message||e)}</div>`;
+ }
+}
+
+
+async function runNicoleCompetitionTrace(){
+ const status=document.getElementById('traceStatus');
+ const list=document.getElementById('traceList');
+ if(!status||!list)return;
+ status.textContent='Competition Trace läuft…';
+ list.innerHTML='';
+ try{
+   const r=await fetch('/msp/nicole-competition-trace',{cache:'no-store'});
+   const txt=await r.text();
+   let d; try{d=JSON.parse(txt)}catch(_){throw new Error(`HTTP ${r.status}: ${txt.slice(0,300)}`)}
+   if(!r.ok)throw new Error(`HTTP ${r.status}`);
+   const s=d.summary||{};
+   status.innerHTML=`Version <strong>${d.version||'–'}</strong> · Matches <strong>${s.player_match_count??0}</strong> · Traces <strong>${s.trace_count??0}</strong> · Solo ${s.modes?.solo??0} · Duo ${s.modes?.duo??0} · Team ${s.modes?.team??0}`;
+
+   const headline=(s.competition_names_found||[]).length
+      ? `<div class="item"><strong>🏁 Gefundene Competition-Namen</strong><div class="small">${(s.competition_names_found||[]).map(readinessEsc).join(' · ')}</div></div>`
+      : `<div class="item small"><strong>Keine eindeutigen Competition-Namen direkt neben Nicoles ID gefunden.</strong></div>`;
+
+   const rows=(d.traces||[]).map((t,i)=>`<details class="item"><summary><strong>${i+1}. ${readinessEsc((t.mode||'unknown').toUpperCase())}${t.competition_name?' · '+readinessEsc(t.competition_name):''}</strong></summary>
+      <div class="small">Pfad: ${readinessEsc(t.path||'')}</div>
+      ${t.competition_id?`<div class="small">Competition-ID: ${readinessEsc(String(t.competition_id))}</div>`:''}
+      ${t.date?`<div class="small">Datum: ${readinessEsc(String(t.date))}</div>`:''}
+      ${t.status?`<div class="small">Status: ${readinessEsc(String(t.status))}</div>`:''}
+      ${t.location?`<div class="small">Ort: ${readinessEsc(String(t.location))}</div>`:''}
+      <pre class="diagPre">${readinessEsc(JSON.stringify(t.context,null,2))}</pre>
+   </details>`).join('');
+
+   list.innerHTML=headline+rows;
+ }catch(e){
+   status.textContent='Competition Trace fehlgeschlagen.';
    list.innerHTML=`<div class="item small">${readinessEsc(e.message||e)}</div>`;
  }
 }
