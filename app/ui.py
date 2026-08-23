@@ -446,6 +446,14 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <div id="tournamentDiagStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
 <div id="tournamentDiagSteps" class="list" style="margin-top:8px"></div>
 </section>
+<section class="card full" data-app-page="more">
+<h2>🔎 MSP Registration-Diagnose</h2>
+<div class="small">Prüft ausschließlich lesend mögliche offizielle MSP-Endpunkte für persönliche Turnier-Anmeldungen.</div>
+<button class="btn secondary" style="margin-top:10px" onclick="runRegistrationDiagnostics()">Registration prüfen</button>
+<div id="registrationDiagStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
+<div id="registrationDiagList" class="list" style="margin-top:8px"></div>
+</section>
+
 <section class="card full appSection" id="appMore" data-app-page="more"><h2>🧠 Tournament Intelligence</h2>
 <div class="small">V6.9.6 MSP-only Puzzle Predictions + Frontend Snapshot Recovery: konkrete Puzzle-Prognosen stammen ausschliesslich aus MySpeedPuzzling; WM-Ziele und Coach-Logik bleiben unverändert. Lokale Turnier-Fallbacks: bei einem MySpeedPuzzling-Ausfall bleibt der letzte erfolgreiche Datenstand aktiv. WM-Fortschritt und transparentes Schweizer Benchmarking. Der Skip bleibt global: ausgeliehene Puzzles werden aus Hauptempfehlung und Wochenplan gleichzeitig entfernt. Das Schweizer Motivationsranking zeigt zusätzlich Abstand zu Platz 1, Abstand zum nächsten Platz und ein konkretes Ø-Ziel. Ausgeliehene Puzzles werden lokal übersprungen und können jederzeit wieder freigegeben werden: bekannte frühere Meisterschaftspuzzles werden für WM-Simulationen stark abgewertet. Puzzle-Fotos helfen beim Finden. Trainings können direkt gestartet und anschliessend mit dem neuen MySpeedPuzzling-Ergebnis automatisch gegen die Zielzeit bewertet werden.</div>
 <div style="margin-top:12px"><a class="btn secondary" href="/docs" target="_blank">API-Dokumentation</a> <a class="btn secondary" href="/msp/my-competitions?refresh=true" target="_blank">Anmeldungen neu prüfen</a> <a class="btn secondary" href="/sync" target="_blank">MySpeedPuzzling neu synchronisieren</a> <a class="btn secondary" href="/msp/library" target="_blank">Puzzle-Bibliothek prüfen</a></div>
@@ -976,6 +984,44 @@ async function runTournamentDiagnostics(){
    list.innerHTML=`<div class="item small">${readinessEsc(e.message||e)}</div>`;
  }
 }
+
+async function runRegistrationDiagnostics(){
+ const status=document.getElementById('registrationDiagStatus');
+ const list=document.getElementById('registrationDiagList');
+ if(!status||!list)return;
+ status.textContent='Registration-Diagnose läuft…';
+ list.innerHTML='';
+ try{
+   const d=await Promise.race([
+     (async()=>{
+       const r=await fetch('/msp/registration-diagnostics',{cache:'no-store'});
+       const txt=await r.text();
+       let obj;
+       try{obj=JSON.parse(txt)}catch(_){throw new Error(`HTTP ${r.status}: ${txt.slice(0,300)}`)}
+       if(!r.ok)throw new Error(`HTTP ${r.status}: ${JSON.stringify(obj).slice(0,300)}`);
+       return obj;
+     })(),
+     new Promise((_,reject)=>setTimeout(()=>reject(new Error('diagnostic_timeout')),45000))
+   ]);
+   const s=d.summary||{};
+   status.innerHTML=`Version <strong>${d.version||'–'}</strong> · ${s.elapsed_ms??'–'} ms · erfolgreiche Endpunkte <strong>${s.successful_count??0}</strong> · Nicole-Matches <strong>${s.player_match_count??0}</strong>`;
+   let targetHtml=(d.targets||[]).map(t=>`<div class="item"><strong>🎯 ${readinessEsc(t.name||'Turnier')}</strong><div class="small">${readinessEsc(t.id||'')} · ${readinessEsc(t.date_from||'')}</div></div>`).join('');
+   let probeHtml=(d.probes||[]).map(p=>{
+     const shape=p.shape?readinessEsc(JSON.stringify(p.shape)):'';
+     return `<div class="item">
+       <strong>${p.ok?'✅':'❌'} ${readinessEsc(p.label||p.path||'Probe')}</strong>
+       <div class="small">${readinessEsc(p.path||'')}</div>
+       ${p.ok?`<div class="small">Shape: ${shape}</div><div class="small">Nicole-ID gefunden: <strong>${p.authenticated_player_match?'JA':'nein'}</strong></div>`:`<div class="small" style="color:#b91c1c">${readinessEsc(p.error||'Fehler')}</div>`}
+       ${p.elapsed_ms!=null?`<div class="small">${p.elapsed_ms} ms</div>`:''}
+     </div>`;
+   }).join('');
+   list.innerHTML=targetHtml+probeHtml;
+ }catch(e){
+   status.textContent='Registration-Diagnose fehlgeschlagen oder Timeout.';
+   list.innerHTML=`<div class="item small">${readinessEsc(e.message||e)}</div>`;
+ }
+}
+
 async function loadAll(){renderUnavailable();
  let coreHasMspData=false;
  // Performance V6.9.6: independent API calls start immediately in parallel.

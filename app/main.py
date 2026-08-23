@@ -17,7 +17,7 @@ from app.schemas import TournamentCreate, TrainingSessionCreate
 from app.crypto import encrypt_text, decrypt_text
 from app.myspeedpuzzling import (
     build_authorize_url, exchange_code, refresh_access_token,
-    get_profile, get_results, get_statistics, get_collections, get_library,
+    get_profile, get_results, get_statistics, get_collections, get_library, api_get,
     get_competitions, get_competition, upcoming_competitions,
     detect_participation, get_my_confirmed_competitions, get_swiss_motivation_ranking, get_puzzle_insights,
     enrich_library_with_msp_insights, clear_api_cache, api_cache_status, debug_prediction_fields, extract_puzzle_insights_from_api_payload, get_predicted_time, normalize_predicted_time_response
@@ -32,7 +32,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.11.7",
+    version="6.11.8",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -281,7 +281,7 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.11.7","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.11.8","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 
 def _ensure_readiness_history_table(db):
@@ -363,7 +363,7 @@ def pwa_manifest():
 
 @app.get("/sw.js")
 def pwa_service_worker():
-    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v6117';
+    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v6118';
 const SHELL=['/manifest.webmanifest','/pwa/icon-192.png','/pwa/icon-512.png','/pwa/icon-maskable-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(SHELL)).catch(()=>{}));
@@ -401,7 +401,7 @@ def pwa_asset(filename:str):
     return FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.11.7"}
+def health(): return {"status":"ok","version":"6.11.8"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -416,7 +416,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.11.7",
+        "version":"6.11.8",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -612,15 +612,15 @@ async def msp_api_test(db:Session=Depends(get_db)):
         return {"ok":False,"mode":"pat","reason":"MSP_PERSONAL_ACCESS_TOKEN not configured"}
     try:
         profile=await get_profile(token)
-        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.11.7","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
+        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.11.8","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
     except Exception as exc:
-        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.11.7","error":str(exc)}
+        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.11.8","error":str(exc)}
 
 @app.get("/msp/sync-status")
 def msp_sync_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     return {
-        "version":"6.11.7",
+        "version":"6.11.8",
         "snapshot_id":snap.id if snap else None,
         "synced_at":snap.synced_at if snap else None,
         "data_available":snap is not None,
@@ -828,11 +828,11 @@ async def my_competitions(
 
 @app.get("/msp/tournament-diagnostics")
 async def msp_tournament_diagnostics(db:Session=Depends(get_db)):
-    """V6.11.7: inspect the tournament pipeline before confirmed filtering."""
+    """V6.11.8: inspect the tournament pipeline before confirmed filtering."""
     import time as _time
     from datetime import datetime as _dt
     started=_time.monotonic()
-    diag={"version":"6.11.7","checked_at":_dt.utcnow().isoformat()+"Z","steps":[],"summary":{}}
+    diag={"version":"6.11.8","checked_at":_dt.utcnow().isoformat()+"Z","steps":[],"summary":{}}
 
     def step(name, ok, **kw):
         diag["steps"].append({"step":name,"ok":bool(ok),**kw})
@@ -1007,6 +1007,149 @@ async def msp_tournament_diagnostics(db:Session=Depends(get_db)):
         "elapsed_ms":round((_time.monotonic()-started)*1000),
     }
     return diag
+
+
+
+@app.get("/msp/registration-diagnostics")
+async def msp_registration_diagnostics(db:Session=Depends(get_db)):
+    """
+    V6.11.8 read-only endpoint discovery for personal competition registrations.
+    No writes, no registration actions, and no coach calculations are changed.
+    """
+    import time as _time
+    started=_time.monotonic()
+    out={"version":"6.11.8","probes":[],"targets":[],"summary":{}}
+
+    try:
+        token=await asyncio.wait_for(_valid_access_token(db), timeout=7.0)
+        profile=await asyncio.wait_for(get_profile(token), timeout=7.0)
+    except Exception as exc:
+        out["summary"]={"ok":False,"stage":"auth","error":f"{type(exc).__name__}: {exc}"}
+        return out
+
+    player_id=profile.get("id") if isinstance(profile,dict) else None
+    out["player_id_present"]=bool(player_id)
+
+    # Locate the two currently relevant competitions from the official list.
+    try:
+        payload=await asyncio.wait_for(get_competitions(token,status="all",online=False,cache=False),timeout=12.0)
+        rows=payload.get("competitions",[]) if isinstance(payload,dict) else []
+    except Exception as exc:
+        rows=[]
+        out["competition_list_error"]=f"{type(exc).__name__}: {exc}"
+
+    for c in rows:
+        if not isinstance(c,dict):
+            continue
+        name=str(c.get("name") or "")
+        low=name.lower()
+        if "world jigsaw puzzle championship 2026" in low or "swiss puzzle championship 2026" in low:
+            out["targets"].append({
+                "id":c.get("id"),
+                "name":name,
+                "slug":c.get("slug"),
+                "date_from":c.get("date_from"),
+            })
+
+    def payload_shape(data):
+        if isinstance(data,dict):
+            shape={"type":"object","keys":list(data.keys())[:50]}
+            for k,v in data.items():
+                if isinstance(v,list):
+                    shape["list_field"]=k
+                    shape["list_count"]=len(v)
+                    break
+            return shape
+        if isinstance(data,list):
+            return {"type":"list","count":len(data)}
+        return {"type":type(data).__name__}
+
+    def contains_player_id(data):
+        if player_id is None:
+            return False
+        wanted=str(player_id)
+        stack=[data]
+        visited=0
+        while stack and visited<5000:
+            obj=stack.pop()
+            visited+=1
+            if isinstance(obj,dict):
+                for k,v in obj.items():
+                    lk=str(k).lower()
+                    if lk in ("player_id","user_id","participant_id","puzzler_id","id") and str(v)==wanted:
+                        return True
+                    if isinstance(v,(dict,list)):
+                        stack.append(v)
+            elif isinstance(obj,list):
+                stack.extend(obj[:500])
+        return False
+
+    # Candidate read-only endpoints. We only report HTTP/error/shape and whether
+    # the authenticated player id appears; no other participant identities are exposed.
+    probes=[
+        ("me_competitions","/me/competitions",None),
+        ("me_registrations","/me/registrations",None),
+        ("me_competition_registrations","/me/competition-registrations",None),
+        ("registrations","/registrations",None),
+        ("competition_registrations","/competition-registrations",None),
+    ]
+    if player_id:
+        probes.extend([
+            ("player_competitions",f"/players/{player_id}/competitions",None),
+            ("player_registrations",f"/players/{player_id}/registrations",None),
+        ])
+
+    for target in out["targets"]:
+        cid=target.get("id")
+        if cid:
+            probes.extend([
+                (f"competition_{cid}_registrations",f"/competitions/{cid}/registrations",None),
+                (f"competition_{cid}_participants",f"/competitions/{cid}/participants",None),
+                (f"competition_{cid}_entries",f"/competitions/{cid}/entries",None),
+                (f"competition_{cid}_me",f"/competitions/{cid}/me",None),
+                (f"competition_{cid}_my_registration",f"/competitions/{cid}/my-registration",None),
+            ])
+
+    async def probe(label,path,params):
+        t=_time.monotonic()
+        try:
+            data=await asyncio.wait_for(api_get(token,path,params,cache=False),timeout=6.0)
+            return {
+                "label":label,
+                "path":path,
+                "ok":True,
+                "elapsed_ms":round((_time.monotonic()-t)*1000),
+                "shape":payload_shape(data),
+                "authenticated_player_match":contains_player_id(data),
+            }
+        except asyncio.TimeoutError:
+            return {"label":label,"path":path,"ok":False,"error":"TimeoutError >6s"}
+        except Exception as exc:
+            return {
+                "label":label,
+                "path":path,
+                "ok":False,
+                "elapsed_ms":round((_time.monotonic()-t)*1000),
+                "error":f"{type(exc).__name__}: {exc}",
+            }
+
+    # Small batches avoid hammering the API while still making the diagnosis quick.
+    for i in range(0,len(probes),4):
+        batch=await asyncio.gather(*(probe(*p) for p in probes[i:i+4]))
+        out["probes"].extend(batch)
+
+    successful=[p for p in out["probes"] if p.get("ok")]
+    player_matches=[p for p in successful if p.get("authenticated_player_match")]
+    out["summary"]={
+        "ok":True,
+        "probe_count":len(out["probes"]),
+        "successful_count":len(successful),
+        "player_match_count":len(player_matches),
+        "successful_paths":[p.get("path") for p in successful],
+        "player_match_paths":[p.get("path") for p in player_matches],
+        "elapsed_ms":round((_time.monotonic()-started)*1000),
+    }
+    return out
 
 
 @app.get("/msp/participation-check")
