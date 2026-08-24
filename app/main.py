@@ -1,8 +1,5 @@
-import httpx
-import traceback
-import time
-import asyncio
 import json
+import asyncio
 import secrets
 import os
 from fastapi import FastAPI, HTTPException, Request, Depends
@@ -17,9 +14,8 @@ from app.db_models import OAuthToken, SyncSnapshot, Tournament, TrainingSession
 from app.schemas import TournamentCreate, TrainingSessionCreate
 from app.crypto import encrypt_text, decrypt_text
 from app.myspeedpuzzling import (
-    get_competitions_shared,
     build_authorize_url, exchange_code, refresh_access_token,
-    get_profile, get_results, get_statistics, get_collections, get_library, api_get,
+    get_profile, get_results, get_statistics, get_collections, get_library,
     get_competitions, get_competition, upcoming_competitions,
     detect_participation, get_my_confirmed_competitions, get_swiss_motivation_ranking, get_puzzle_insights,
     enrich_library_with_msp_insights, clear_api_cache, api_cache_status, debug_prediction_fields, extract_puzzle_insights_from_api_payload, get_predicted_time, normalize_predicted_time_response
@@ -34,7 +30,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.13.1",
+    version="6.9.8",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -283,7 +279,7 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.13.1","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.8.18","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 
 def _ensure_readiness_history_table(db):
@@ -365,7 +361,7 @@ def pwa_manifest():
 
 @app.get("/sw.js")
 def pwa_service_worker():
-    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v6131';
+    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v696';
 const SHELL=['/manifest.webmanifest','/pwa/icon-192.png','/pwa/icon-512.png','/pwa/icon-maskable-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(SHELL)).catch(()=>{}));
@@ -403,7 +399,7 @@ def pwa_asset(filename:str):
     return FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.13.1"}
+def health(): return {"status":"ok","version":"6.8.18"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -418,11 +414,11 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.13.1",
+        "version":"6.8.18",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
-        "data_source":"official_api_snapshot" if snap else ("legacy" if has_legacy else "none"),
+        "data_source":"snapshot" if snap else ("legacy" if has_legacy else "none"),
         "myspeedpuzzling_connected":pat_configured or configured,
         "myspeedpuzzling_auth_mode":"pat" if pat_configured else ("oauth" if configured else "none"),
         "pat_configured":pat_configured,
@@ -536,13 +532,10 @@ async def sync(db:Session=Depends(get_db)):
 
         confirmed=[]
         try:
-            comp_payload=await get_competitions_shared(token,refresh=True)
-            comp_rows=comp_payload.get("competitions",[]) if isinstance(comp_payload,dict) else (comp_payload if isinstance(comp_payload,list) else [])
-            confirmed_slugs={"world-jigsaw-puzzle-championship-2026","swiss-championship-2026"}
-            for c in comp_rows:
-                if isinstance(c,dict) and str(c.get("slug") or "").lower() in confirmed_slugs:
-                    item=dict(c); item["registered"]=True; item["registration_source"]="confirmed_config_live_metadata"; confirmed.append(item)
+            confirmed_payload=await get_my_confirmed_competitions(token,limit=30,cache=False)
+            confirmed=(confirmed_payload or {}).get("competitions",[]) if isinstance(confirmed_payload,dict) else []
         except Exception:
+            # Local tournament fallback remains responsible for continuity.
             confirmed=[]
 
         stored_statistics={
@@ -617,15 +610,15 @@ async def msp_api_test(db:Session=Depends(get_db)):
         return {"ok":False,"mode":"pat","reason":"MSP_PERSONAL_ACCESS_TOKEN not configured"}
     try:
         profile=await get_profile(token)
-        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.13.1","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
+        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.18","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
     except Exception as exc:
-        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.13.1","error":str(exc)}
+        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.18","error":str(exc)}
 
 @app.get("/msp/sync-status")
 def msp_sync_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     return {
-        "version":"6.13.1",
+        "version":"6.8.18",
         "snapshot_id":snap.id if snap else None,
         "synced_at":snap.synced_at if snap else None,
         "data_available":snap is not None,
@@ -769,93 +762,43 @@ async def msp_competition_detail(competition_id:str,db:Session=Depends(get_db)):
     except Exception as exc:
         raise HTTPException(502,f"MySpeedPuzzling competition detail request failed: {exc}")
 
-
-_CONFIRMED_COMPETITION_SLUGS={
-    "world-jigsaw-puzzle-championship-2026",
-    "swiss-championship-2026",
-}
-
-def _confirmed_from_live_competition_list(payload):
-    """Use MSP live metadata, with only registration identity configured locally."""
-    if isinstance(payload,dict):
-        rows=payload.get("competitions") or payload.get("data") or payload.get("items") or []
-    elif isinstance(payload,list):
-        rows=payload
-    else:
-        rows=[]
-
-    confirmed=[]
-    for row in rows:
-        if not isinstance(row,dict):
-            continue
-        slug=str(row.get("slug") or "").strip().lower()
-        if slug not in _CONFIRMED_COMPETITION_SLUGS:
-            continue
-        item=dict(row)
-        item["registered"]=True
-        item["registration_source"]="confirmed_config_live_metadata"
-        confirmed.append(item)
-    confirmed.sort(key=lambda c:str(c.get("date_from") or "9999"))
-    return confirmed
-
-
-def _confirmed_from_snapshot(db):
-    try:
-        snap=_latest_snapshot(db)
-        if not snap:
-            return []
-        payload=_snapshot_payload(snap)
-        rows=payload.get("confirmed_competitions") or []
-        out=[]
-        for row in rows:
-            if not isinstance(row,dict):
-                continue
-            slug=str(row.get("slug") or "").strip().lower()
-            if slug in _CONFIRMED_COMPETITION_SLUGS:
-                item=dict(row)
-                item["registered"]=True
-                item["registration_source"]="last_official_snapshot"
-                out.append(item)
-        out.sort(key=lambda c:str(c.get("date_from") or "9999"))
-        return out
-    except Exception:
-        return []
-
-
 @app.get("/msp/my-competitions")
-async def my_competitions(limit:int=30, refresh:bool=False, db:Session=Depends(get_db)):
-    confirmed=[]
-    api_error=None
-    api_count=0
-    source="live_msp_metadata"
+async def my_competitions(
+    limit:int=30,
+    refresh:bool=False,
+    db:Session=Depends(get_db)
+):
+    """
+    API-first tournament list with stable local fallback.
+    Live API-confirmed registrations win; known local confirmed tournaments are
+    retained whenever the API returns none or incomplete participation data.
+    """
+    api_list=[]
+    api_meta={}
     try:
         token=await _valid_access_token(db)
-        payload=await asyncio.wait_for(
-            get_competitions_shared(token,refresh=refresh),
-            timeout=12.0
+        result=await get_my_confirmed_competitions(
+            token,
+            limit=max(1,min(limit,60)),
+            cache=not refresh
         )
-        if isinstance(payload,dict):
-            rows=payload.get("competitions") or payload.get("data") or payload.get("items") or []
-        elif isinstance(payload,list):
-            rows=payload
-        else:
-            rows=[]
-        api_count=len(rows)
-        confirmed=_confirmed_from_live_competition_list(payload)
+        if isinstance(result,dict):
+            api_list=result.get("competitions") or []
+            api_meta={k:v for k,v in result.items() if k!="competitions"}
+        elif isinstance(result,list):
+            api_list=result
     except Exception as exc:
-        api_error=f"{type(exc).__name__}: {exc}"
-        confirmed=_confirmed_from_snapshot(db)
-        source="last_official_snapshot"
+        api_meta={"api_error":str(exc)}
 
+    merged=_merge_competitions(api_list,_local_confirmed_competitions())
     return {
-        "competitions":confirmed[:max(1,min(limit,60))],
-        "count":len(confirmed),
-        "api_count":api_count,
-        "live_ok":api_error is None,
-        "api_error":api_error,
-        "source":source,
+        **api_meta,
+        "competitions":merged,
+        "count":len(merged),
+        "api_count":len(api_list),
+        "local_fallback_count":len(_local_confirmed_competitions()),
+        "source":"api_plus_local_fallback",
     }
-
 
 @app.get("/msp/participation-check")
 async def participation_check(limit:int=12,db:Session=Depends(get_db)):
@@ -1118,37 +1061,63 @@ def repeat_priority(limit:int=5, db:Session=Depends(get_db)):
     except Exception as exc:return {"available":False,"items":[],"count":0,"message":"Wiederholungs-Priorität derzeit nicht verfügbar.","error":str(exc)}
 
 @app.get("/coach/unsolved-library")
-def unsolved_library(db:Session=Depends(get_db)):
+async def unsolved_library(db:Session=Depends(get_db)):
+    """Unsolved 500-piece library puzzles with official MSP insights."""
     payload,source,snapshot_id=_best_available_payload(db)
-    if not payload:return {"available":False,"items":[],"count":0,"message":"Noch keine synchronisierten MySpeedPuzzling-Daten vorhanden."}
+    if not payload:
+        return {"available":False,"items":[],"count":0,"message":"Noch keine synchronisierten MySpeedPuzzling-Daten vorhanden."}
     try:
         rows=normalize_results(payload.get("results") or {})
         from app.wm_coach import _extract_library_puzzles,_history_for_puzzle
-        items=[]
+        candidates=[]
         for p in _extract_library_puzzles(payload.get("collections") or {}):
-            if not isinstance(p,dict):continue
+            if not isinstance(p,dict): continue
             try:
-                if int(p.get("pieces") or 0) != 500:
-                    continue
-            except (TypeError, ValueError):
-                continue
-            hist=_history_for_puzzle(rows,p)
-            if any(r.get("mode")=="solo" for r in hist):continue
-            ins=p.get("msp_insights") or {}
-            diff=ins.get("difficulty") if isinstance(ins,dict) else {}
-            pred=ins.get("prediction") if isinstance(ins,dict) else {}
-            diff=diff if isinstance(diff,dict) else {}
-            pred=pred if isinstance(pred,dict) else {}
-            ps=pred.get("predicted_seconds") or pred.get("seconds") or p.get("predicted_seconds")
-            lo=pred.get("range_low_seconds") or pred.get("rangeLowSeconds") or p.get("prediction_range_low_seconds")
-            hi=pred.get("range_high_seconds") or pred.get("rangeHighSeconds") or p.get("prediction_range_high_seconds")
-            items.append({"id":p.get("id"),"name":p.get("name"),"manufacturer":p.get("manufacturer"),"pieces":p.get("pieces"),"image_url":p.get("image_url"),
-              "difficulty_label":diff.get("label") or diff.get("level") or p.get("difficulty_label"),"difficulty_percent":diff.get("percent") if diff.get("percent") is not None else p.get("difficulty_percent"),
-              "prediction":_fmt_seconds(int(ps)) if ps else None,"prediction_low":_fmt_seconds(int(lo)) if lo else None,"prediction_high":_fmt_seconds(int(hi)) if hi else None})
-        items.sort(key=lambda p:(int(p.get("pieces") or 99999),str(p.get("name") or "").lower()))
+                if int(p.get("pieces") or 0)!=500: continue
+            except (TypeError,ValueError): continue
+            if any(r.get("mode")=="solo" for r in _history_for_puzzle(rows,p)): continue
+            candidates.append(p)
+
+        token=None
+        try: token=await _valid_access_token(db)
+        except Exception: token=None
+        semaphore=asyncio.Semaphore(4)
+        async def official_insights(puzzle):
+            base=puzzle.get("msp_insights") if isinstance(puzzle.get("msp_insights"),dict) else {}
+            merged=dict(base)
+            have_prediction=merged.get("prediction_seconds") is not None or bool(merged.get("prediction_text"))
+            have_difficulty=bool(merged.get("difficulty_label")) or merged.get("difficulty_percent") is not None
+            pid=puzzle.get("id")
+            if token and pid and not (have_prediction and have_difficulty):
+                try:
+                    async with semaphore: raw=await get_predicted_time(token,pid)
+                    live=normalize_predicted_time_response(raw)
+                    if isinstance(live,dict):
+                        for k,v in live.items():
+                            if v is not None: merged[k]=v
+                except Exception: pass
+            return merged
+
+        insights_list=await asyncio.gather(*(official_insights(p) for p in candidates)) if candidates else []
+        items=[]
+        for p,ins in zip(candidates,insights_list):
+            ps=ins.get("prediction_seconds"); ptext=ins.get("prediction_text")
+            lo=ins.get("prediction_range_from_seconds"); hi=ins.get("prediction_range_to_seconds")
+            diff_label=ins.get("difficulty_label") or p.get("difficulty_label")
+            diff_percent=ins.get("difficulty_percent") if ins.get("difficulty_percent") is not None else p.get("difficulty_percent")
+            items.append({
+                "id":p.get("id"),"name":p.get("name"),"manufacturer":p.get("manufacturer"),"pieces":p.get("pieces"),"image_url":p.get("image_url"),
+                "difficulty_label":diff_label,"difficulty_percent":diff_percent,
+                "prediction":_fmt_seconds(int(ps)) if ps is not None else ptext,
+                "prediction_seconds":int(ps) if ps is not None else None,
+                "prediction_low":_fmt_seconds(int(lo)) if lo is not None else None,
+                "prediction_high":_fmt_seconds(int(hi)) if hi is not None else None,
+                "msp_insights":ins})
+        items.sort(key=lambda x:(int(x.get("pieces") or 99999),str(x.get("name") or "").lower()))
         return {"available":bool(items),"items":items,"count":len(items),"snapshot_id":snapshot_id,"data_source":source,
-          "message":f"{len(items)} Puzzle in der Library haben noch kein Solo-Ergebnis." if items else "Alle Puzzle in der Library haben bereits ein Solo-Ergebnis."}
-    except Exception as exc:return {"available":False,"items":[],"count":0,"message":"Ungelöste Library derzeit nicht verfügbar.","error":str(exc)}
+                "message":f"{len(items)} Puzzle in der Library haben noch kein Solo-Ergebnis." if items else "Alle Puzzle in der Library haben bereits ein Solo-Ergebnis."}
+    except Exception as exc:
+        return {"available":False,"items":[],"count":0,"message":"Ungelöste Library derzeit nicht verfügbar.","error":str(exc)}
 
 @app.get("/coach/puzzle-progress")
 def puzzle_progress(limit:int=8, db:Session=Depends(get_db)):
@@ -1336,9 +1305,6 @@ async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
     if exclude_puzzle_ids:
         excluded=[x.strip() for x in exclude_puzzle_ids.split(",") if x.strip()]
 
-    # V6.13.1: one fast live MSP competition-list request.
-    # Do not use per-competition registration probing here; it can take tens of seconds
-    # and must never decide whether the whole coach is "resilient".
     comps=_merge_competitions(
         payload.get("confirmed_competitions") or [],
         _local_confirmed_competitions()
@@ -1348,19 +1314,15 @@ async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
 
     try:
         token=await _valid_access_token(db)
-        live_comp_payload=await asyncio.wait_for(
-            get_competitions_shared(token,refresh=False),
-            timeout=10.0
-        )
-        live_confirmed=_confirmed_from_live_competition_list(live_comp_payload)
-        if live_confirmed:
-            comps=live_confirmed
+        fresh=await get_my_confirmed_competitions(token,limit=30)
+        if fresh:
+            fresh_list=fresh.get("competitions",[]) if isinstance(fresh,dict) else fresh
+            comps=_merge_competitions(fresh_list,_local_confirmed_competitions())
         data_mode="live"
     except Exception as exc:
-        live_warning=f"MySpeedPuzzling Competition-Liste derzeit nicht live erreichbar: {exc}"
+        live_warning=f"MySpeedPuzzling Live-Zugriff derzeit nicht möglich: {exc}"
 
-    competition_payload={"competitions": comps}
-
+    competition_payload = comps if isinstance(comps,dict) else {"competitions": comps}
     plan=build_wm_plan(
         rows,
         competition_payload,
@@ -1383,10 +1345,10 @@ async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
                 live_warning=f"Live-Puzzle-Insights derzeit nicht möglich: {exc}"
 
     plan["data_mode"]=data_mode
-    plan["data_source"]="official_api_snapshot" if source=="snapshot" else source
+    plan["data_source"]=source
     plan["snapshot_id"]=snapshot_id
     plan["live_warning"]=live_warning
-    plan["resilient"]=bool(source=="legacy")
+    plan["resilient"]=True
     plan["legacy_result_count"]=len(rows) if source=="legacy" else None
     return plan
 

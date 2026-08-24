@@ -1936,6 +1936,16 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 }
 </style>
 
+
+<style id="npc-no-truncated-puzzle-names-v6132">
+@media(max-width:760px){
+  #wmWeeklyPlan .trainingPuzzleSession>summary,#medianGapFocus .trainingPuzzleSession>summary,#repeatPriority .trainingPuzzleSession>summary,#unsolvedLibrary .trainingPuzzleSession>summary{height:auto!important;max-height:none!important;overflow:visible!important;align-items:start!important}
+  #wmWeeklyPlan .trainingPuzzleSession .weeklySummaryText,#medianGapFocus .trainingPuzzleSession .weeklySummaryText,#repeatPriority .trainingPuzzleSession .weeklySummaryText,#unsolvedLibrary .trainingPuzzleSession .weeklySummaryText{height:auto!important;max-height:none!important;overflow:visible!important;align-self:start!important}
+  #wmWeeklyPlan .trainingPuzzleSession .weeklyPuzzleName,#medianGapFocus .trainingPuzzleSession .weeklyPuzzleName,#repeatPriority .trainingPuzzleSession .weeklyPuzzleName,#unsolvedLibrary .trainingPuzzleSession .weeklyPuzzleName{display:block!important;height:auto!important;max-height:none!important;min-height:0!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;-webkit-line-clamp:unset!important;-webkit-box-orient:initial!important;word-break:normal!important;overflow-wrap:anywhere!important}
+  #wmWeeklyPlan .trainingPuzzleSession .weeklySessionTitle,#wmWeeklyPlan .trainingPuzzleSession .weeklySessionTitle strong,#medianGapFocus .trainingPuzzleSession .weeklySessionTitle,#medianGapFocus .trainingPuzzleSession .weeklySessionTitle strong,#repeatPriority .trainingPuzzleSession .weeklySessionTitle,#repeatPriority .trainingPuzzleSession .weeklySessionTitle strong,#unsolvedLibrary .trainingPuzzleSession .weeklySessionTitle,#unsolvedLibrary .trainingPuzzleSession .weeklySessionTitle strong{display:block!important;height:auto!important;max-height:none!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;-webkit-line-clamp:unset!important;-webkit-box-orient:initial!important;word-break:normal!important;overflow-wrap:anywhere!important}
+}
+</style>
+
 </head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
@@ -2100,7 +2110,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 
 <div id="infoModal" class="modal" onclick="if(event.target===this)closeInfo()"><div class="modalbox"><div id="infoContent"></div><button class="secondary" onclick="closeInfo()">Schliessen</button></div></div>
 <script>
-const NPC_FRONTEND_VERSION='6.13.1';
+const NPC_FRONTEND_VERSION='6.13.2';
 function showInfo(type){
  const form=`<h2>ℹ️ Was bedeutet Form?</h2><p><b>Form</b> zeigt, ob Nicole aktuell schneller oder langsamer puzzelt als in der vorherigen Vergleichsperiode. Dafür werden die letzten 10 Solo-Ergebnisse mit den vorherigen 10 verglichen und auf <b>Zeit pro 100 Teile</b> normalisiert.</p><div class="scale"><div><b>Positiver Wert:</b> aktuell schneller. Beispiel +11,7 % = die normalisierte Zeit ist rund 11,7 % besser als zuvor.</div><div><b>Um 0 %:</b> Leistung weitgehend stabil.</div><div><b>Negativer Wert:</b> aktuell langsamer als in der vorherigen Periode.</div></div><p class="small">Die Zahl ist ein Trendindikator, keine Gewinnwahrscheinlichkeit und keine Prognose einer einzelnen Puzzlezeit.</p>`;
  const con=`<h2>ℹ️ Was bedeutet Konsistenz?</h2><p><b>Konsistenz</b> misst, wie ähnlich die letzten 10 normalisierten Solo-Leistungen sind. Auch hier wird Zeit pro 100 Teile verwendet, damit verschiedene Teilezahlen besser vergleichbar sind.</p><div class="scale"><div><b>90–100:</b> sehr konstante Leistungen</div><div><b>80–89:</b> gute bis hohe Konstanz</div><div><b>70–79:</b> merkliche Schwankungen</div><div><b>unter 70:</b> starke Schwankungen; Ursachen genauer analysieren</div></div><p class="small">Ein hoher Wert bedeutet nicht automatisch schnell. Ideal ist eine hohe Konsistenz zusammen mit einer starken bzw. steigenden Form.</p>`;
@@ -2600,7 +2610,7 @@ function updateTodaySummary(w){
 if('serviceWorker' in navigator){
   window.addEventListener('load',async()=>{
     try{
-      const reg=await navigator.serviceWorker.register('/sw.js?v=6131');
+      const reg=await navigator.serviceWorker.register('/sw.js?v=6132');
       await reg.update();
       let reloading=false;
       navigator.serviceWorker.addEventListener('controllerchange',()=>{
@@ -3213,6 +3223,6 @@ def dashboard():
             "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
             "Pragma": "no-cache",
             "Expires": "0",
-            "X-NPC-Version": "6.13.1",
+            "X-NPC-Version": "6.13.2",
         },
     )
