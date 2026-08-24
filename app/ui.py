@@ -1317,6 +1317,623 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 }
 </style>
 
+
+<style id="npc-final-mobile-visual-v3">
+@media(max-width:760px){
+
+  .trainingPuzzleSession,
+  #wmWeeklyPlan .weeklySession{
+    width:100%!important;max-width:100%!important;min-width:0!important;
+    margin:0 0 12px!important;border:1px solid #dfe5ec!important;
+    border-radius:16px!important;background:#fff!important;box-shadow:none!important;
+    overflow:hidden!important;box-sizing:border-box!important;
+  }
+
+  .trainingPuzzleSession>summary,
+  #wmWeeklyPlan .weeklySession>summary{
+    display:grid!important;
+    grid-template-columns:38px 92px minmax(0,1fr) 20px!important;
+    grid-template-rows:auto auto!important;
+    column-gap:12px!important;row-gap:10px!important;
+    width:100%!important;min-width:0!important;padding:14px!important;
+    align-items:center!important;box-sizing:border-box!important;
+  }
+
+  .trainingPuzzleSession .weeklyIndex,
+  #wmWeeklyPlan .weeklyIndex{
+    grid-column:1!important;grid-row:1 / 3!important;
+    justify-self:center!important;align-self:center!important;
+    width:38px!important;height:38px!important;min-width:38px!important;
+    margin:0!important;display:flex!important;align-items:center!important;
+    justify-content:center!important;border-radius:50%!important;
+    background:#f4f6f9!important;color:#475467!important;
+    font-size:15px!important;font-weight:800!important;
+  }
+
+  .trainingPuzzleSession .weeklyThumb,
+  #wmWeeklyPlan .weeklyThumb{
+    grid-column:2!important;grid-row:1 / 3!important;
+    width:92px!important;height:92px!important;min-width:92px!important;
+    max-width:92px!important;min-height:92px!important;max-height:92px!important;
+    margin:0!important;border-radius:14px!important;object-fit:cover!important;
+    background:#f4f6f9!important;align-self:center!important;justify-self:center!important;
+  }
+
+  .trainingPuzzleSession .weeklySummaryText,
+  #wmWeeklyPlan .weeklySummaryText{
+    grid-column:3!important;grid-row:1!important;
+    width:100%!important;min-width:0!important;max-width:100%!important;
+    margin:0!important;padding:0!important;align-self:end!important;
+  }
+
+  /* Training type/session heading: always wrap, never ellipsize */
+  .trainingPuzzleSession .weeklySessionTitle,
+  #wmWeeklyPlan .weeklySessionTitle,
+  .trainingPuzzleSession .weeklySessionTitle strong,
+  #wmWeeklyPlan .weeklySessionTitle strong{
+    display:block!important;width:100%!important;max-width:100%!important;min-width:0!important;
+    margin:0!important;padding:0!important;white-space:normal!important;
+    overflow:visible!important;text-overflow:clip!important;word-break:normal!important;
+    overflow-wrap:break-word!important;
+  }
+
+  .trainingPuzzleSession .weeklySessionTitle strong,
+  #wmWeeklyPlan .weeklySessionTitle strong{
+    color:#202939!important;font-size:16px!important;line-height:1.2!important;font-weight:800!important;
+  }
+
+  /* Puzzle name: readable up to three lines */
+  .trainingPuzzleSession .weeklyPuzzleName,
+  #wmWeeklyPlan .weeklyPuzzleName{
+    display:-webkit-box!important;-webkit-box-orient:vertical!important;-webkit-line-clamp:3!important;
+    width:100%!important;max-width:100%!important;min-width:0!important;margin:5px 0 0!important;
+    overflow:hidden!important;white-space:normal!important;text-overflow:ellipsis!important;
+    word-break:normal!important;overflow-wrap:break-word!important;color:#475467!important;
+    font-size:12.5px!important;line-height:1.28!important;font-weight:700!important;
+  }
+
+  .trainingPuzzleSession .weeklySummaryText>.small,
+  #wmWeeklyPlan .weeklySummaryText>.small{
+    display:-webkit-box!important;-webkit-box-orient:vertical!important;-webkit-line-clamp:3!important;
+    width:100%!important;max-width:100%!important;min-width:0!important;margin:5px 0 0!important;
+    overflow:hidden!important;white-space:normal!important;text-overflow:ellipsis!important;
+    word-break:normal!important;overflow-wrap:break-word!important;color:#667085!important;
+    font-size:11.5px!important;line-height:1.32!important;
+  }
+
+  .trainingPuzzleSession .weeklyIntensity,
+  #wmWeeklyPlan .weeklyIntensity{
+    position:static!important;float:none!important;display:inline-flex!important;
+    width:auto!important;max-width:100%!important;margin:6px 0 0!important;padding:5px 10px!important;
+    border:0!important;border-radius:999px!important;background:#f2f4f7!important;color:#475467!important;
+    font-size:11px!important;line-height:1!important;font-weight:600!important;white-space:nowrap!important;
+  }
+
+  .trainingPuzzleSession>summary:after,
+  #wmWeeklyPlan .weeklySession>summary:after{
+    grid-column:4!important;grid-row:1 / 3!important;align-self:center!important;
+    justify-self:center!important;margin:0!important;
+  }
+
+  .trainingPuzzleSession .skipBtnCompact,
+  #wmWeeklyPlan .skipBtnCompact{
+    grid-column:3!important;grid-row:2!important;justify-self:stretch!important;align-self:start!important;
+    display:block!important;width:100%!important;max-width:none!important;min-width:0!important;
+    min-height:42px!important;margin:0!important;padding:10px 12px!important;
+    border:1.5px solid #d98e8e!important;border-radius:12px!important;background:#fff!important;
+    color:#a53d3d!important;font-size:12.5px!important;line-height:1.15!important;font-weight:800!important;
+    white-space:normal!important;box-sizing:border-box!important;
+  }
+
+  .trainingPuzzleSession .weeklyDetail,
+  #wmWeeklyPlan .weeklyDetail,
+  #medianGapFocus .weeklyDetail,
+  #repeatPriority .weeklyDetail,
+  #unsolvedLibrary .weeklyDetail{
+    display:block!important;width:100%!important;max-width:100%!important;min-width:0!important;
+    margin:0!important;padding:12px 14px 14px!important;border-top:1px solid #edf0f4!important;
+    box-sizing:border-box!important;
+  }
+
+  .trainingPuzzleSession .weeklyFacts,
+  #wmWeeklyPlan .weeklyFacts,
+  .trainingFacts4{
+    display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+    gap:10px!important;width:100%!important;max-width:100%!important;min-width:0!important;
+    margin:0!important;box-sizing:border-box!important;
+  }
+
+  .trainingPuzzleSession .weeklyFact,
+  #wmWeeklyPlan .weeklyFact,
+  .trainingFacts4 .weeklyFact{
+    display:block!important;width:100%!important;min-width:0!important;max-width:none!important;
+    min-height:92px!important;margin:0!important;padding:12px!important;
+    border:1px solid #dfe5ec!important;border-radius:13px!important;background:#fbfcfd!important;
+    box-shadow:none!important;box-sizing:border-box!important;overflow:hidden!important;
+  }
+
+  .trainingPuzzleSession .weeklyFact span,
+  #wmWeeklyPlan .weeklyFact span,
+  .trainingFacts4 .weeklyFact span{
+    display:block!important;width:100%!important;max-width:100%!important;margin:0!important;
+    color:#737d8c!important;font-size:9.5px!important;line-height:1.18!important;font-weight:600!important;
+    text-transform:uppercase!important;letter-spacing:.025em!important;white-space:normal!important;
+    overflow-wrap:break-word!important;
+  }
+
+  .trainingPuzzleSession .weeklyFact strong,
+  #wmWeeklyPlan .weeklyFact strong,
+  .trainingFacts4 .weeklyFact strong{
+    display:block!important;width:100%!important;max-width:100%!important;min-width:0!important;
+    margin:7px 0 0!important;color:#273142!important;font-size:16px!important;line-height:1.18!important;
+    font-weight:800!important;white-space:normal!important;word-break:normal!important;
+    overflow-wrap:break-word!important;
+  }
+
+  .trainingCoachNote,
+  .weeklyCoachReason,
+  #wmWeeklyPlan .weeklyCoachReason{
+    display:block!important;width:100%!important;max-width:100%!important;min-width:0!important;
+    margin:10px 0 0!important;padding:12px 13px!important;border:1px solid #d7e3f2!important;
+    border-radius:13px!important;background:#f7faff!important;color:#5f6b7c!important;
+    font-size:11.5px!important;line-height:1.48!important;white-space:normal!important;
+    word-break:normal!important;overflow-wrap:break-word!important;box-sizing:border-box!important;
+  }
+
+  .trainingCoachNote strong,
+  .weeklyCoachReason strong,
+  #wmWeeklyPlan .weeklyCoachReason strong{
+    display:block!important;margin:0 0 5px!important;color:#344054!important;
+    font-size:12px!important;line-height:1.2!important;font-weight:800!important;
+  }
+
+  #wmWeeklyPlan{
+    display:block!important;width:100%!important;max-width:100%!important;min-width:0!important;
+  }
+  #wmWeeklyPlan .weeklySession{display:block!important;}
+
+  .trainingQuick{
+    width:100%!important;max-width:100%!important;min-width:0!important;margin:8px 0 12px!important;
+    padding:14px!important;border:1px solid #dfe5ec!important;border-radius:16px!important;
+    background:#fff!important;box-shadow:none!important;box-sizing:border-box!important;overflow:hidden!important;
+  }
+
+  .trainingQuickHero{
+    display:grid!important;grid-template-columns:104px minmax(0,1fr)!important;gap:14px!important;
+    width:100%!important;min-width:0!important;align-items:center!important;
+  }
+
+  .trainingQuickImage{
+    width:104px!important;height:104px!important;min-width:104px!important;max-width:104px!important;
+    border-radius:14px!important;object-fit:cover!important;
+  }
+
+  .trainingQuickMain{
+    width:100%!important;min-width:0!important;max-width:100%!important;
+  }
+  .trainingQuickMain strong,
+  .trainingQuickMain .small{
+    width:100%!important;max-width:100%!important;white-space:normal!important;
+    word-break:normal!important;overflow-wrap:break-word!important;
+  }
+
+  .trainingQuickStats{
+    display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+    gap:10px!important;width:100%!important;margin-top:12px!important;
+  }
+
+  .trainingQuickStats>div{
+    min-width:0!important;min-height:92px!important;padding:12px!important;
+    border:1px solid #dfe5ec!important;border-radius:13px!important;background:#fbfcfd!important;
+    box-sizing:border-box!important;
+  }
+
+  .trainingQuickReason{
+    width:100%!important;max-width:100%!important;margin-top:10px!important;padding:12px 13px!important;
+    border:1px solid #d7e3f2!important;border-radius:13px!important;background:#f7faff!important;
+    box-sizing:border-box!important;
+  }
+
+  .trainingQuickAction,
+  .trainingQuickAction .skipBtn{
+    width:100%!important;max-width:100%!important;box-sizing:border-box!important;
+  }
+
+  #appTraining,
+  #appTraining *,
+  .trainingPuzzleSession,
+  .trainingPuzzleSession *,
+  #wmWeeklyPlan,
+  #wmWeeklyPlan *,
+  .trainingQuick,
+  .trainingQuick *{box-sizing:border-box!important;}
+
+  #appTraining,
+  .trainingPuzzleSession,
+  #wmWeeklyPlan .weeklySession,
+  .trainingQuick{max-width:100%!important;}
+}
+</style>
+
+
+<style id="npc-final-mobile-visual-v4">
+@media(max-width:760px){
+
+  /* HIGH-SPECIFICITY FINAL LAYER: overrides all earlier !important mobile rules. */
+
+  #appTraining #wmWeeklyPlan .weeklySession>summary,
+  #appTraining #medianGapFocus .trainingPuzzleSession>summary,
+  #appTraining #repeatPriority .trainingPuzzleSession>summary,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession>summary{
+    display:grid!important;
+    grid-template-columns:38px 92px minmax(0,1fr) 20px!important;
+    grid-template-rows:auto auto!important;
+    column-gap:12px!important;
+    row-gap:10px!important;
+    align-items:center!important;
+    width:100%!important;
+    min-width:0!important;
+    padding:14px!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklySession .weeklyIndex,
+  #appTraining #medianGapFocus .trainingPuzzleSession .weeklyIndex,
+  #appTraining #repeatPriority .trainingPuzzleSession .weeklyIndex,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession .weeklyIndex{
+    grid-column:1!important;grid-row:1 / 3!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklySession .weeklyThumb,
+  #appTraining #medianGapFocus .trainingPuzzleSession .weeklyThumb,
+  #appTraining #repeatPriority .trainingPuzzleSession .weeklyThumb,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession .weeklyThumb{
+    grid-column:2!important;grid-row:1 / 3!important;
+    width:92px!important;height:92px!important;min-width:92px!important;
+    max-width:92px!important;min-height:92px!important;max-height:92px!important;
+    border-radius:14px!important;object-fit:cover!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklySession .weeklySummaryText,
+  #appTraining #medianGapFocus .trainingPuzzleSession .weeklySummaryText,
+  #appTraining #repeatPriority .trainingPuzzleSession .weeklySummaryText,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession .weeklySummaryText{
+    grid-column:3!important;grid-row:1!important;
+    width:100%!important;max-width:100%!important;min-width:0!important;
+    padding:0!important;margin:0!important;
+  }
+
+  /* Never abbreviate the training type. "Turniersimulation" and
+     "Konstanztraining" wrap naturally instead of becoming Turniersim… */
+  #appTraining #wmWeeklyPlan .weeklySession .weeklySessionTitle,
+  #appTraining #wmWeeklyPlan .weeklySession .weeklySessionTitle strong,
+  #appTraining #medianGapFocus .trainingPuzzleSession .weeklySessionTitle,
+  #appTraining #medianGapFocus .trainingPuzzleSession .weeklySessionTitle strong,
+  #appTraining #repeatPriority .trainingPuzzleSession .weeklySessionTitle,
+  #appTraining #repeatPriority .trainingPuzzleSession .weeklySessionTitle strong,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession .weeklySessionTitle,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession .weeklySessionTitle strong{
+    display:block!important;
+    width:100%!important;max-width:100%!important;min-width:0!important;
+    white-space:normal!important;
+    overflow:visible!important;
+    text-overflow:clip!important;
+    -webkit-line-clamp:unset!important;
+    -webkit-box-orient:initial!important;
+    word-break:normal!important;
+    overflow-wrap:break-word!important;
+    line-height:1.2!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklySession .weeklyIntensity,
+  #appTraining #repeatPriority .trainingPuzzleSession .weeklyIntensity{
+    position:static!important;
+    float:none!important;
+    display:inline-flex!important;
+    margin:6px 0 0!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklySession .weeklyPuzzleName,
+  #appTraining #medianGapFocus .trainingPuzzleSession .weeklyPuzzleName,
+  #appTraining #repeatPriority .trainingPuzzleSession .weeklyPuzzleName,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession .weeklyPuzzleName{
+    width:100%!important;max-width:100%!important;min-width:0!important;
+    white-space:normal!important;
+    word-break:normal!important;
+    overflow-wrap:break-word!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklySession .weeklySummaryText>.small,
+  #appTraining #medianGapFocus .trainingPuzzleSession .weeklySummaryText>.small,
+  #appTraining #repeatPriority .trainingPuzzleSession .weeklySummaryText>.small,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession .weeklySummaryText>.small{
+    width:100%!important;max-width:100%!important;min-width:0!important;
+    white-space:normal!important;
+    word-break:normal!important;
+    overflow-wrap:break-word!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklySession .skipBtnCompact,
+  #appTraining #medianGapFocus .trainingPuzzleSession .skipBtnCompact,
+  #appTraining #repeatPriority .trainingPuzzleSession .skipBtnCompact,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession .skipBtnCompact{
+    grid-column:3!important;grid-row:2!important;
+    width:100%!important;max-width:none!important;min-width:0!important;
+    min-height:42px!important;margin:0!important;padding:10px 12px!important;
+    justify-self:stretch!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklySession>summary:after,
+  #appTraining #medianGapFocus .trainingPuzzleSession>summary:after,
+  #appTraining #repeatPriority .trainingPuzzleSession>summary:after,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession>summary:after{
+    grid-column:4!important;grid-row:1 / 3!important;
+  }
+
+  /* IDENTICAL expanded detail geometry */
+  #appTraining #wmWeeklyPlan .weeklySession>.weeklyDetail,
+  #appTraining #medianGapFocus .trainingPuzzleSession>.weeklyDetail,
+  #appTraining #repeatPriority .trainingPuzzleSession>.weeklyDetail,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession>.weeklyDetail{
+    width:100%!important;max-width:100%!important;min-width:0!important;
+    margin:0!important;padding:13px 14px 14px!important;
+    border-top:1px solid #edf0f4!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklyFacts,
+  #appTraining #medianGapFocus .trainingFacts4,
+  #appTraining #repeatPriority .trainingFacts4,
+  #appTraining #unsolvedLibrary .trainingFacts4{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+    gap:9px!important;
+    width:100%!important;max-width:100%!important;min-width:0!important;
+    margin:0!important;
+  }
+
+  /* SAME metric cards and icon geometry in every detail section */
+  #appTraining #wmWeeklyPlan .weeklyFact,
+  #appTraining #medianGapFocus .weeklyFact,
+  #appTraining #repeatPriority .weeklyFact,
+  #appTraining #unsolvedLibrary .weeklyFact{
+    position:relative!important;
+    width:100%!important;min-width:0!important;max-width:none!important;
+    min-height:88px!important;
+    padding:12px 10px 11px 46px!important;
+    border:1px solid #e3e8ef!important;
+    border-radius:13px!important;
+    background:#fbfcfe!important;
+    overflow:hidden!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklyFact:before,
+  #appTraining #medianGapFocus .weeklyFact:before,
+  #appTraining #repeatPriority .weeklyFact:before,
+  #appTraining #unsolvedLibrary .weeklyFact:before{
+    position:absolute!important;
+    left:12px!important;top:20px!important;
+    width:24px!important;
+    font-size:21px!important;line-height:1!important;
+    font-weight:700!important;text-align:center!important;
+  }
+
+  /* Existing semantic icon scheme kept for the three analysis lists. */
+  #appTraining #medianGapFocus .weeklyFact:nth-child(1):before{content:'◷';color:#3b82f6!important}
+  #appTraining #medianGapFocus .weeklyFact:nth-child(2):before{content:'▥';color:#65b84f!important}
+  #appTraining #medianGapFocus .weeklyFact:nth-child(3):before{content:'↕';color:#7654c6!important}
+  #appTraining #medianGapFocus .weeklyFact:nth-child(4):before{content:'%';color:#e58416!important}
+
+  #appTraining #repeatPriority .weeklyFact:nth-child(1):before{content:'◷';color:#3b82f6!important}
+  #appTraining #repeatPriority .weeklyFact:nth-child(2):before{content:'★';color:#e9ad18!important}
+  #appTraining #repeatPriority .weeklyFact:nth-child(3):before{content:'▥';color:#65b84f!important}
+  #appTraining #repeatPriority .weeklyFact:nth-child(4):before{content:'▣';color:#7c4fd0!important}
+
+  #appTraining #unsolvedLibrary .weeklyFact:nth-child(1):before{content:'◆';color:#3b82f6!important}
+  #appTraining #unsolvedLibrary .weeklyFact:nth-child(2):before{content:'▥';color:#e58416!important}
+  #appTraining #unsolvedLibrary .weeklyFact:nth-child(3):before{content:'↗';color:#55a944!important}
+  #appTraining #unsolvedLibrary .weeklyFact:nth-child(4):before{content:'◎';color:#7c4fd0!important}
+
+  /* Weekly-plan details now use the SAME icon treatment. */
+  #appTraining #wmWeeklyPlan .weeklyFact:nth-child(1):before{content:'▥';color:#65b84f!important}
+  #appTraining #wmWeeklyPlan .weeklyFact:nth-child(2):before{content:'◷';color:#3b82f6!important}
+  #appTraining #wmWeeklyPlan .weeklyFact:nth-child(3):before{content:'↕';color:#7654c6!important}
+  #appTraining #wmWeeklyPlan .weeklyFact:nth-child(4):before{content:'↗';color:#55a944!important}
+  #appTraining #wmWeeklyPlan .weeklyFact:nth-child(5):before{content:'%';color:#e58416!important}
+  #appTraining #wmWeeklyPlan .weeklyFact:nth-child(6):before{content:'◎';color:#7c4fd0!important}
+
+  #appTraining #wmWeeklyPlan .weeklyFact span,
+  #appTraining #medianGapFocus .weeklyFact span,
+  #appTraining #repeatPriority .weeklyFact span,
+  #appTraining #unsolvedLibrary .weeklyFact span{
+    display:block!important;
+    font-size:9px!important;line-height:1.15!important;
+    color:#667085!important;font-weight:600!important;
+    text-transform:uppercase!important;letter-spacing:.035em!important;
+    white-space:normal!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklyFact strong,
+  #appTraining #medianGapFocus .weeklyFact strong,
+  #appTraining #repeatPriority .weeklyFact strong,
+  #appTraining #unsolvedLibrary .weeklyFact strong{
+    display:block!important;
+    margin-top:5px!important;
+    color:#202939!important;
+    font-size:15px!important;line-height:1.18!important;font-weight:800!important;
+    white-space:normal!important;word-break:normal!important;overflow-wrap:break-word!important;
+  }
+
+  /* SAME Coach component + blue star everywhere. */
+  #appTraining #wmWeeklyPlan .weeklyCoachReason,
+  #appTraining #medianGapFocus .trainingCoachNote,
+  #appTraining #repeatPriority .trainingCoachNote,
+  #appTraining #unsolvedLibrary .trainingCoachNote{
+    position:relative!important;
+    width:100%!important;max-width:100%!important;min-width:0!important;
+    margin:10px 0 0!important;
+    padding:12px 12px 12px 40px!important;
+    border:1px solid #d8e5f5!important;
+    border-radius:13px!important;background:#f7faff!important;
+    color:#5f6b7c!important;font-size:11px!important;line-height:1.45!important;
+    white-space:normal!important;word-break:normal!important;overflow-wrap:break-word!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklyCoachReason:before,
+  #appTraining #medianGapFocus .trainingCoachNote:before,
+  #appTraining #repeatPriority .trainingCoachNote:before,
+  #appTraining #unsolvedLibrary .trainingCoachNote:before{
+    content:'★'!important;
+    position:absolute!important;left:13px!important;top:12px!important;
+    color:#3b82f6!important;font-size:17px!important;line-height:1!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklyCoachReason strong,
+  #appTraining #medianGapFocus .trainingCoachNote strong,
+  #appTraining #repeatPriority .trainingCoachNote strong,
+  #appTraining #unsolvedLibrary .trainingCoachNote strong{
+    display:block!important;
+    margin:0 0 5px!important;
+    color:#344054!important;font-size:12px!important;font-weight:800!important;
+  }
+
+  /* Adaptive Preparation: same metric-card and Coach visual style.
+     Existing content/order remains unchanged. */
+  #appTraining .trainingQuick .trainingQuickStats,
+  #appTraining .trainingQuick .trainingQuickFacts{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+    gap:9px!important;width:100%!important;
+  }
+
+  #appTraining .trainingQuick .trainingQuickStats>div,
+  #appTraining .trainingQuick .trainingQuickFacts>div{
+    position:relative!important;
+    min-width:0!important;min-height:88px!important;
+    padding:12px 10px 11px 46px!important;
+    border:1px solid #e3e8ef!important;border-radius:13px!important;
+    background:#fbfcfe!important;overflow:hidden!important;
+  }
+
+  #appTraining .trainingQuick .trainingQuickStats>div:before,
+  #appTraining .trainingQuick .trainingQuickFacts>div:before{
+    position:absolute!important;left:12px!important;top:20px!important;
+    width:24px!important;font-size:21px!important;line-height:1!important;
+    font-weight:700!important;text-align:center!important;
+  }
+
+  #appTraining .trainingQuick .trainingQuickStats>div:nth-child(1):before{content:'◎';color:#7c4fd0!important}
+  #appTraining .trainingQuick .trainingQuickStats>div:nth-child(2):before{content:'↗';color:#55a944!important}
+  #appTraining .trainingQuick .trainingQuickFacts>div:nth-child(1):before{content:'▥';color:#65b84f!important}
+  #appTraining .trainingQuick .trainingQuickFacts>div:nth-child(2):before{content:'◷';color:#3b82f6!important}
+  #appTraining .trainingQuick .trainingQuickFacts>div:nth-child(3):before{content:'↕';color:#7654c6!important}
+  #appTraining .trainingQuick .trainingQuickFacts>div:nth-child(4):before{content:'◎';color:#7c4fd0!important}
+
+  #appTraining .trainingQuick .trainingQuickReason{
+    position:relative!important;
+    padding:12px 12px 12px 40px!important;
+    border:1px solid #d8e5f5!important;border-radius:13px!important;background:#f7faff!important;
+  }
+
+  #appTraining .trainingQuick .trainingQuickReason:before{
+    content:'★'!important;position:absolute!important;left:13px!important;top:12px!important;
+    color:#3b82f6!important;font-size:17px!important;line-height:1!important;
+  }
+}
+</style>
+
+
+<style id="npc-final-mobile-visual-v5">
+@media(max-width:760px){
+  /* More text width in the shared mobile card header.
+     Same structure, only compact geometry. */
+  #appTraining #wmWeeklyPlan .weeklySession>summary,
+  #appTraining #medianGapFocus .trainingPuzzleSession>summary,
+  #appTraining #repeatPriority .trainingPuzzleSession>summary,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession>summary{
+    grid-template-columns:32px 78px minmax(0,1fr) 16px!important;
+    column-gap:8px!important;
+    padding:12px!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklySession .weeklyIndex,
+  #appTraining #medianGapFocus .trainingPuzzleSession .weeklyIndex,
+  #appTraining #repeatPriority .trainingPuzzleSession .weeklyIndex,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession .weeklyIndex{
+    width:32px!important;height:32px!important;min-width:32px!important;
+    font-size:14px!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklySession .weeklyThumb,
+  #appTraining #medianGapFocus .trainingPuzzleSession .weeklyThumb,
+  #appTraining #repeatPriority .trainingPuzzleSession .weeklyThumb,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession .weeklyThumb{
+    width:78px!important;height:78px!important;min-width:78px!important;max-width:78px!important;
+    min-height:78px!important;max-height:78px!important;border-radius:12px!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklySession .weeklySessionTitle strong,
+  #appTraining #medianGapFocus .trainingPuzzleSession .weeklySessionTitle strong,
+  #appTraining #repeatPriority .trainingPuzzleSession .weeklySessionTitle strong,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession .weeklySessionTitle strong{
+    font-size:15px!important;
+    line-height:1.18!important;
+    overflow-wrap:normal!important;
+    word-break:normal!important;
+    hyphens:auto!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklySession .weeklyPuzzleName,
+  #appTraining #medianGapFocus .trainingPuzzleSession .weeklyPuzzleName,
+  #appTraining #repeatPriority .trainingPuzzleSession .weeklyPuzzleName,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession .weeklyPuzzleName{
+    font-size:12px!important;
+    line-height:1.25!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklySession .weeklySummaryText>.small,
+  #appTraining #medianGapFocus .trainingPuzzleSession .weeklySummaryText>.small,
+  #appTraining #repeatPriority .trainingPuzzleSession .weeklySummaryText>.small,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession .weeklySummaryText>.small{
+    font-size:11px!important;
+  }
+}
+</style>
+
+
+<style id="npc-final-mobile-visual-v6">
+@media(max-width:380px){
+  #appTraining #wmWeeklyPlan .weeklySession>summary,
+  #appTraining #medianGapFocus .trainingPuzzleSession>summary,
+  #appTraining #repeatPriority .trainingPuzzleSession>summary,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession>summary{
+    grid-template-columns:28px 68px minmax(0,1fr) 14px!important;
+    column-gap:6px!important;
+    padding:10px!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklySession .weeklyIndex,
+  #appTraining #medianGapFocus .trainingPuzzleSession .weeklyIndex,
+  #appTraining #repeatPriority .trainingPuzzleSession .weeklyIndex,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession .weeklyIndex{
+    width:28px!important;height:28px!important;min-width:28px!important;font-size:13px!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklySession .weeklyThumb,
+  #appTraining #medianGapFocus .trainingPuzzleSession .weeklyThumb,
+  #appTraining #repeatPriority .trainingPuzzleSession .weeklyThumb,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession .weeklyThumb{
+    width:68px!important;height:68px!important;min-width:68px!important;max-width:68px!important;
+    min-height:68px!important;max-height:68px!important;border-radius:11px!important;
+  }
+
+  #appTraining #wmWeeklyPlan .weeklySession .weeklySessionTitle strong,
+  #appTraining #medianGapFocus .trainingPuzzleSession .weeklySessionTitle strong,
+  #appTraining #repeatPriority .trainingPuzzleSession .weeklySessionTitle strong,
+  #appTraining #unsolvedLibrary .trainingPuzzleSession .weeklySessionTitle strong{
+    font-size:14px!important;
+  }
+}
+</style>
+
 </head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
