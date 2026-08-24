@@ -1946,6 +1946,18 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 }
 </style>
 
+
+<style id="npc-difficulty-display-clean">
+@media(max-width:760px){
+  #unsolvedLibrary .difficultyDelta{
+    display:block!important;
+    margin-top:4px!important;
+    white-space:nowrap!important;
+    line-height:1.15!important;
+  }
+}
+</style>
+
 </head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
@@ -2413,7 +2425,7 @@ async function loadUnsolvedLibrary(){
          let dp=Number(dpRaw);
          if(Number.isFinite(dp)){
            if(dp>=0.25 && dp<=3.0) dp=(dp-1)*100;
-           diff+=` · ${dp>0?'+':''}${dp.toFixed(1)}% ggü. Ø`;
+           diff+=`<br><span class="difficultyDelta">${dp>0?'+':''}${dp.toFixed(1)}% ggü. Ø</span>`;
          }
        }else if(diffObj && typeof diffObj!=='object'){ diff=String(diffObj); }
      }catch(_){}
