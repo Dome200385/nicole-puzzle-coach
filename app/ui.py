@@ -296,15 +296,6 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <section class="card kpi third" data-app-page="today"><div class="label">WM-Readiness <button class="infoBtn" onclick="showInfo('readiness')">i</button></div><div class="value" id="readinessTopKpi">–</div><div class="small">50 = MSP-Median-Niveau · 60+ = solide WM-Form</div></section>
 <section class="card kpi third" data-app-page="today"><div class="label">Konsistenz <button class="infoBtn" onclick="showInfo('consistency')">i</button></div><div class="value" id="consistencyKpi">–</div><div class="small">median-relative Stabilität · 0–100</div></section>
 
-<section id="resilientBanner" class="card full" data-app-page="today" style="display:none;background:#fff8e6;border-color:#f0d99b">
-  <strong>🛡️ Resilient Mode</strong>
-  <div id="resilientText" class="small" style="margin-top:4px"></div>
-</section>
-
-
-
-
-
 <section class="card half hero appSection" id="appToday" data-app-page="today"><h2>🏆 Mein nächstes Turnier</h2><div id="nextMspCompetition" class="small">Prüfe bestätigte Anmeldung…</div></section>
 <section class="card half hero" data-app-page="today"><h2>🎯 Coach-Empfehlung</h2><div id="coachRecommendation" class="small">Analysiere MySpeedPuzzling-Ergebnisse…</div></section>
 
@@ -1376,25 +1367,10 @@ async function loadAll(){renderUnavailable();
        return `<details class="item weeklySession"${i===0?' open':''}><summary><div class="weeklyIndex">${i+1}</div>${compactImage}<div class="weeklySummaryText"><div class="weeklySessionTitle"><strong>${s.session}</strong><span class="pill weeklyIntensity">${s.intensity}</span></div>${displayName?`<div class="weeklyPuzzleName">${displayName}</div>`:''}<div class="small">${s.goal}</div></div></summary>${detail}</details>`;
      }).join('')||'<div class="small">Kein Trainingsplan verfügbar.</div>';
    }
+   // Competition cards are rendered only from /msp/my-competitions.
+   // Resilient/fallback state remains internal and is intentionally not shown
+   // as a user-facing banner.
 
-   const resilientBannerEl=document.getElementById('resilientBanner');
-   const resilientTextEl=document.getElementById('resilientText');
-   // Resilient Mode requires TWO independent backend signals:
-   // 1) /coach/status says the core source is legacy, and
-   // 2) /coach/wm-plan explicitly says resilient=true.
-   // A normal official API SyncSnapshot can therefore never show this banner.
-   if(w.resilient===true && coreDataSource==='legacy'){
-     if(resilientBannerEl) resilientBannerEl.style.display='block';
-     if(resilientTextEl) resilientTextEl.innerHTML=`MySpeedPuzzling-Kerndaten sind aktuell nicht aus einem verwertbaren offiziellen Sync verfügbar. Der Coach rekonstruiert die Vorbereitung aus <strong>${w.legacy_result_count||0} historischen Trainingsdatensätzen</strong>.${w.live_warning?`<br>${w.live_warning}`:''}`;
-     mspKpi.textContent='LEGACY';
-     mspText.textContent='Historische DB-Daten aktiv';
-   }else{
-     if(resilientBannerEl) resilientBannerEl.style.display='none';
-     mspKpi.textContent='LIVE';
-     mspText.textContent='MySpeedPuzzling live verbunden · MSP Live-Sync aktiv';
-   }
-   // Competition cards are rendered only from /msp/my-competitions below.
-   // Do not let wm-plan overwrite the complete confirmed competition list.
    wmReadiness.textContent=w.readiness_score==null?'–':w.readiness_score+'/100';
    updateTodaySummary(w);
    updateTrainingQuick(w);
@@ -1482,8 +1458,6 @@ async function loadAll(){renderUnavailable();
 
  }catch(e){
    wmRecommendation.textContent='WM-Coach konnte nicht live aktualisiert werden. Der letzte Server-Snapshot bleibt erhalten.';
-   if(resilientBannerEl) resilientBannerEl.style.display='none';
-   // A UI/rendering or auxiliary live error must never falsely label current MSP data as Resilient Mode.
  }
 
 
