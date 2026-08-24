@@ -1947,12 +1947,14 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 </style>
 
 
-<style id="npc-difficulty-display-clean">
+
+<style id="npc-difficulty-display-final">
 @media(max-width:760px){
-  #unsolvedLibrary .difficultyDelta{
+  #unsolvedLibrary .weeklyFact strong .difficultyDelta{
     display:block!important;
-    margin-top:4px!important;
+    margin-top:5px!important;
     white-space:nowrap!important;
+    font-size:.95em!important;
     line-height:1.15!important;
   }
 }
@@ -2413,6 +2415,8 @@ async function loadUnsolvedLibrary(){
   el.innerHTML=`<div class="small trainingListIntro"><strong>${d.count}</strong> Puzzle ohne Solo-Ergebnis.</div>`+
    d.items.filter(p=>!isPuzzleUnavailable(p)).map((p,i)=>{
      let diff='–';
+     let diffLabel='–';
+     let diffDelta='';
      try{
        const insight=p.msp_insights||p.insights||p.puzzle?.msp_insights||p.puzzle?.insights||{};
        const diffObj=p.difficulty||insight.difficulty||p.puzzle?.difficulty||{};
@@ -2421,13 +2425,18 @@ async function loadUnsolvedLibrary(){
        const dpRaw=p.difficulty_percent??p.msp_difficulty_percent??insight.difficulty_percent??
                    diffObj.percent??diffObj.percentage??p.puzzle?.difficulty_percent??p.puzzle?.msp_difficulty_percent;
        if(dl){
-         diff=String(dl);
+         diffLabel=String(dl);
+         diff=diffLabel;
          let dp=Number(dpRaw);
          if(Number.isFinite(dp)){
            if(dp>=0.25 && dp<=3.0) dp=(dp-1)*100;
-           diff+=`<br><span class="difficultyDelta">${dp>0?'+':''}${dp.toFixed(1)}% ggü. Ø</span>`;
+           diffDelta=`${dp>0?'+':''}${dp.toFixed(1)}% ggü. Ø`;
+           diff=`${diffLabel} · ${diffDelta}`;
          }
-       }else if(diffObj && typeof diffObj!=='object'){ diff=String(diffObj); }
+       }else if(diffObj && typeof diffObj!=='object'){
+         diffLabel=String(diffObj);
+         diff=diffLabel;
+       }
      }catch(_){}
      let pred='–';
      try{
@@ -2453,7 +2462,7 @@ async function loadUnsolvedLibrary(){
      <div class="weeklyDetail">
        <div class="weeklyFacts trainingFacts4">
          <div class="weeklyFact"><span>Teile</span><strong>${p.pieces||'–'}</strong></div>
-         <div class="weeklyFact"><span>Difficulty</span><strong>${readinessEsc(diff)}</strong></div>
+         <div class="weeklyFact"><span>Difficulty</span><strong>${readinessEsc(diffLabel)}${diffDelta?`<span class="difficultyDelta">${readinessEsc(diffDelta)}</span>`:''}</strong></div>
          <div class="weeklyFact"><span>MSP Prediction</span><strong>${readinessEsc(pred)}</strong></div>
          <div class="weeklyFact"><span>Status</span><strong>First Try</strong></div>
        </div>
