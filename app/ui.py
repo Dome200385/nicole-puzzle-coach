@@ -1203,6 +1203,18 @@ async function runResultCompetitionReverseMap(){
  }
 }
 
+
+function renderCompetitionTerminalState(message){
+  const ids=['nextTournament','nextTournamentBody','confirmedCompetitions','confirmedCompetitionsList'];
+  ids.map(id=>document.getElementById(id)).filter(Boolean).forEach(el=>{
+    const t=(el.textContent||'');
+    if(t.includes('Prüfe bestätigte Anmeldung') || !t.trim()){
+      el.innerHTML=`<div class="small">${readinessEsc(message)}</div>`;
+    }
+  });
+}
+setTimeout(()=>renderCompetitionTerminalState('Turnierdaten momentan nicht verfügbar.'),15000);
+
 async function loadAll(){renderUnavailable();
  let coreHasMspData=false;
  // Performance V6.9.6: independent API calls start immediately in parallel.
@@ -1216,7 +1228,7 @@ async function loadAll(){renderUnavailable();
  ]);
  const competitionsPromise=Promise.race([
    getj('/msp/my-competitions?limit=30'),
-   new Promise((_,reject)=>setTimeout(()=>reject(new Error('competition_timeout')),6500))
+   new Promise((_,reject)=>setTimeout(()=>reject(new Error('competition_timeout')),14000))
  ]);
 
  try{let st=await statusPromise;coreHasMspData=!!st.has_myspeedpuzzling_data;systemKpi.textContent='OK';systemText.textContent=`Backend V${st.version} · Datenbank ok`;systemBadge.textContent='🟢 System bereit';mspKpi.textContent=st.has_myspeedpuzzling_data?'DATA':(st.pat_configured?'PAT':(st.oauth_configured?'READY':'WAIT'));mspText.textContent=st.data_source==='legacy'?'Historische DB-Daten aktiv':(st.has_myspeedpuzzling_data?`Letzter Datenstand verfügbar · Snapshot #${st.latest_snapshot_id||'–'}`:(st.pat_configured?'PAT eingerichtet · noch kein Snapshot':'Verbindung möglich'))}catch(e){systemBadge.textContent='🔴 Fehler'}

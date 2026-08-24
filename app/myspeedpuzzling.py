@@ -9,6 +9,12 @@ from app.config import (
     MSP_CLIENT_ID, MSP_CLIENT_SECRET, MSP_SCOPES
 )
 
+
+# V6.12.8 shared competition cache / single-flight
+_COMPETITIONS_SHARED_CACHE = {"payload": None, "fetched_at": 0.0}
+_COMPETITIONS_SHARED_LOCK = asyncio.Lock()
+_COMPETITIONS_SHARED_TTL = 900.0
+
 MSP_USER_AGENT = "NicolePuzzleCoach/6.8.6"
 _API_CACHE = {}
 _API_CACHE_DEFAULT_SECONDS = 5 * 60
@@ -246,6 +252,39 @@ async def get_competitions(token, status="all", online=False, country=None, cach
     if country:
         params["country"] = country
     return await api_get(token, "/competitions", params, cache=cache)
+
+
+async def get_competitions_shared(token, *, refresh=False, max_age=None):
+    """
+    Centralized MSP competition fetch:
+    one outbound request at a time + shared 15-minute in-process cache.
+    """
+    ttl = _COMPETITIONS_SHARED_TTL if max_age is None else float(max_age)
+    now = time.monotonic()
+    payload = _COMPETITIONS_SHARED_CACHE.get("payload")
+    fetched_at = float(_COMPETITIONS_SHARED_CACHE.get("fetched_at") or 0.0)
+
+    if (not refresh) and payload is not None and (now - fetched_at) < ttl:
+        return payload
+
+    async with _COMPETITIONS_SHARED_LOCK:
+        now = time.monotonic()
+        payload = _COMPETITIONS_SHARED_CACHE.get("payload")
+        fetched_at = float(_COMPETITIONS_SHARED_CACHE.get("fetched_at") or 0.0)
+
+        if (not refresh) and payload is not None and (now - fetched_at) < ttl:
+            return payload
+
+        payload = await get_competitions(
+            token,
+            status="all",
+            online=False,
+            cache=not refresh
+        )
+        _COMPETITIONS_SHARED_CACHE["payload"] = payload
+        _COMPETITIONS_SHARED_CACHE["fetched_at"] = time.monotonic()
+        return payload
+
 
 async def get_competition(token, competition_id, cache=True):
     return await api_get(token, f"/competitions/{competition_id}", cache=cache)

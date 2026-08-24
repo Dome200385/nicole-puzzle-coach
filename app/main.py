@@ -17,6 +17,7 @@ from app.db_models import OAuthToken, SyncSnapshot, Tournament, TrainingSession
 from app.schemas import TournamentCreate, TrainingSessionCreate
 from app.crypto import encrypt_text, decrypt_text
 from app.myspeedpuzzling import (
+    get_competitions_shared,
     build_authorize_url, exchange_code, refresh_access_token,
     get_profile, get_results, get_statistics, get_collections, get_library, api_get,
     get_competitions, get_competition, upcoming_competitions,
@@ -33,7 +34,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.12.7",
+    version="6.12.8",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -282,7 +283,7 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.12.7","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.12.8","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 
 def _ensure_readiness_history_table(db):
@@ -364,7 +365,7 @@ def pwa_manifest():
 
 @app.get("/sw.js")
 def pwa_service_worker():
-    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v6127';
+    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v6128';
 const SHELL=['/manifest.webmanifest','/pwa/icon-192.png','/pwa/icon-512.png','/pwa/icon-maskable-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(SHELL)).catch(()=>{}));
@@ -402,7 +403,7 @@ def pwa_asset(filename:str):
     return FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.12.7"}
+def health(): return {"status":"ok","version":"6.12.8"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -417,7 +418,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.12.7",
+        "version":"6.12.8",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -535,7 +536,7 @@ async def sync(db:Session=Depends(get_db)):
 
         confirmed=[]
         try:
-            comp_payload=await get_competitions(token,status="all",online=False,cache=False)
+            comp_payload=await get_competitions_shared(token,refresh=True)
             comp_rows=comp_payload.get("competitions",[]) if isinstance(comp_payload,dict) else (comp_payload if isinstance(comp_payload,list) else [])
             confirmed_slugs={"world-jigsaw-puzzle-championship-2026","swiss-championship-2026"}
             for c in comp_rows:
@@ -616,15 +617,15 @@ async def msp_api_test(db:Session=Depends(get_db)):
         return {"ok":False,"mode":"pat","reason":"MSP_PERSONAL_ACCESS_TOKEN not configured"}
     try:
         profile=await get_profile(token)
-        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.12.7","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
+        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.12.8","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
     except Exception as exc:
-        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.12.7","error":str(exc)}
+        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.12.8","error":str(exc)}
 
 @app.get("/msp/sync-status")
 def msp_sync_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     return {
-        "version":"6.12.7",
+        "version":"6.12.8",
         "snapshot_id":snap.id if snap else None,
         "synced_at":snap.synced_at if snap else None,
         "data_available":snap is not None,
@@ -797,48 +798,62 @@ def _confirmed_from_live_competition_list(payload):
     confirmed.sort(key=lambda c:str(c.get("date_from") or "9999"))
     return confirmed
 
+
+def _confirmed_from_snapshot(db):
+    try:
+        snap=_latest_snapshot(db)
+        if not snap:
+            return []
+        payload=_snapshot_payload(snap)
+        rows=payload.get("confirmed_competitions") or []
+        out=[]
+        for row in rows:
+            if not isinstance(row,dict):
+                continue
+            slug=str(row.get("slug") or "").strip().lower()
+            if slug in _CONFIRMED_COMPETITION_SLUGS:
+                item=dict(row)
+                item["registered"]=True
+                item["registration_source"]="last_official_snapshot"
+                out.append(item)
+        out.sort(key=lambda c:str(c.get("date_from") or "9999"))
+        return out
+    except Exception:
+        return []
+
+
 @app.get("/msp/my-competitions")
-async def my_competitions(
-    limit:int=30,
-    refresh:bool=False,
-    db:Session=Depends(get_db)
-):
-    """
-    V6.12.7 fast confirmed-tournament bridge.
-    One MSP competition-list request only; no per-competition detail probing.
-    """
-    live_rows=[]
-    api_error=None
+async def my_competitions(limit:int=30, refresh:bool=False, db:Session=Depends(get_db)):
     confirmed=[]
+    api_error=None
+    api_count=0
+    source="live_msp_metadata"
     try:
         token=await _valid_access_token(db)
         payload=await asyncio.wait_for(
-            get_competitions(token,status="all",online=False,cache=not refresh),
-            timeout=10.0
+            get_competitions_shared(token,refresh=refresh),
+            timeout=12.0
         )
         if isinstance(payload,dict):
-            live_rows=payload.get("competitions") or payload.get("data") or payload.get("items") or []
+            rows=payload.get("competitions") or payload.get("data") or payload.get("items") or []
         elif isinstance(payload,list):
-            live_rows=payload
+            rows=payload
+        else:
+            rows=[]
+        api_count=len(rows)
         confirmed=_confirmed_from_live_competition_list(payload)
     except Exception as exc:
         api_error=f"{type(exc).__name__}: {exc}"
-
-    # Only if the competition list itself is unavailable, retain continuity
-    # from the known confirmed entries. This is not used when MSP live data works.
-    source="live_msp_metadata"
-    if not confirmed and api_error:
-        confirmed=_local_confirmed_competitions()
-        source="local_continuity_fallback"
+        confirmed=_confirmed_from_snapshot(db)
+        source="last_official_snapshot"
 
     return {
         "competitions":confirmed[:max(1,min(limit,60))],
         "count":len(confirmed),
-        "api_count":len(live_rows),
+        "api_count":api_count,
         "live_ok":api_error is None,
         "api_error":api_error,
         "source":source,
-        "registration_capability":"confirmation_identity_configured; metadata_live_from_msp",
     }
 
 @app.get("/msp/participation-check")
@@ -1320,7 +1335,7 @@ async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
     if exclude_puzzle_ids:
         excluded=[x.strip() for x in exclude_puzzle_ids.split(",") if x.strip()]
 
-    # V6.12.7: one fast live MSP competition-list request.
+    # V6.12.8: one fast live MSP competition-list request.
     # Do not use per-competition registration probing here; it can take tens of seconds
     # and must never decide whether the whole coach is "resilient".
     comps=_merge_competitions(
@@ -1333,7 +1348,7 @@ async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
     try:
         token=await _valid_access_token(db)
         live_comp_payload=await asyncio.wait_for(
-            get_competitions(token,status="all",online=False,cache=True),
+            get_competitions_shared(token,refresh=False),
             timeout=10.0
         )
         live_confirmed=_confirmed_from_live_competition_list(live_comp_payload)
@@ -1370,7 +1385,7 @@ async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
     plan["data_source"]=source
     plan["snapshot_id"]=snapshot_id
     plan["live_warning"]=live_warning
-    plan["resilient"]=(data_mode!="live")
+    plan["resilient"]=bool(source=="snapshot")
     plan["legacy_result_count"]=len(rows) if source=="legacy" else None
     return plan
 
