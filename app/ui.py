@@ -1378,9 +1378,12 @@ async function loadAll(){renderUnavailable();
 
    const resilientBannerEl=document.getElementById('resilientBanner');
    const resilientTextEl=document.getElementById('resilientText');
-   if(w.data_mode==='legacy'){
+   // Resilient Mode is an explicit backend state.
+   // data_mode can temporarily be "legacy" when only the separate competition
+   // metadata request times out; that must not label the whole coach resilient.
+   if(w.resilient===true){
      if(resilientBannerEl) resilientBannerEl.style.display='block';
-     if(resilientTextEl) resilientTextEl.innerHTML=`MySpeedPuzzling ist aktuell nicht live erreichbar und es existiert kein verwertbarer Snapshot. Der Coach rekonstruiert die Vorbereitung aus <strong>${w.legacy_result_count||0} historischen Trainingsdatensätzen</strong>. Puzzle-Bibliothek und Live-Turniere können dabei eingeschränkt sein.${w.live_warning?`<br>${w.live_warning}`:''}`;
+     if(resilientTextEl) resilientTextEl.innerHTML=`MySpeedPuzzling-Kerndaten sind aktuell nicht aus einem verwertbaren offiziellen Sync verfügbar. Der Coach rekonstruiert die Vorbereitung aus <strong>${w.legacy_result_count||0} historischen Trainingsdatensätzen</strong>.${w.live_warning?`<br>${w.live_warning}`:''}`;
      mspKpi.textContent='LEGACY';
      mspText.textContent='Historische DB-Daten aktiv';
    }else{
