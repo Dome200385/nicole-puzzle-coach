@@ -1,0 +1,12 @@
+REMOVE RESILIENT MODE
+
+Upload ONLY app/ui.py into the repository's app folder.
+
+GitHub must show:
+  1 file changed
+
+This change:
+- completely removes the visible "Resilient Mode" card
+- removes its frontend JavaScript control
+- keeps backend fallback/resilience mechanisms untouched
+- does not change tournament, readiness, form, consistency or training logic

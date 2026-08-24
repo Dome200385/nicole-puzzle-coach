@@ -153,7 +153,13 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 .trainingQuickFacts span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
 .trainingQuickFacts strong{display:block;font-size:15px;margin-top:2px}
 .trainingQuickReason{font-size:11px;line-height:1.35;color:var(--muted);margin-top:8px}
-.trainingPriorityGroup>.item:first-of-type+ .item{margin-top:8px!important}
+.trainingPriorityGroup>.item:first-of-type+ .item{margin-top:0!important}
+  .trainingPriorityGroup{display:flex;flex-direction:column;gap:10px}
+  .trainingPriorityGroup>.item,.trainingAnalysisBottom .trainingDropdownBody>.item{margin:0!important}
+  .trainingDropdownBody{display:flex;flex-direction:column;gap:10px}
+  .trainingListIntro{margin-bottom:0}
+  .loanActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .restoreBtn{background:#eef0f4;color:var(--text);border:0;border-radius:9px;padding:7px 10px;font-weight:800;cursor:pointer}
 }
 @media(max-width:760px){
   #wmWeeklyPlan{display:flex;flex-direction:column;gap:7px}
@@ -571,7 +577,12 @@ function renderUnavailable(){
   let arr=getUnavailablePuzzles();
   if(!arr.length){unavailableBox.style.display='none';return}
   unavailableBox.style.display='block';
-  unavailableList.innerHTML=arr.map(p=>`<span class="pill">📦 ${p.name} <button onclick='restorePuzzle(${JSON.stringify(p.id)})' style="border:0;background:none;cursor:pointer">↩</button></span>`).join('');
+  unavailableList.innerHTML=arr.map(p=>`<div class="item"><div class="puzzleRow">${p.image_url?`<img class="puzzleImg" src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy">`:''}<div class="puzzleInfo"><strong>📦 ${readinessEsc(p.name||'Puzzle')}</strong><div class="small">Aktuell ausgeliehen / nicht verfügbar</div><div class="loanActions"><button class="restoreBtn" onclick='restorePuzzle(${JSON.stringify(p.id)})'>↩ Wieder verfügbar</button></div></div></div></div>`).join('');
+}
+function isPuzzleUnavailable(p){return !!(p&&p.id!=null&&unavailableIds().includes(String(p.id)))}
+function skipButtonHtml(p,label='Skip – ausgeliehen'){
+  if(!p||p.id==null)return '';
+  return `<button class="skipBtn" style="margin-top:8px" onclick='skipPuzzle(${JSON.stringify(p)})'>${label}</button>`;
 }
 
 function startTraining(session,puzzle,goal){
@@ -626,7 +637,7 @@ async function loadMedianGapFocus(){
  try{
   const mg=await getj('/coach/median-gap-focus');
   if(!mg.available){el.textContent=mg.message||'Kein Median-Abstand verfügbar.';return}
-  const items=(Array.isArray(mg.items)&&mg.items.length)?mg.items:[mg];
+  const items=((Array.isArray(mg.items)&&mg.items.length)?mg.items:[mg]).filter(p=>!isPuzzleUnavailable(p));
   el.innerHTML=`<div class="small trainingListIntro">${mg.message||''}</div>`+
    items.map((p,i)=>`<details class="item weeklySession trainingPuzzleSession"><summary>
     <div class="weeklyIndex">${i+1}</div>
@@ -642,7 +653,7 @@ async function loadMedianGapFocus(){
        <div class="weeklyFact"><span>Letzte Zeit</span><strong>${p.last_time||'–'}</strong></div>
        <div class="weeklyFact"><span>MSP-Median</span><strong>${p.median||'–'}</strong></div>
        <div class="weeklyFact"><span>Abstand</span><strong>${p.gap||'–'}</strong></div>
-     </div>
+     </div>${skipButtonHtml(p)}
    </div></details>`).join('');
  }catch(e){el.textContent='Medianvergleich derzeit nicht verfügbar.'}
 }
@@ -711,7 +722,7 @@ async function loadUnsolvedLibrary(){
   const d=await getj('/coach/unsolved-library');
   if(!d.available||!d.items?.length){el.textContent=d.message||'Keine ungelösten Library-Puzzle gefunden.';return}
   el.innerHTML=`<div class="small trainingListIntro"><strong>${d.count}</strong> Puzzle ohne Solo-Ergebnis.</div>`+
-   d.items.map((p,i)=>{
+   d.items.filter(p=>!isPuzzleUnavailable(p)).map((p,i)=>{
      let diff='–';
      if(p.difficulty_label){
        diff=p.difficulty_label;
@@ -735,7 +746,7 @@ async function loadUnsolvedLibrary(){
          <div class="weeklyFact"><span>Difficulty</span><strong>${diff}</strong></div>
          <div class="weeklyFact"><span>MSP Prediction</span><strong>${p.prediction?displayPuzzleTime(p.prediction):'–'}</strong></div>
          <div class="weeklyFact"><span>Status</span><strong>First Try</strong></div>
-       </div>
+       </div>${skipButtonHtml(p)}
      </div></details>`;
    }).join('');
  }catch(e){el.textContent='Ungelöste Library derzeit nicht verfügbar.'}
@@ -746,7 +757,7 @@ async function loadRepeatPriority(){
   const d=await getj('/coach/repeat-priority?limit=5');
   if(!d.available||!d.items?.length){el.textContent=d.message||'Keine geeigneten Wiederholungs-Puzzle gefunden.';return}
   el.innerHTML=`<div class="small trainingListIntro">${d.message||''}</div>`+
-   d.items.map((p,i)=>`<details class="item weeklySession trainingPuzzleSession"><summary>
+   d.items.filter(p=>!isPuzzleUnavailable(p)).map((p,i)=>`<details class="item weeklySession trainingPuzzleSession"><summary>
     <div class="weeklyIndex">${i+1}</div>
     ${p.image_url?`<img class="weeklyThumb" src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.style.display='none'">`:`<div class="weeklyThumb weeklyThumbEmpty">🧩</div>`}
     <div class="weeklySummaryText">
@@ -762,7 +773,7 @@ async function loadRepeatPriority(){
        <div class="weeklyFact"><span>MSP-Median</span><strong>${p.median||'–'}</strong></div>
        <div class="weeklyFact"><span>Zuletzt</span><strong>${p.days_since_last_solve!=null?'vor '+p.days_since_last_solve+' Tagen':'–'}</strong></div>
      </div>
-     ${p.reasons?.length?`<div class="weeklyCoachReason"><strong>Coach:</strong> ${p.reasons.join(' · ')}</div>`:''}
+     ${p.reasons?.length?`<div class="weeklyCoachReason"><strong>Coach:</strong> ${p.reasons.join(' · ')}</div>`:''}${skipButtonHtml(p)}
    </div></details>`).join('');
  }catch(e){el.textContent='Wiederholungs-Priorität derzeit nicht verfügbar.'}
 }
@@ -872,7 +883,7 @@ function updateTrainingQuick(w){
    else delta.textContent=dlt||'–';
  }
  if(fit)fit.textContent=(wf!==undefined&&wf!==null&&wf!=='')?(String(wf).includes('/100')?wf:`${wf}/100`):'–';
- if(reason)reason.textContent=pick(p.reason,p.recommendation_reason,p.note,'');
+ if(reason){reason.innerHTML=readinessEsc(pick(p.reason,p.recommendation_reason,p.note,''))+(!isPuzzleUnavailable(p)?skipButtonHtml(p,'Skip – aktuell ausgeliehen'):'');}
  if(img)img.innerHTML=p.image_url?`<img src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.parentElement.textContent='🧩'">`:'🧩';
 }
 
