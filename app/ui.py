@@ -273,17 +273,73 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 @media(max-width:760px){
   .trainingDropdownBody{padding:8px 9px 10px!important}
   .trainingListIntro{margin:2px 2px 8px!important}
-  .trainingPuzzleSession{margin-top:7px!important}
+  .trainingPuzzleSession{margin:0!important}
   .trainingPuzzleSession:first-of-type{margin-top:0!important}
+  .trainingPuzzleSession + .trainingPuzzleSession{margin-top:10px!important}
+
+  /* One visual system for every puzzle card in Training */
+  .trainingPuzzleSession summary{
+    grid-template-columns:32px 68px minmax(0,1fr) 18px!important;
+    gap:10px!important;
+    align-items:center!important;
+    min-height:102px;
+    padding:12px!important;
+  }
+  .trainingPuzzleSession .weeklyIndex{
+    width:32px;height:32px;font-size:14px
+  }
+  .trainingPuzzleSession .weeklyThumb{
+    width:68px;height:68px;border-radius:11px;object-fit:cover
+  }
+  .trainingPuzzleSession .weeklySummaryText{
+    display:flex;flex-direction:column;justify-content:center;min-width:0;
+    padding:0!important
+  }
+  .trainingPuzzleSession .weeklySessionTitle{
+    display:flex;align-items:flex-start;justify-content:space-between;gap:6px
+  }
   .trainingPuzzleSession .weeklySessionTitle strong{
-    display:-webkit-box;
-    -webkit-line-clamp:2;
-    -webkit-box-orient:vertical;
-    overflow:hidden
+    font-size:15px!important;line-height:1.18!important;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden
   }
-  .trainingPuzzleSession .weeklyFacts{
-    grid-template-columns:1fr 1fr
+  .trainingPuzzleSession .weeklyPuzzleName{
+    font-size:12px!important;line-height:1.25!important;margin-top:3px!important;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis
   }
+  .trainingPuzzleSession .weeklySummaryText .small{
+    font-size:11px!important;line-height:1.28!important;margin-top:3px!important;
+    display:block!important;white-space:normal!important
+  }
+  .trainingPuzzleSession .weeklyFacts{grid-template-columns:1fr 1fr}
+  .trainingPuzzleSession summary:after{grid-column:4!important}
+
+  .skipBtnCompact{
+    margin:8px 0 0!important;padding:7px 10px!important;
+    font-size:11px!important;line-height:1.1!important;
+    width:max-content;max-width:100%;
+    background:#fff!important;border:1px solid #e89191!important;
+    color:#a63a3a!important;border-radius:9px!important
+  }
+
+  /* Today-training hero: explanation and action may never run into each other */
+  .trainingQuick{padding:14px!important}
+  .trainingQuickHero{grid-template-columns:92px minmax(0,1fr)!important;gap:14px!important}
+  .trainingQuickImage{width:92px!important;height:92px!important;border-radius:13px!important}
+  .trainingQuickMain strong{font-size:19px!important;line-height:1.15!important}
+  .trainingQuickReason{margin-top:10px!important}
+  .trainingQuickReasonText{
+    display:block;font-size:11px;line-height:1.45;color:var(--muted);
+    overflow-wrap:anywhere
+  }
+  .trainingQuickAction{display:block;margin-top:10px}
+  .trainingQuickAction .skipBtn{
+    margin:0!important;width:100%;padding:10px 12px!important;
+    font-size:13px!important
+  }
+
+  /* Weekly plan uses the same spacing and dimensions */
+  #wmWeeklyPlan{gap:10px!important}
+  #wmWeeklyPlan .weeklySession{margin:0!important}
 }
 
 .diagPre{
@@ -584,6 +640,11 @@ function skipButtonHtml(p,label='Skip – ausgeliehen'){
   if(!p||p.id==null)return '';
   return `<button class="skipBtn" style="margin-top:8px" onclick='skipPuzzle(${JSON.stringify(p)})'>${label}</button>`;
 }
+function summarySkipButtonHtml(p,label='Skip – ausgeliehen'){
+  if(!p||p.id==null)return '';
+  const payload=JSON.stringify(p);
+  return `<button type="button" class="skipBtn skipBtnCompact" onclick='event.preventDefault();event.stopPropagation();skipPuzzle(${payload})'>${label}</button>`;
+}
 
 function startTraining(session,puzzle,goal){
   if(!puzzle||!puzzle.available){alert('Für diese Einheit ist kein vollständiges Puzzle vorgesehen.');return}
@@ -646,6 +707,7 @@ async function loadMedianGapFocus(){
       <div class="weeklySessionTitle"><strong>${readinessEsc(p.name||'Puzzle')}</strong></div>
       <div class="weeklyPuzzleName">${p.manufacturer?readinessEsc(p.manufacturer):'Puzzle'}</div>
       <div class="small">Abstand zum MSP-Median ${p.gap||'–'}</div>
+      ${summarySkipButtonHtml(p)}
     </div>
    </summary>
    <div class="weeklyDetail">
@@ -653,7 +715,7 @@ async function loadMedianGapFocus(){
        <div class="weeklyFact"><span>Letzte Zeit</span><strong>${p.last_time||'–'}</strong></div>
        <div class="weeklyFact"><span>MSP-Median</span><strong>${p.median||'–'}</strong></div>
        <div class="weeklyFact"><span>Abstand</span><strong>${p.gap||'–'}</strong></div>
-     </div>${skipButtonHtml(p)}
+     </div>
    </div></details>`).join('');
  }catch(e){el.textContent='Medianvergleich derzeit nicht verfügbar.'}
 }
@@ -738,6 +800,7 @@ async function loadUnsolvedLibrary(){
         <div class="weeklySessionTitle"><strong>${readinessEsc(p.name||'Puzzle')}</strong></div>
         <div class="weeklyPuzzleName">${p.manufacturer?readinessEsc(p.manufacturer):'Puzzle'}</div>
         <div class="small">Noch kein Solo-Ergebnis</div>
+        ${summarySkipButtonHtml(p)}
       </div>
      </summary>
      <div class="weeklyDetail">
@@ -746,7 +809,7 @@ async function loadUnsolvedLibrary(){
          <div class="weeklyFact"><span>Difficulty</span><strong>${diff}</strong></div>
          <div class="weeklyFact"><span>MSP Prediction</span><strong>${p.prediction?displayPuzzleTime(p.prediction):'–'}</strong></div>
          <div class="weeklyFact"><span>Status</span><strong>First Try</strong></div>
-       </div>${skipButtonHtml(p)}
+       </div>
      </div></details>`;
    }).join('');
  }catch(e){el.textContent='Ungelöste Library derzeit nicht verfügbar.'}
@@ -764,6 +827,7 @@ async function loadRepeatPriority(){
       <div class="weeklySessionTitle"><strong>${readinessEsc(p.name||'Puzzle')}</strong><span class="pill weeklyIntensity">${p.label||''}</span></div>
       <div class="weeklyPuzzleName">${p.manufacturer?readinessEsc(p.manufacturer):'Puzzle'}</div>
       <div class="small">Priorität ${p.score!=null?p.score+'/100':'–'}</div>
+      ${summarySkipButtonHtml(p)}
     </div>
    </summary>
    <div class="weeklyDetail">
@@ -773,7 +837,7 @@ async function loadRepeatPriority(){
        <div class="weeklyFact"><span>MSP-Median</span><strong>${p.median||'–'}</strong></div>
        <div class="weeklyFact"><span>Zuletzt</span><strong>${p.days_since_last_solve!=null?'vor '+p.days_since_last_solve+' Tagen':'–'}</strong></div>
      </div>
-     ${p.reasons?.length?`<div class="weeklyCoachReason"><strong>Coach:</strong> ${p.reasons.join(' · ')}</div>`:''}${skipButtonHtml(p)}
+     ${p.reasons?.length?`<div class="weeklyCoachReason"><strong>Coach:</strong> ${p.reasons.join(' · ')}</div>`:''}
    </div></details>`).join('');
  }catch(e){el.textContent='Wiederholungs-Priorität derzeit nicht verfügbar.'}
 }
@@ -849,7 +913,7 @@ function renderWeeklyPlanFallback(w){
       return `<details class="item weeklySession"${i===0?' open':''}><summary>
         <div class="weeklyIndex">${i+1}</div>${image}
         <div class="weeklySummaryText"><div class="weeklySessionTitle"><strong>${s?.session||'Training'}</strong><span class="pill weeklyIntensity">${s?.intensity||''}</span></div>
-        ${has?`<div class="weeklyPuzzleName">${p.name||'Puzzle'}</div>`:''}<div class="small">${s?.goal||''}</div></div>
+        ${has?`<div class="weeklyPuzzleName">${p.name||'Puzzle'}</div>`:''}<div class="small">${s?.goal||''}</div>${has?summarySkipButtonHtml(p):''}</div>
       </summary>${details}</details>`;
     }).join('');
   }catch(e){
@@ -883,7 +947,11 @@ function updateTrainingQuick(w){
    else delta.textContent=dlt||'–';
  }
  if(fit)fit.textContent=(wf!==undefined&&wf!==null&&wf!=='')?(String(wf).includes('/100')?wf:`${wf}/100`):'–';
- if(reason){reason.innerHTML=readinessEsc(pick(p.reason,p.recommendation_reason,p.note,''))+(!isPuzzleUnavailable(p)?skipButtonHtml(p,'Skip – aktuell ausgeliehen'):'');}
+ if(reason){
+   const reasonText=readinessEsc(pick(p.reason,p.recommendation_reason,p.note,''));
+   const action=!isPuzzleUnavailable(p)?`<span class="trainingQuickAction">${skipButtonHtml(p,'Skip – aktuell ausgeliehen')}</span>`:'';
+   reason.innerHTML=`<span class="trainingQuickReasonText">${reasonText}</span>${action}`;
+ }
  if(img)img.innerHTML=p.image_url?`<img src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.parentElement.textContent='🧩'">`:'🧩';
 }
 
@@ -1372,10 +1440,10 @@ async function loadAll(){renderUnavailable();
          medianDelta=`${d>0?'+':''}${d.toFixed(1)}% ${d<=0?'unter':'über'} Median`;
        }else if(p.median_gap){medianDelta=p.median_gap+' über Median';}
        let detail=p.available
-         ? `<div class="weeklyDetail"><div class="weeklyFacts"><div class="weeklyFact"><span>MSP-Median</span><strong>${p.msp_median||'–'}</strong></div><div class="weeklyFact"><span>Letzte Zeit</span><strong>${p.msp_last_time||'–'}</strong></div><div class="weeklyFact"><span>vs. Median</span><strong>${medianDelta}</strong></div><div class="weeklyFact"><span>MSP Prediction</span><strong>${displayPuzzleTime(p.msp_prediction)}</strong></div><div class="weeklyFact"><span>Difficulty</span><strong>${diff}</strong></div><div class="weeklyFact"><span>WM-Fit</span><strong>${p.wm_fit?.score!=null?p.wm_fit.score+'/100':'–'}</strong></div></div><div class="weeklyCoachReason"><strong>Coach:</strong> ${p.reason||p.wm_fit?.summary||'Passend für diese Trainingseinheit.'}</div><div class="weeklyPills"><span class="pill">${p.previous_solo_solves||0} Solo-Läufe</span>${p.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${p.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}${p.wm_suitability?`<span class="pill ${p.wm_suitability.level==='hoch'||p.wm_suitability.level==='gut'?'wmGood':''}">${p.wm_suitability.label}</span>`:''}</div>${p.competition_risk?.score>=80?`<div class="small riskHigh" style="padding:7px;border-radius:8px;margin-top:7px">⚠️ ${p.competition_risk.reason}</div>`:''}<button class="skipBtn" style="margin-top:8px" onclick='skipPuzzle(${JSON.stringify(p)})'>Skip – ausgeliehen</button></div>`
+         ? `<div class="weeklyDetail"><div class="weeklyFacts"><div class="weeklyFact"><span>MSP-Median</span><strong>${p.msp_median||'–'}</strong></div><div class="weeklyFact"><span>Letzte Zeit</span><strong>${p.msp_last_time||'–'}</strong></div><div class="weeklyFact"><span>vs. Median</span><strong>${medianDelta}</strong></div><div class="weeklyFact"><span>MSP Prediction</span><strong>${displayPuzzleTime(p.msp_prediction)}</strong></div><div class="weeklyFact"><span>Difficulty</span><strong>${diff}</strong></div><div class="weeklyFact"><span>WM-Fit</span><strong>${p.wm_fit?.score!=null?p.wm_fit.score+'/100':'–'}</strong></div></div><div class="weeklyCoachReason"><strong>Coach:</strong> ${p.reason||p.wm_fit?.summary||'Passend für diese Trainingseinheit.'}</div><div class="weeklyPills"><span class="pill">${p.previous_solo_solves||0} Solo-Läufe</span>${p.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${p.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}${p.wm_suitability?`<span class="pill ${p.wm_suitability.level==='hoch'||p.wm_suitability.level==='gut'?'wmGood':''}">${p.wm_suitability.label}</span>`:''}</div>${p.competition_risk?.score>=80?`<div class="small riskHigh" style="padding:7px;border-radius:8px;margin-top:7px">⚠️ ${p.competition_risk.reason}</div>`:''}</div>`
          : `<div class="weeklyDetail small">${p.reason||'Für diese Technik-/Recovery-Einheit ist kein vollständiges Puzzle nötig.'}</div>`;
        let displayName=p.available?compactName:'';
-       return `<details class="item weeklySession"${i===0?' open':''}><summary><div class="weeklyIndex">${i+1}</div>${compactImage}<div class="weeklySummaryText"><div class="weeklySessionTitle"><strong>${s.session}</strong><span class="pill weeklyIntensity">${s.intensity}</span></div>${displayName?`<div class="weeklyPuzzleName">${displayName}</div>`:''}<div class="small">${s.goal}</div></div></summary>${detail}</details>`;
+       return `<details class="item weeklySession trainingPuzzleSession"${i===0?' open':''}><summary><div class="weeklyIndex">${i+1}</div>${compactImage}<div class="weeklySummaryText"><div class="weeklySessionTitle"><strong>${s.session}</strong><span class="pill weeklyIntensity">${s.intensity}</span></div>${displayName?`<div class="weeklyPuzzleName">${displayName}</div>`:''}<div class="small">${s.goal}</div>${p.available?summarySkipButtonHtml(p):''}</div></summary>${detail}</details>`;
      }).join('')||'<div class="small">Kein Trainingsplan verfügbar.</div>';
    }
    // Competition cards are rendered only from /msp/my-competitions.

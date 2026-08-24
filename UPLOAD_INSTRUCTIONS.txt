@@ -1,12 +1,12 @@
-REMOVE RESILIENT MODE
+TRAINING UI POLISH + WEEKLY SKIP
 
-Upload ONLY app/ui.py into the repository's app folder.
+Changes:
+- Skip button is now always visible in weekly-plan puzzle cards.
+- Skip remains "borrowed / unavailable" only; nothing is deleted.
+- Skipped puzzles still return through "Wieder verfügbar" / "Alle wieder verfügbar".
+- "Heute trainieren" explanation and Skip action are visually separated.
+- Training puzzle cards use one consistent mobile layout:
+  same image size, spacing, rank alignment, text structure and margins.
+- Median-gap, repeat-priority and unsolved cards use the same visible Skip pattern.
 
-GitHub must show:
-  1 file changed
-
-This change:
-- completely removes the visible "Resilient Mode" card
-- removes its frontend JavaScript control
-- keeps backend fallback/resilience mechanisms untouched
-- does not change tournament, readiness, form, consistency or training logic
+Deploy the complete project as usual.
