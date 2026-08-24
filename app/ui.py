@@ -303,13 +303,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 
 
 
-<section class="card full" data-app-page="today">
-  <h2>🧪 Turnier-Pipeline Diagnose</h2>
-  <div class="small">Prüft nur Datenquelle, Competition-API und die zwei betroffenen Backend-Pfade.</div>
-  <button class="secondary" style="margin-top:8px" onclick="runTournamentPipelineDebug()">Diagnose starten</button>
-  <div id="pipelineDiagStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
-  <div id="pipelineDiagResult" class="list" style="margin-top:8px"></div>
-</section>
+
 
 <section class="card half hero appSection" id="appToday" data-app-page="today"><h2>🏆 Mein nächstes Turnier</h2><div id="nextMspCompetition" class="small">Prüfe bestätigte Anmeldung…</div></section>
 <section class="card half hero" data-app-page="today"><h2>🎯 Coach-Empfehlung</h2><div id="coachRecommendation" class="small">Analysiere MySpeedPuzzling-Ergebnisse…</div></section>
@@ -466,6 +460,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 
 <div id="infoModal" class="modal" onclick="if(event.target===this)closeInfo()"><div class="modalbox"><div id="infoContent"></div><button class="secondary" onclick="closeInfo()">Schliessen</button></div></div>
 <script>
+const NPC_FRONTEND_VERSION='6.13.1';
 function showInfo(type){
  const form=`<h2>ℹ️ Was bedeutet Form?</h2><p><b>Form</b> zeigt, ob Nicole aktuell schneller oder langsamer puzzelt als in der vorherigen Vergleichsperiode. Dafür werden die letzten 10 Solo-Ergebnisse mit den vorherigen 10 verglichen und auf <b>Zeit pro 100 Teile</b> normalisiert.</p><div class="scale"><div><b>Positiver Wert:</b> aktuell schneller. Beispiel +11,7 % = die normalisierte Zeit ist rund 11,7 % besser als zuvor.</div><div><b>Um 0 %:</b> Leistung weitgehend stabil.</div><div><b>Negativer Wert:</b> aktuell langsamer als in der vorherigen Periode.</div></div><p class="small">Die Zahl ist ein Trendindikator, keine Gewinnwahrscheinlichkeit und keine Prognose einer einzelnen Puzzlezeit.</p>`;
  const con=`<h2>ℹ️ Was bedeutet Konsistenz?</h2><p><b>Konsistenz</b> misst, wie ähnlich die letzten 10 normalisierten Solo-Leistungen sind. Auch hier wird Zeit pro 100 Teile verwendet, damit verschiedene Teilezahlen besser vergleichbar sind.</p><div class="scale"><div><b>90–100:</b> sehr konstante Leistungen</div><div><b>80–89:</b> gute bis hohe Konstanz</div><div><b>70–79:</b> merkliche Schwankungen</div><div><b>unter 70:</b> starke Schwankungen; Ursachen genauer analysieren</div></div><p class="small">Ein hoher Wert bedeutet nicht automatisch schnell. Ideal ist eine hohe Konsistenz zusammen mit einer starken bzw. steigenden Form.</p>`;
@@ -912,7 +907,7 @@ function updateTodaySummary(w){
 if('serviceWorker' in navigator){
   window.addEventListener('load',async()=>{
     try{
-      const reg=await navigator.serviceWorker.register('/sw.js?v=6110');
+      const reg=await navigator.serviceWorker.register('/sw.js?v=6131');
       await reg.update();
       let reloading=false;
       navigator.serviceWorker.addEventListener('controllerchange',()=>{
@@ -1213,57 +1208,33 @@ async function runResultCompetitionReverseMap(){
 }
 
 
-function renderCompetitionTerminalState(message){
-  const ids=['nextTournament','nextTournamentBody','confirmedCompetitions','confirmedCompetitionsList'];
-  ids.map(id=>document.getElementById(id)).filter(Boolean).forEach(el=>{
-    const t=(el.textContent||'');
-    if(t.includes('Prüfe bestätigte Anmeldung') || !t.trim()){
-      el.innerHTML=`<div class="small">${readinessEsc(message)}</div>`;
+
+
+
+function renderConfirmedTournamentData(data){
+  const rows=(data&&Array.isArray(data.competitions))?data.competitions:[];
+  const nextEl=document.getElementById('nextMspCompetition');
+  const listEl=document.getElementById('mspCompetitions');
+
+  if(rows.length){
+    const c=rows[0];
+    if(nextEl){
+      nextEl.innerHTML=`<strong>${readinessEsc(c.name||'Turnier')}</strong><br>${dateText(c.date_from)}${c.location?' · '+readinessEsc(c.location):''}${c.country_code?' · '+readinessEsc(String(c.country_code).toUpperCase()):''}<br><span class="pill">✅ Angemeldet</span><span class="pill">⏳ ${countdownText(c.date_from)}</span>`;
     }
-  });
+    if(listEl){
+      listEl.innerHTML=rows.map(c=>`<div class="item"><strong>${readinessEsc(c.name||'Turnier')}</strong><div class="small">${dateText(c.date_from)}${c.date_to?' – '+dateText(c.date_to):''}${c.location?' · '+readinessEsc(c.location):''}${c.country_code?' · '+readinessEsc(String(c.country_code).toUpperCase()):''}</div><span class="pill">✅ Angemeldet</span><span class="pill">⏳ ${countdownText(c.date_from)}</span>${c.link?`<br><a class="btn secondary" style="margin-top:8px" href="${readinessEsc(c.link)}" target="_blank">Turnier öffnen</a>`:''}</div>`).join('');
+    }
+  }else{
+    if(nextEl) nextEl.textContent='Keine bestätigte zukünftige Anmeldung gefunden.';
+    if(listEl) listEl.innerHTML='<div class="small">Keine bestätigten zukünftigen Turniere.</div>';
+  }
 }
-setTimeout(()=>renderCompetitionTerminalState('Turnierdaten momentan nicht verfügbar.'),15000);
 
-
-async function runTournamentPipelineDebug(){
- const s=document.getElementById('pipelineDiagStatus');
- const b=document.getElementById('pipelineDiagResult');
- s.textContent='Diagnose läuft…'; b.innerHTML='';
- try{
-   const ctrl=new AbortController();
-   const timer=setTimeout(()=>ctrl.abort(),45000);
-   const r=await fetch('/debug/tournament-pipeline',{cache:'no-store',signal:ctrl.signal});
-   clearTimeout(timer);
-   const txt=await r.text();
-   let d; try{d=JSON.parse(txt)}catch(_){throw new Error(`HTTP ${r.status}: ${txt.slice(0,250)}`)}
-   if(!r.ok)throw new Error(`HTTP ${r.status}`);
-   const st=d.storage||{}, ba=d.best_available||{}, ca=d.competition_api||{}, mc=d.my_competitions||{}, wp=d.wm_plan||{};
-   s.innerHTML=`Version <strong>${readinessEsc(d.version||'–')}</strong>`;
-   b.innerHTML=`
-    <div class="item"><strong>1. Gespeicherte Daten</strong>
-      <div class="small">Snapshot vorhanden: <strong>${st.snapshot_present?'JA':'NEIN'}</strong> · ID ${st.snapshot_id??'–'}</div>
-      <div class="small">Legacy Results vorhanden: ${st.legacy_results_present?'JA':'NEIN'}</div>
-      <div class="small">_best_available_payload → <strong>${readinessEsc(String(ba.source||'–'))}</strong></div>
-    </div>
-    <div class="item"><strong>2. MSP Competition API</strong>
-      <div class="small">${ca.ok?'✅ OK':'❌ FEHLER'} · ${ca.ms??'–'} ms · Count ${ca.count??'–'} · bestätigt ${ca.confirmed_count??'–'}</div>
-      <div class="small">${readinessEsc(ca.error||((ca.confirmed_names||[]).join(' · '))||'–')}</div>
-    </div>
-    <div class="item"><strong>3. /msp/my-competitions</strong>
-      <div class="small">${mc.ok?'✅ OK':'❌ FEHLER'} · ${mc.ms??'–'} ms · count ${mc.count??'–'} · API ${mc.api_count??'–'}</div>
-      <div class="small">source=${readinessEsc(String(mc.source??'–'))} · live_ok=${String(mc.live_ok)}</div>
-      <div class="small">${readinessEsc(mc.error||mc.api_error||((mc.names||[]).join(' · '))||'–')}</div>
-    </div>
-    <div class="item"><strong>4. /coach/wm-plan</strong>
-      <div class="small">${wp.ok?'✅ OK':'❌ FEHLER'} · ${wp.ms??'–'} ms</div>
-      <div class="small">data_mode=<strong>${readinessEsc(String(wp.data_mode??'–'))}</strong> · data_source=${readinessEsc(String(wp.data_source??'–'))}</div>
-      <div class="small">resilient=<strong>${String(wp.resilient)}</strong> · Snapshot ${wp.snapshot_id??'–'} · Legacy ${wp.legacy_result_count??'–'}</div>
-      <div class="small">${readinessEsc(wp.error||wp.live_warning||('Next: '+(wp.next_competition||'–')))}</div>
-    </div>`;
- }catch(e){
-   s.textContent='Diagnose fehlgeschlagen.';
-   b.innerHTML=`<div class="item small">${readinessEsc(e.name==='AbortError'?'Timeout nach 45 Sekunden':(e.message||String(e)))}</div>`;
- }
+function renderTournamentLoadError(){
+  const nextEl=document.getElementById('nextMspCompetition');
+  const listEl=document.getElementById('mspCompetitions');
+  if(nextEl) nextEl.textContent='Turnierdaten derzeit nicht verfügbar.';
+  if(listEl) listEl.innerHTML='<div class="small">Bestätigte Turniere derzeit nicht abrufbar.</div>';
 }
 
 async function loadAll(){renderUnavailable();
@@ -1281,8 +1252,23 @@ async function loadAll(){renderUnavailable();
    getj('/msp/my-competitions?limit=30'),
    new Promise((_,reject)=>setTimeout(()=>reject(new Error('competition_timeout')),14000))
  ]);
+ // Render tournament cards immediately when this request resolves.
+ // Do not wait for the comparatively expensive WM-plan rendering below.
+ competitionsPromise
+   .then(data=>renderConfirmedTournamentData(data))
+   .catch(()=>renderTournamentLoadError());
 
- try{let st=await statusPromise;coreHasMspData=!!st.has_myspeedpuzzling_data;systemKpi.textContent='OK';systemText.textContent=`Backend V${st.version} · Datenbank ok`;systemBadge.textContent='🟢 System bereit';mspKpi.textContent=st.has_myspeedpuzzling_data?'DATA':(st.pat_configured?'PAT':(st.oauth_configured?'READY':'WAIT'));mspText.textContent=st.data_source==='legacy'?'Historische DB-Daten aktiv':(st.has_myspeedpuzzling_data?`Letzter Datenstand verfügbar · Snapshot #${st.latest_snapshot_id||'–'}`:(st.pat_configured?'PAT eingerichtet · noch kein Snapshot':'Verbindung möglich'))}catch(e){systemBadge.textContent='🔴 Fehler'}
+
+ try{let st=await statusPromise;
+   if(st.version && st.version!==NPC_FRONTEND_VERSION){
+     const key='npc_version_reload_'+st.version;
+     if(!sessionStorage.getItem(key)){
+       sessionStorage.setItem(key,'1');
+       location.replace('/dashboard?v='+encodeURIComponent(st.version)+'&t='+Date.now());
+       return;
+     }
+   }
+   coreHasMspData=!!st.has_myspeedpuzzling_data;systemKpi.textContent='OK';systemText.textContent=`Backend V${st.version} · Frontend V${NPC_FRONTEND_VERSION} · Datenbank ok`;systemBadge.textContent='🟢 System bereit';mspKpi.textContent=st.has_myspeedpuzzling_data?'DATA':(st.pat_configured?'PAT':(st.oauth_configured?'READY':'WAIT'));mspText.textContent=st.data_source==='legacy'?'Historische DB-Daten aktiv':(st.has_myspeedpuzzling_data?`MSP-Daten synchronisiert · Snapshot #${st.latest_snapshot_id||'–'}`:(st.pat_configured?'PAT eingerichtet · noch kein Snapshot':'Verbindung möglich'))}catch(e){systemBadge.textContent='🔴 Fehler'}
 
  try{
    let a=await summaryPromise;
@@ -1392,12 +1378,7 @@ async function loadAll(){renderUnavailable();
 
    const resilientBannerEl=document.getElementById('resilientBanner');
    const resilientTextEl=document.getElementById('resilientText');
-   if(false && w.data_mode==='snapshot'){
-     if(resilientBannerEl) resilientBannerEl.style.display='block';
-     if(resilientTextEl) resilientTextEl.innerHTML=`MySpeedPuzzling ist von Render aktuell nicht live erreichbar. Der Coach verwendet Snapshot <strong>#${w.snapshot_id||'–'}</strong>. Trainingsdaten, WM-Ziele und Wochenplan bleiben nutzbar. Bekannte Turnierdaten werden lokal ergänzt.${w.live_warning?`<br>${w.live_warning}`:''}`;
-     mspKpi.textContent='CACHE';
-     mspText.textContent=`Letzter erfolgreicher Datenstand · Snapshot #${w.snapshot_id||'–'}`;
-   }else if(w.data_mode==='legacy'){
+   if(w.data_mode==='legacy'){
      if(resilientBannerEl) resilientBannerEl.style.display='block';
      if(resilientTextEl) resilientTextEl.innerHTML=`MySpeedPuzzling ist aktuell nicht live erreichbar und es existiert kein verwertbarer Snapshot. Der Coach rekonstruiert die Vorbereitung aus <strong>${w.legacy_result_count||0} historischen Trainingsdatensätzen</strong>. Puzzle-Bibliothek und Live-Turniere können dabei eingeschränkt sein.${w.live_warning?`<br>${w.live_warning}`:''}`;
      mspKpi.textContent='LEGACY';
@@ -1501,20 +1482,7 @@ async function loadAll(){renderUnavailable();
  }
 
 
- try{
-   let data=await competitionsPromise;let rows=data.competitions||[];
-   if(rows.length){
-     let c=rows[0];
-     nextMspCompetition.innerHTML=`<strong>${c.name}</strong><br>${dateText(c.date_from)}${c.location?' · '+c.location:''}${c.country_code?' · '+c.country_code.toUpperCase():''}<br><span class="pill">✅ Angemeldet</span><span class="pill">⏳ ${countdownText(c.date_from)}</span>`;
-     mspCompetitions.innerHTML=rows.map(c=>`<div class="item"><strong>${c.name}</strong><div class="small">${dateText(c.date_from)}${c.date_to?' – '+dateText(c.date_to):''}${c.location?' · '+c.location:''}${c.country_code?' · '+c.country_code.toUpperCase():''}</div><span class="pill">✅ Angemeldet</span><span class="pill">⏳ ${countdownText(c.date_from)}</span>${c.link?`<br><a class="btn secondary" style="margin-top:8px" href="${c.link}" target="_blank">Turnier öffnen</a>`:''}</div>`).join('');
-   }else{
-     nextMspCompetition.textContent='Keine bestätigte zukünftige Anmeldung gefunden.';
-     mspCompetitions.innerHTML='<div class="small">Keine bestätigten zukünftigen Turniere.</div>';
-   }
- }catch(e){
-   nextMspCompetition.textContent='Turnierdaten werden beim nächsten erfolgreichen Abruf erneut geladen.';
-   mspCompetitions.innerHTML='<div class="small">Bestätigte Turniere derzeit nicht abrufbar.</div>';
- }
+
 
  try{
    let r=await swissPromise;
@@ -1558,4 +1526,12 @@ document.addEventListener('DOMContentLoaded',()=>{
 """
 
 def dashboard():
-    return HTMLResponse(DASHBOARD_HTML)
+    return HTMLResponse(
+        DASHBOARD_HTML,
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "X-NPC-Version": "6.13.1",
+        },
+    )
