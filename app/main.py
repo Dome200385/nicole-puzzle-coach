@@ -1104,7 +1104,16 @@ async def unsolved_library(db:Session=Depends(get_db)):
             ps=ins.get("prediction_seconds"); ptext=ins.get("prediction_text")
             lo=ins.get("prediction_range_from_seconds"); hi=ins.get("prediction_range_to_seconds")
             diff_label=ins.get("difficulty_label") or p.get("difficulty_label")
-            diff_percent=ins.get("difficulty_percent") if ins.get("difficulty_percent") is not None else p.get("difficulty_percent")
+            diff_raw=ins.get("difficulty_percent") if ins.get("difficulty_percent") is not None else p.get("difficulty_percent")
+            diff_percent=None
+            if diff_raw is not None:
+                try:
+                    dv=float(diff_raw)
+                    # MSP difficulty is a multiplier around 1.0.
+                    # 1.10 = 10% above average, 0.90 = 10% below average.
+                    diff_percent=(dv-1.0)*100.0 if 0.25 <= dv <= 3.0 else dv
+                except (TypeError,ValueError):
+                    diff_percent=None
             items.append({
                 "id":p.get("id"),"name":p.get("name"),"manufacturer":p.get("manufacturer"),"pieces":p.get("pieces"),"image_url":p.get("image_url"),
                 "difficulty_label":diff_label,"difficulty_percent":diff_percent,

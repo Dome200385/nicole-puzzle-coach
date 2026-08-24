@@ -2410,8 +2410,11 @@ async function loadUnsolvedLibrary(){
                    diffObj.percent??diffObj.percentage??p.puzzle?.difficulty_percent??p.puzzle?.msp_difficulty_percent;
        if(dl){
          diff=String(dl);
-         const dp=Number(dpRaw);
-         if(Number.isFinite(dp)) diff+=` · ${dp>0?'+':''}${dp.toFixed(1)}% ggü. Ø`;
+         let dp=Number(dpRaw);
+         if(Number.isFinite(dp)){
+           if(dp>=0.25 && dp<=3.0) dp=(dp-1)*100;
+           diff+=` · ${dp>0?'+':''}${dp.toFixed(1)}% ggü. Ø`;
+         }
        }else if(diffObj && typeof diffObj!=='object'){ diff=String(diffObj); }
      }catch(_){}
      let pred='–';
