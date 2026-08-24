@@ -435,6 +435,89 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
   }
 }
 
+
+/* === SKIP BUTTON PLACEMENT: MEDIAN / REPEAT / UNSOLVED ONLY === */
+@media(max-width:760px){
+  #medianGapFocus .trainingPuzzleSession > summary,
+  #repeatPriority .trainingPuzzleSession > summary,
+  #unsolvedLibrary .trainingPuzzleSession > summary{
+    grid-template-columns:36px 74px minmax(0,1fr) 18px!important;
+    grid-template-rows:auto auto!important;
+    column-gap:10px!important;
+    row-gap:8px!important;
+    align-items:center!important;
+    min-height:132px!important
+  }
+
+  #medianGapFocus .trainingPuzzleSession .weeklyIndex,
+  #repeatPriority .trainingPuzzleSession .weeklyIndex,
+  #unsolvedLibrary .trainingPuzzleSession .weeklyIndex{
+    grid-column:1!important;
+    grid-row:1 / 3!important;
+    align-self:center!important
+  }
+
+  #medianGapFocus .trainingPuzzleSession .weeklyThumb,
+  #repeatPriority .trainingPuzzleSession .weeklyThumb,
+  #unsolvedLibrary .trainingPuzzleSession .weeklyThumb{
+    grid-column:2!important;
+    grid-row:1 / 3!important;
+    align-self:center!important
+  }
+
+  #medianGapFocus .trainingPuzzleSession .weeklySummaryText,
+  #repeatPriority .trainingPuzzleSession .weeklySummaryText,
+  #unsolvedLibrary .trainingPuzzleSession .weeklySummaryText{
+    grid-column:3!important;
+    grid-row:1!important;
+    align-self:end!important;
+    min-width:0!important
+  }
+
+  /* Repeat-priority badge remains inside the text block, but no longer steals text width. */
+  #repeatPriority .trainingPuzzleSession .weeklyIntensity{
+    position:static!important;
+    display:inline-block!important;
+    width:auto!important;
+    margin:5px 0 0!important;
+    padding:4px 9px!important;
+    text-align:center!important
+  }
+
+  #medianGapFocus .trainingPuzzleSession .skipBtnCompact,
+  #repeatPriority .trainingPuzzleSession .skipBtnCompact,
+  #unsolvedLibrary .trainingPuzzleSession .skipBtnCompact{
+    grid-column:3!important;
+    grid-row:2!important;
+    justify-self:start!important;
+    align-self:start!important;
+    display:block!important;
+    width:auto!important;
+    min-width:156px!important;
+    max-width:100%!important;
+    min-height:36px!important;
+    margin:0!important;
+    padding:8px 12px!important;
+    white-space:nowrap!important;
+    font-size:11px!important;
+    line-height:1.1!important
+  }
+
+  #medianGapFocus .trainingPuzzleSession > summary:after,
+  #repeatPriority .trainingPuzzleSession > summary:after,
+  #unsolvedLibrary .trainingPuzzleSession > summary:after{
+    grid-column:4!important;
+    grid-row:1 / 3!important;
+    align-self:center!important
+  }
+
+  #medianGapFocus .trainingPuzzleSession .weeklyDetail,
+  #repeatPriority .trainingPuzzleSession .weeklyDetail,
+  #unsolvedLibrary .trainingPuzzleSession .weeklyDetail{
+    margin-left:130px!important
+  }
+}
+
 </style></head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
@@ -793,8 +876,8 @@ async function loadMedianGapFocus(){
       <div class="weeklySessionTitle"><strong>${readinessEsc(p.name||'Puzzle')}</strong></div>
       <div class="weeklyPuzzleName">${p.manufacturer?readinessEsc(p.manufacturer):'Puzzle'}</div>
       <div class="small">Abstand zum MSP-Median ${p.gap||'–'}</div>
-      ${summarySkipButtonHtml(p)}
     </div>
+    ${summarySkipButtonHtml(p)}
    </summary>
    <div class="weeklyDetail">
      <div class="weeklyFacts">
@@ -886,8 +969,8 @@ async function loadUnsolvedLibrary(){
         <div class="weeklySessionTitle"><strong>${readinessEsc(p.name||'Puzzle')}</strong></div>
         <div class="weeklyPuzzleName">${p.manufacturer?readinessEsc(p.manufacturer):'Puzzle'}</div>
         <div class="small">Noch kein Solo-Ergebnis</div>
-        ${summarySkipButtonHtml(p)}
       </div>
+      ${summarySkipButtonHtml(p)}
      </summary>
      <div class="weeklyDetail">
        <div class="weeklyFacts">
@@ -913,8 +996,8 @@ async function loadRepeatPriority(){
       <div class="weeklySessionTitle"><strong>${readinessEsc(p.name||'Puzzle')}</strong><span class="pill weeklyIntensity">${p.label||''}</span></div>
       <div class="weeklyPuzzleName">${p.manufacturer?readinessEsc(p.manufacturer):'Puzzle'}</div>
       <div class="small">Priorität ${p.score!=null?p.score+'/100':'–'}</div>
-      ${summarySkipButtonHtml(p)}
     </div>
+    ${summarySkipButtonHtml(p)}
    </summary>
    <div class="weeklyDetail">
      <div class="weeklyFacts">
