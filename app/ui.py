@@ -518,6 +518,64 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
   }
 }
 
+
+/* === TRAINING INFO CARDS V2 === */
+@media(max-width:760px){
+  #medianGapFocus .weeklyDetail,
+  #repeatPriority .weeklyDetail,
+  #unsolvedLibrary .weeklyDetail{
+    margin:0 12px 14px 130px!important;
+    padding-top:10px!important
+  }
+  .trainingFacts4{
+    display:grid!important;
+    grid-template-columns:1fr 1fr!important;
+    gap:8px!important
+  }
+  .trainingFacts4 .weeklyFact{
+    min-width:0!important;
+    min-height:70px!important;
+    padding:10px!important;
+    border:1px solid #e4e8ef!important;
+    border-radius:11px!important;
+    background:#fff!important
+  }
+  .trainingFacts4 .weeklyFact span{
+    display:block!important;
+    color:#7a8393!important;
+    font-size:9px!important;
+    line-height:1.15!important;
+    text-transform:uppercase!important;
+    letter-spacing:.035em!important
+  }
+  .trainingFacts4 .weeklyFact strong{
+    display:block!important;
+    margin-top:5px!important;
+    color:#344054!important;
+    font-size:14px!important;
+    line-height:1.2!important;
+    overflow-wrap:anywhere!important
+  }
+  .trainingCoachNote{
+    width:100%!important;
+    margin-top:10px!important;
+    padding:11px 12px!important;
+    border:1px solid #e4e8ef!important;
+    border-radius:11px!important;
+    background:#f6f8fb!important;
+    color:#667085!important;
+    font-size:11px!important;
+    line-height:1.45!important
+  }
+  .trainingCoachNote strong{
+    display:block!important;
+    margin-bottom:4px!important;
+    color:#344054!important;
+    font-size:11px!important
+  }
+  #repeatPriority .weeklyCoachReason{display:none!important}
+}
+
 </style></head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
@@ -815,6 +873,92 @@ function summarySkipButtonHtml(p,label='Skip – ausgeliehen'){
   return `<button type="button" class="skipBtn skipBtnCompact" onclick='event.preventDefault();event.stopPropagation();skipPuzzle(${payload})'>${label}</button>`;
 }
 
+function npcClockSeconds(v){
+  if(v==null)return null;
+  if(typeof v==='number' && Number.isFinite(v))return v;
+  const s=String(v).trim();
+  if(!s || s==='–')return null;
+  const a=s.split(':').map(Number);
+  if(a.some(x=>!Number.isFinite(x)))return null;
+  if(a.length===3)return a[0]*3600+a[1]*60+a[2];
+  if(a.length===2)return a[0]*60+a[1];
+  return Number(s)||null;
+}
+function npcPctVsMedian(own,median){
+  const a=npcClockSeconds(own),m=npcClockSeconds(median);
+  if(!a||!m||m<=0)return '–';
+  const p=((a-m)/m)*100;
+  return `${p>0?'+':''}${p.toFixed(1)}%`;
+}
+function npcDifficulty(p){
+  if(!p)return '–';
+  let label=pick(
+    p.difficulty_label,
+    p.msp_difficulty,
+    p.difficulty,
+    p.msp_insights?.difficulty_label,
+    p.puzzle?.difficulty_label,
+    p.puzzle?.msp_insights?.difficulty_label,
+    ''
+  );
+  let pct=pick(
+    p.difficulty_percent,
+    p.msp_insights?.difficulty_percent,
+    p.puzzle?.difficulty_percent,
+    p.puzzle?.msp_insights?.difficulty_percent,
+    null
+  );
+  if(label){
+    const n=Number(pct);
+    return Number.isFinite(n)?`${label} · ${n>0?'+':''}${n.toFixed(1)}% ggü. Ø`:String(label);
+  }
+  return 'bei MSP nicht verfügbar';
+}
+function npcPrediction(p){
+  if(!p)return 'bei MSP nicht verfügbar';
+  const v=pick(
+    p.prediction,
+    p.msp_prediction,
+    p.predicted_time,
+    p.prediction_time,
+    p.msp_prediction_time,
+    p.puzzle?.prediction,
+    p.puzzle?.msp_prediction,
+    ''
+  );
+  if(v){
+    if(typeof v==='number')return displayPuzzleTime(v);
+    return String(v);
+  }
+  const sec=pick(
+    p.prediction_seconds,
+    p.msp_prediction_seconds,
+    p.puzzle?.prediction_seconds,
+    p.puzzle?.msp_prediction_seconds,
+    null
+  );
+  if(sec!=null && Number.isFinite(Number(sec)))return displayPuzzleTime(Number(sec));
+  return 'bei MSP nicht verfügbar';
+}
+function npcMedianCoach(p){
+  const own=pick(p.own_median,p.personal_median,p.last_time,'');
+  const med=pick(p.median,p.msp_median,'');
+  const gap=pick(p.gap,'');
+  const pct=npcPctVsMedian(own,med);
+  if(gap && pct!=='–')return `Aktuell ${gap} bzw. ${pct} über dem MSP-Median. Fokus: gleichmäßiges Sortieren, sauberer Start und gezielte Wiederholung bis der Abstand stabil sinkt.`;
+  if(gap)return `Aktuell ${gap} über dem MSP-Median. Fokus: Technik und konstantes Tempo statt reiner Bestzeitjagd.`;
+  return `Dieses Puzzle eignet sich für gezielte Wiederholung und Technikarbeit gegen den MSP-Median.`;
+}
+function npcUnsolvedCoach(p){
+  const d=npcDifficulty(p), pr=npcPrediction(p);
+  const hasD=d!=='bei MSP nicht verfügbar';
+  const hasP=pr!=='bei MSP nicht verfügbar';
+  if(hasD&&hasP)return `Echter First Try. Difficulty: ${d}. MSP Prediction: ${pr}. Gut geeignet als unverfälschte Standortbestimmung.`;
+  if(hasD)return `Echter First Try mit MSP-Difficulty ${d}. Gut geeignet, um die Leistung ohne Erinnerungseffekt zu messen.`;
+  if(hasP)return `Echter First Try mit MSP Prediction ${pr}. Gut geeignet für eine realistische Standortbestimmung.`;
+  return `Noch ohne Solo-Ergebnis. Ideal für einen echten First Try; MSP liefert für dieses Puzzle aktuell keine Difficulty/Prediction.`;
+}
+
 function startTraining(session,puzzle,goal){
   if(!puzzle||!puzzle.available){alert('Für diese Einheit ist kein vollständiges Puzzle vorgesehen.');return}
   let active={
@@ -880,11 +1024,13 @@ async function loadMedianGapFocus(){
     ${summarySkipButtonHtml(p)}
    </summary>
    <div class="weeklyDetail">
-     <div class="weeklyFacts">
-       <div class="weeklyFact"><span>Letzte Zeit</span><strong>${p.last_time||'–'}</strong></div>
-       <div class="weeklyFact"><span>MSP-Median</span><strong>${p.median||'–'}</strong></div>
+     <div class="weeklyFacts trainingFacts4">
+       <div class="weeklyFact"><span>Eigene Referenz</span><strong>${p.own_median||p.personal_median||p.last_time||'–'}</strong></div>
+       <div class="weeklyFact"><span>MSP-Median</span><strong>${p.median||p.msp_median||'–'}</strong></div>
        <div class="weeklyFact"><span>Abstand</span><strong>${p.gap||'–'}</strong></div>
+       <div class="weeklyFact"><span>Abstand %</span><strong>${npcPctVsMedian(p.own_median||p.personal_median||p.last_time,p.median||p.msp_median)}</strong></div>
      </div>
+     <div class="trainingCoachNote"><strong>Coach</strong>${readinessEsc(npcMedianCoach(p))}</div>
    </div></details>`).join('');
  }catch(e){el.textContent='Medianvergleich derzeit nicht verfügbar.'}
 }
@@ -954,14 +1100,6 @@ async function loadUnsolvedLibrary(){
   if(!d.available||!d.items?.length){el.textContent=d.message||'Keine ungelösten Library-Puzzle gefunden.';return}
   el.innerHTML=`<div class="small trainingListIntro"><strong>${d.count}</strong> Puzzle ohne Solo-Ergebnis.</div>`+
    d.items.filter(p=>!isPuzzleUnavailable(p)).map((p,i)=>{
-     let diff='–';
-     if(p.difficulty_label){
-       diff=p.difficulty_label;
-       if(p.difficulty_percent!=null){
-         const dp=Number(p.difficulty_percent);
-         if(Number.isFinite(dp)) diff+=` · ${dp>0?'+':''}${dp.toFixed(1)}% ggü. Ø`;
-       }
-     }
      return `<details class="item weeklySession trainingPuzzleSession"><summary>
       <div class="weeklyIndex">${i+1}</div>
       ${p.image_url?`<img class="weeklyThumb" src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.style.display='none'">`:`<div class="weeklyThumb weeklyThumbEmpty">🧩</div>`}
@@ -973,12 +1111,13 @@ async function loadUnsolvedLibrary(){
       ${summarySkipButtonHtml(p)}
      </summary>
      <div class="weeklyDetail">
-       <div class="weeklyFacts">
+       <div class="weeklyFacts trainingFacts4">
          <div class="weeklyFact"><span>Teile</span><strong>${p.pieces||'–'}</strong></div>
-         <div class="weeklyFact"><span>Difficulty</span><strong>${diff}</strong></div>
-         <div class="weeklyFact"><span>MSP Prediction</span><strong>${p.prediction?displayPuzzleTime(p.prediction):'–'}</strong></div>
+         <div class="weeklyFact"><span>Difficulty</span><strong>${readinessEsc(npcDifficulty(p))}</strong></div>
+         <div class="weeklyFact"><span>MSP Prediction</span><strong>${readinessEsc(npcPrediction(p))}</strong></div>
          <div class="weeklyFact"><span>Status</span><strong>First Try</strong></div>
        </div>
+       <div class="trainingCoachNote"><strong>Coach</strong>${readinessEsc(npcUnsolvedCoach(p))}</div>
      </div></details>`;
    }).join('');
  }catch(e){el.textContent='Ungelöste Library derzeit nicht verfügbar.'}
@@ -1000,13 +1139,13 @@ async function loadRepeatPriority(){
     ${summarySkipButtonHtml(p)}
    </summary>
    <div class="weeklyDetail">
-     <div class="weeklyFacts">
+     <div class="weeklyFacts trainingFacts4">
        <div class="weeklyFact"><span>Letzte Zeit</span><strong>${p.latest||'–'}</strong></div>
        <div class="weeklyFact"><span>Best</span><strong>${p.best||'–'}</strong></div>
        <div class="weeklyFact"><span>MSP-Median</span><strong>${p.median||'–'}</strong></div>
        <div class="weeklyFact"><span>Zuletzt</span><strong>${p.days_since_last_solve!=null?'vor '+p.days_since_last_solve+' Tagen':'–'}</strong></div>
      </div>
-     ${p.reasons?.length?`<div class="weeklyCoachReason"><strong>Coach:</strong> ${p.reasons.join(' · ')}</div>`:''}
+     <div class="trainingCoachNote"><strong>Coach</strong>${p.reasons?.length?readinessEsc(p.reasons.join(' · ')):readinessEsc(npcMedianCoach(p))}</div>
    </div></details>`).join('');
  }catch(e){el.textContent='Wiederholungs-Priorität derzeit nicht verfügbar.'}
 }
