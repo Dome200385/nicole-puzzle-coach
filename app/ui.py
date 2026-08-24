@@ -369,7 +369,8 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
   .trainingPuzzleSession .weeklyIndex{
     grid-column:1!important;width:34px!important;height:34px!important;min-width:34px!important;
     display:flex!important;align-items:center!important;justify-content:center!important;
-    margin:0!important;align-self:center!important
+    margin:0!important;align-self:center!important;
+    background:#f1f5f9!important;color:#475569!important;border:0!important;box-shadow:none!important
   }
   .trainingPuzzleSession .weeklyThumb{
     grid-column:2!important;width:74px!important;height:74px!important;
