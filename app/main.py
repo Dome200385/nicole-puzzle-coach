@@ -34,7 +34,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.12.8",
+    version="6.12.9",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -283,7 +283,7 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.12.8","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.12.9","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 
 def _ensure_readiness_history_table(db):
@@ -365,7 +365,7 @@ def pwa_manifest():
 
 @app.get("/sw.js")
 def pwa_service_worker():
-    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v6128';
+    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v6129';
 const SHELL=['/manifest.webmanifest','/pwa/icon-192.png','/pwa/icon-512.png','/pwa/icon-maskable-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(SHELL)).catch(()=>{}));
@@ -403,7 +403,7 @@ def pwa_asset(filename:str):
     return FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.12.8"}
+def health(): return {"status":"ok","version":"6.12.9"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -418,7 +418,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.12.8",
+        "version":"6.12.9",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -617,15 +617,15 @@ async def msp_api_test(db:Session=Depends(get_db)):
         return {"ok":False,"mode":"pat","reason":"MSP_PERSONAL_ACCESS_TOKEN not configured"}
     try:
         profile=await get_profile(token)
-        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.12.8","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
+        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.12.9","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
     except Exception as exc:
-        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.12.8","error":str(exc)}
+        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.12.9","error":str(exc)}
 
 @app.get("/msp/sync-status")
 def msp_sync_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     return {
-        "version":"6.12.8",
+        "version":"6.12.9",
         "snapshot_id":snap.id if snap else None,
         "synced_at":snap.synced_at if snap else None,
         "data_available":snap is not None,
@@ -855,6 +855,102 @@ async def my_competitions(limit:int=30, refresh:bool=False, db:Session=Depends(g
         "api_error":api_error,
         "source":source,
     }
+
+
+@app.get("/debug/tournament-pipeline")
+async def tournament_pipeline_debug(db:Session=Depends(get_db)):
+    import time as _time
+    out={"version":"6.12.9"}
+
+    # Stored data state: this determines snapshot/legacy.
+    snap=_latest_snapshot(db)
+    legacy=_legacy_payload_from_db(db)
+    out["storage"]={
+        "snapshot_present":bool(snap),
+        "snapshot_id":getattr(snap,"id",None) if snap else None,
+        "legacy_results_present":bool((legacy or {}).get("results")),
+        "legacy_confirmed_count":len((legacy or {}).get("confirmed_competitions") or []),
+    }
+    payload,source,snapshot_id=_best_available_payload(db)
+    out["best_available"]={
+        "source":source,
+        "snapshot_id":snapshot_id,
+        "has_payload":bool(payload),
+        "results_present":bool((payload or {}).get("results")),
+        "confirmed_count":len((payload or {}).get("confirmed_competitions") or []),
+    }
+
+    # Exact competition list path.
+    t0=_time.monotonic()
+    try:
+        token=await _valid_access_token(db)
+        cp=await asyncio.wait_for(get_competitions_shared(token,refresh=True),timeout=15.0)
+        if isinstance(cp,dict):
+            rows=cp.get("competitions") or cp.get("data") or cp.get("items") or []
+        elif isinstance(cp,list):
+            rows=cp
+        else:
+            rows=[]
+        conf=_confirmed_from_live_competition_list(cp)
+        out["competition_api"]={
+            "ok":True,
+            "ms":round((_time.monotonic()-t0)*1000),
+            "count":len(rows),
+            "confirmed_count":len(conf),
+            "confirmed_names":[x.get("name") for x in conf],
+        }
+    except Exception as exc:
+        out["competition_api"]={
+            "ok":False,
+            "ms":round((_time.monotonic()-t0)*1000),
+            "error":f"{type(exc).__name__}: {exc}",
+        }
+
+    # Exact endpoint used by frontend.
+    t1=_time.monotonic()
+    try:
+        mc=await my_competitions(limit=30,refresh=False,db=db)
+        out["my_competitions"]={
+            "ok":True,
+            "ms":round((_time.monotonic()-t1)*1000),
+            "count":mc.get("count"),
+            "api_count":mc.get("api_count"),
+            "live_ok":mc.get("live_ok"),
+            "source":mc.get("source"),
+            "api_error":mc.get("api_error"),
+            "names":[x.get("name") for x in (mc.get("competitions") or [])],
+        }
+    except Exception as exc:
+        out["my_competitions"]={
+            "ok":False,
+            "ms":round((_time.monotonic()-t1)*1000),
+            "error":f"{type(exc).__name__}: {exc}",
+        }
+
+    # Exact wm-plan source selection.
+    t2=_time.monotonic()
+    try:
+        wp=await wm_plan(exclude_puzzle_ids=None,db=db)
+        out["wm_plan"]={
+            "ok":True,
+            "ms":round((_time.monotonic()-t2)*1000),
+            "data_mode":wp.get("data_mode"),
+            "data_source":wp.get("data_source"),
+            "snapshot_id":wp.get("snapshot_id"),
+            "resilient":wp.get("resilient"),
+            "live_warning":wp.get("live_warning"),
+            "legacy_result_count":wp.get("legacy_result_count"),
+            "next_competition":(wp.get("next_competition") or {}).get("name") if isinstance(wp.get("next_competition"),dict) else None,
+        }
+    except Exception as exc:
+        out["wm_plan"]={
+            "ok":False,
+            "ms":round((_time.monotonic()-t2)*1000),
+            "error":f"{type(exc).__name__}: {exc}",
+        }
+
+    return out
+
 
 @app.get("/msp/participation-check")
 async def participation_check(limit:int=12,db:Session=Depends(get_db)):
@@ -1335,7 +1431,7 @@ async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
     if exclude_puzzle_ids:
         excluded=[x.strip() for x in exclude_puzzle_ids.split(",") if x.strip()]
 
-    # V6.12.8: one fast live MSP competition-list request.
+    # V6.12.9: one fast live MSP competition-list request.
     # Do not use per-competition registration probing here; it can take tens of seconds
     # and must never decide whether the whole coach is "resilient".
     comps=_merge_competitions(

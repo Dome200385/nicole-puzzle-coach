@@ -10,7 +10,7 @@ from app.config import (
 )
 
 
-# V6.12.8 shared competition cache / single-flight
+# V6.12.9 shared competition cache / single-flight
 _COMPETITIONS_SHARED_CACHE = {"payload": None, "fetched_at": 0.0}
 _COMPETITIONS_SHARED_LOCK = asyncio.Lock()
 _COMPETITIONS_SHARED_TTL = 900.0

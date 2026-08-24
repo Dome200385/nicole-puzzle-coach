@@ -302,6 +302,15 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 </section>
 
 
+
+<section class="card full" data-app-page="today">
+  <h2>🧪 Turnier-Pipeline Diagnose</h2>
+  <div class="small">Prüft nur Datenquelle, Competition-API und die zwei betroffenen Backend-Pfade.</div>
+  <button class="secondary" style="margin-top:8px" onclick="runTournamentPipelineDebug()">Diagnose starten</button>
+  <div id="pipelineDiagStatus" class="small" style="margin-top:8px">Noch nicht ausgeführt.</div>
+  <div id="pipelineDiagResult" class="list" style="margin-top:8px"></div>
+</section>
+
 <section class="card half hero appSection" id="appToday" data-app-page="today"><h2>🏆 Mein nächstes Turnier</h2><div id="nextMspCompetition" class="small">Prüfe bestätigte Anmeldung…</div></section>
 <section class="card half hero" data-app-page="today"><h2>🎯 Coach-Empfehlung</h2><div id="coachRecommendation" class="small">Analysiere MySpeedPuzzling-Ergebnisse…</div></section>
 
@@ -1214,6 +1223,48 @@ function renderCompetitionTerminalState(message){
   });
 }
 setTimeout(()=>renderCompetitionTerminalState('Turnierdaten momentan nicht verfügbar.'),15000);
+
+
+async function runTournamentPipelineDebug(){
+ const s=document.getElementById('pipelineDiagStatus');
+ const b=document.getElementById('pipelineDiagResult');
+ s.textContent='Diagnose läuft…'; b.innerHTML='';
+ try{
+   const ctrl=new AbortController();
+   const timer=setTimeout(()=>ctrl.abort(),45000);
+   const r=await fetch('/debug/tournament-pipeline',{cache:'no-store',signal:ctrl.signal});
+   clearTimeout(timer);
+   const txt=await r.text();
+   let d; try{d=JSON.parse(txt)}catch(_){throw new Error(`HTTP ${r.status}: ${txt.slice(0,250)}`)}
+   if(!r.ok)throw new Error(`HTTP ${r.status}`);
+   const st=d.storage||{}, ba=d.best_available||{}, ca=d.competition_api||{}, mc=d.my_competitions||{}, wp=d.wm_plan||{};
+   s.innerHTML=`Version <strong>${readinessEsc(d.version||'–')}</strong>`;
+   b.innerHTML=`
+    <div class="item"><strong>1. Gespeicherte Daten</strong>
+      <div class="small">Snapshot vorhanden: <strong>${st.snapshot_present?'JA':'NEIN'}</strong> · ID ${st.snapshot_id??'–'}</div>
+      <div class="small">Legacy Results vorhanden: ${st.legacy_results_present?'JA':'NEIN'}</div>
+      <div class="small">_best_available_payload → <strong>${readinessEsc(String(ba.source||'–'))}</strong></div>
+    </div>
+    <div class="item"><strong>2. MSP Competition API</strong>
+      <div class="small">${ca.ok?'✅ OK':'❌ FEHLER'} · ${ca.ms??'–'} ms · Count ${ca.count??'–'} · bestätigt ${ca.confirmed_count??'–'}</div>
+      <div class="small">${readinessEsc(ca.error||((ca.confirmed_names||[]).join(' · '))||'–')}</div>
+    </div>
+    <div class="item"><strong>3. /msp/my-competitions</strong>
+      <div class="small">${mc.ok?'✅ OK':'❌ FEHLER'} · ${mc.ms??'–'} ms · count ${mc.count??'–'} · API ${mc.api_count??'–'}</div>
+      <div class="small">source=${readinessEsc(String(mc.source??'–'))} · live_ok=${String(mc.live_ok)}</div>
+      <div class="small">${readinessEsc(mc.error||mc.api_error||((mc.names||[]).join(' · '))||'–')}</div>
+    </div>
+    <div class="item"><strong>4. /coach/wm-plan</strong>
+      <div class="small">${wp.ok?'✅ OK':'❌ FEHLER'} · ${wp.ms??'–'} ms</div>
+      <div class="small">data_mode=<strong>${readinessEsc(String(wp.data_mode??'–'))}</strong> · data_source=${readinessEsc(String(wp.data_source??'–'))}</div>
+      <div class="small">resilient=<strong>${String(wp.resilient)}</strong> · Snapshot ${wp.snapshot_id??'–'} · Legacy ${wp.legacy_result_count??'–'}</div>
+      <div class="small">${readinessEsc(wp.error||wp.live_warning||('Next: '+(wp.next_competition||'–')))}</div>
+    </div>`;
+ }catch(e){
+   s.textContent='Diagnose fehlgeschlagen.';
+   b.innerHTML=`<div class="item small">${readinessEsc(e.name==='AbortError'?'Timeout nach 45 Sekunden':(e.message||String(e)))}</div>`;
+ }
+}
 
 async function loadAll(){renderUnavailable();
  let coreHasMspData=false;
