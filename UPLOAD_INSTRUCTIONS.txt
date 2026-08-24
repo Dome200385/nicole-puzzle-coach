@@ -1,12 +1,13 @@
-TRAINING UI POLISH + WEEKLY SKIP
+TRAINING FIXED GRID CARDS
 
-Changes:
-- Skip button is now always visible in weekly-plan puzzle cards.
-- Skip remains "borrowed / unavailable" only; nothing is deleted.
-- Skipped puzzles still return through "Wieder verfügbar" / "Alle wieder verfügbar".
-- "Heute trainieren" explanation and Skip action are visually separated.
-- Training puzzle cards use one consistent mobile layout:
-  same image size, spacing, rank alignment, text structure and margins.
-- Median-gap, repeat-priority and unsolved cards use the same visible Skip pattern.
+- existing Skip / restore logic unchanged
+- fixed columns for rank, image, text, badge and arrow
+- identical image dimensions and X positions
+- titles capped at two lines
+- summary text capped at two lines
+- Skip aligned consistently
+- consistent card heights and spacing
+- weekly plan and ranked training lists use the same geometry
+- more compact 'Heute trainieren' hero
 
 Deploy the complete project as usual.

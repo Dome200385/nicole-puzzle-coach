@@ -349,6 +349,91 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
  padding:9px;margin-top:8px;max-height:300px;overflow:auto
 }
 .diagDetails summary{cursor:pointer}
+
+/* === TRAINING FIXED GRID CARDS === */
+@media(max-width:760px){
+  .trainingPuzzleSession{margin:0!important;border-radius:14px!important;overflow:hidden}
+  .trainingPuzzleSession + .trainingPuzzleSession{margin-top:10px!important}
+
+  .trainingPuzzleSession > summary{
+    display:grid!important;
+    grid-template-columns:36px 74px minmax(0,1fr) 68px 18px!important;
+    column-gap:10px!important;
+    align-items:center!important;
+    min-height:116px!important;
+    padding:12px 10px!important;
+    list-style:none!important
+  }
+  .trainingPuzzleSession > summary::-webkit-details-marker{display:none!important}
+
+  .trainingPuzzleSession .weeklyIndex{
+    grid-column:1!important;width:34px!important;height:34px!important;min-width:34px!important;
+    display:flex!important;align-items:center!important;justify-content:center!important;
+    margin:0!important;align-self:center!important
+  }
+  .trainingPuzzleSession .weeklyThumb{
+    grid-column:2!important;width:74px!important;height:74px!important;
+    max-width:74px!important;max-height:74px!important;object-fit:cover!important;
+    border-radius:12px!important;margin:0!important;align-self:center!important
+  }
+  .trainingPuzzleSession .weeklySummaryText{
+    grid-column:3!important;min-width:0!important;padding:0!important;margin:0!important;align-self:center!important
+  }
+  .trainingPuzzleSession .weeklySessionTitle{
+    display:block!important;position:relative!important;min-width:0!important
+  }
+  .trainingPuzzleSession .weeklySessionTitle strong{
+    display:-webkit-box!important;-webkit-box-orient:vertical!important;-webkit-line-clamp:2!important;
+    overflow:hidden!important;font-size:15px!important;line-height:1.18!important;margin:0!important;max-width:100%!important
+  }
+  .trainingPuzzleSession .weeklyPuzzleName{
+    margin-top:3px!important;font-size:12px!important;line-height:1.22!important;
+    white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important
+  }
+  .trainingPuzzleSession .weeklySummaryText>.small{
+    display:-webkit-box!important;-webkit-box-orient:vertical!important;-webkit-line-clamp:2!important;
+    overflow:hidden!important;margin-top:3px!important;font-size:11px!important;line-height:1.25!important;min-height:28px!important
+  }
+  .trainingPuzzleSession .weeklyIntensity{
+    position:absolute!important;left:calc(100% + 10px)!important;top:0!important;
+    width:68px!important;margin:0!important;text-align:center!important;white-space:nowrap!important;
+    font-size:10px!important;padding:5px 4px!important
+  }
+  .trainingPuzzleSession > summary:after{
+    grid-column:5!important;justify-self:center!important;align-self:center!important;margin:0!important
+  }
+  .trainingPuzzleSession .skipBtnCompact{
+    display:block!important;margin:8px 0 0!important;width:100%!important;max-width:190px!important;
+    min-height:34px!important;padding:7px 10px!important;font-size:11px!important;line-height:1.1!important;white-space:nowrap!important
+  }
+  .trainingPuzzleSession .weeklyDetail{
+    margin:0 10px 10px 130px!important;padding-top:8px!important
+  }
+
+  #wmWeeklyPlan .trainingPuzzleSession > summary{
+    grid-template-columns:36px 74px minmax(0,1fr) 68px 18px!important
+  }
+
+  .trainingQuick{padding:14px!important}
+  .trainingQuickHero{
+    display:grid!important;grid-template-columns:96px minmax(0,1fr)!important;
+    gap:14px!important;align-items:center!important
+  }
+  .trainingQuickImage{width:96px!important;height:96px!important;border-radius:13px!important;margin:0!important}
+  .trainingQuickMain{min-width:0!important}
+  .trainingQuickMain strong{font-size:19px!important;line-height:1.15!important}
+  .trainingQuickStats{grid-template-columns:1fr 1fr 1fr 1fr!important;gap:6px!important;margin-top:12px!important}
+  .trainingQuickStats>div{padding:8px!important;min-height:62px!important}
+  .trainingQuickStats span{font-size:9px!important}
+  .trainingQuickStats strong{font-size:13px!important;line-height:1.2!important}
+  .trainingQuickReason{margin-top:9px!important}
+  .trainingQuickReasonText{font-size:10.5px!important;line-height:1.38!important}
+  .trainingQuickAction{margin-top:9px!important}
+  .trainingQuickAction .skipBtn{
+    width:auto!important;min-width:190px!important;max-width:100%!important;padding:9px 12px!important
+  }
+}
+
 </style></head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
