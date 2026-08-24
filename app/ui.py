@@ -1239,6 +1239,7 @@ function renderTournamentLoadError(){
 
 async function loadAll(){renderUnavailable();
  let coreHasMspData=false;
+ let coreDataSource='none';
  // Performance V6.9.6: independent API calls start immediately in parallel.
  const exPrefetch=unavailableIds();
  const statusPromise=getj('/coach/status');
@@ -1268,7 +1269,7 @@ async function loadAll(){renderUnavailable();
        return;
      }
    }
-   coreHasMspData=!!st.has_myspeedpuzzling_data;systemKpi.textContent='OK';systemText.textContent=`Backend V${st.version} · Frontend V${NPC_FRONTEND_VERSION} · Datenbank ok`;systemBadge.textContent='🟢 System bereit';mspKpi.textContent=st.has_myspeedpuzzling_data?'DATA':(st.pat_configured?'PAT':(st.oauth_configured?'READY':'WAIT'));mspText.textContent=st.data_source==='legacy'?'Historische DB-Daten aktiv':(st.has_myspeedpuzzling_data?`MSP-Daten synchronisiert · Snapshot #${st.latest_snapshot_id||'–'}`:(st.pat_configured?'PAT eingerichtet · noch kein Snapshot':'Verbindung möglich'))}catch(e){systemBadge.textContent='🔴 Fehler'}
+   coreHasMspData=!!st.has_myspeedpuzzling_data;coreDataSource=st.data_source||'none';systemKpi.textContent='OK';systemText.textContent=`Backend V${st.version} · Frontend V${NPC_FRONTEND_VERSION} · Datenbank ok`;systemBadge.textContent='🟢 System bereit';mspKpi.textContent=st.has_myspeedpuzzling_data?'DATA':(st.pat_configured?'PAT':(st.oauth_configured?'READY':'WAIT'));mspText.textContent=st.data_source==='legacy'?'Historische DB-Daten aktiv':(st.has_myspeedpuzzling_data?`MSP-Daten synchronisiert · Snapshot #${st.latest_snapshot_id||'–'}`:(st.pat_configured?'PAT eingerichtet · noch kein Snapshot':'Verbindung möglich'))}catch(e){systemBadge.textContent='🔴 Fehler'}
 
  try{
    let a=await summaryPromise;
@@ -1378,10 +1379,11 @@ async function loadAll(){renderUnavailable();
 
    const resilientBannerEl=document.getElementById('resilientBanner');
    const resilientTextEl=document.getElementById('resilientText');
-   // Resilient Mode is an explicit backend state.
-   // data_mode can temporarily be "legacy" when only the separate competition
-   // metadata request times out; that must not label the whole coach resilient.
-   if(w.resilient===true){
+   // Resilient Mode requires TWO independent backend signals:
+   // 1) /coach/status says the core source is legacy, and
+   // 2) /coach/wm-plan explicitly says resilient=true.
+   // A normal official API SyncSnapshot can therefore never show this banner.
+   if(w.resilient===true && coreDataSource==='legacy'){
      if(resilientBannerEl) resilientBannerEl.style.display='block';
      if(resilientTextEl) resilientTextEl.innerHTML=`MySpeedPuzzling-Kerndaten sind aktuell nicht aus einem verwertbaren offiziellen Sync verfügbar. Der Coach rekonstruiert die Vorbereitung aus <strong>${w.legacy_result_count||0} historischen Trainingsdatensätzen</strong>.${w.live_warning?`<br>${w.live_warning}`:''}`;
      mspKpi.textContent='LEGACY';
