@@ -576,6 +576,336 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
   }
 }
 
+
+/* =========================================================
+   TRAINING VISUAL UNIFICATION — CSS ONLY
+   No logic / order / data / structure changes
+   ========================================================= */
+@media(max-width:760px){
+
+  /* ---------- Shared card language ---------- */
+  .trainingPuzzleSession,
+  #wmWeeklyPlan .weeklySession{
+    border:1px solid #e1e6ee!important;
+    border-radius:16px!important;
+    background:#fff!important;
+    box-shadow:none!important;
+    overflow:hidden!important;
+  }
+
+  .trainingPuzzleSession + .trainingPuzzleSession,
+  #wmWeeklyPlan .weeklySession + .weeklySession{
+    margin-top:12px!important;
+  }
+
+  /* ---------- Shared top row ---------- */
+  .trainingPuzzleSession > summary,
+  #wmWeeklyPlan .weeklySession > summary{
+    padding:14px 12px!important;
+  }
+
+  .trainingPuzzleSession .weeklyThumb,
+  #wmWeeklyPlan .weeklyThumb{
+    width:82px!important;
+    height:82px!important;
+    max-width:82px!important;
+    max-height:82px!important;
+    border-radius:14px!important;
+    object-fit:cover!important;
+    background:#f4f6f9!important;
+  }
+
+  .trainingPuzzleSession .weeklyIndex,
+  #wmWeeklyPlan .weeklyIndex{
+    width:36px!important;
+    height:36px!important;
+    min-width:36px!important;
+    border-radius:50%!important;
+    background:#f5f7fa!important;
+    color:#475467!important;
+    font-size:15px!important;
+    font-weight:700!important;
+  }
+
+  .trainingPuzzleSession .weeklySessionTitle strong,
+  #wmWeeklyPlan .weeklySessionTitle strong{
+    color:#202939!important;
+    font-size:16px!important;
+    line-height:1.22!important;
+    font-weight:750!important;
+  }
+
+  .trainingPuzzleSession .weeklyPuzzleName,
+  #wmWeeklyPlan .weeklyPuzzleName{
+    color:#667085!important;
+    font-size:12.5px!important;
+    line-height:1.3!important;
+    font-weight:600!important;
+  }
+
+  .trainingPuzzleSession .weeklySummaryText > .small,
+  #wmWeeklyPlan .weeklySummaryText > .small{
+    color:#667085!important;
+    font-size:11.5px!important;
+    line-height:1.35!important;
+  }
+
+  .weeklyIntensity{
+    border:0!important;
+    border-radius:999px!important;
+    background:#f2f4f7!important;
+    color:#475467!important;
+    font-weight:600!important;
+    box-shadow:none!important;
+  }
+
+  /* ---------- Skip button: identical everywhere ---------- */
+  .trainingPuzzleSession .skipBtnCompact,
+  #wmWeeklyPlan .skipBtnCompact,
+  .trainingQuickAction .skipBtn{
+    box-sizing:border-box!important;
+    min-height:42px!important;
+    border:1.5px solid #df8e8e!important;
+    border-radius:12px!important;
+    background:#fff!important;
+    color:#a83f3f!important;
+    font-size:12.5px!important;
+    line-height:1.1!important;
+    font-weight:750!important;
+    box-shadow:none!important;
+  }
+
+  #medianGapFocus .trainingPuzzleSession .skipBtnCompact,
+  #repeatPriority .trainingPuzzleSession .skipBtnCompact,
+  #unsolvedLibrary .trainingPuzzleSession .skipBtnCompact{
+    width:100%!important;
+    max-width:none!important;
+    min-width:0!important;
+  }
+
+  /* ---------- Expanded detail: use full usable card width ---------- */
+  #medianGapFocus .weeklyDetail,
+  #repeatPriority .weeklyDetail,
+  #unsolvedLibrary .weeklyDetail,
+  #wmWeeklyPlan .weeklyDetail{
+    box-sizing:border-box!important;
+    margin:0!important;
+    padding:0 14px 14px 14px!important;
+    width:100%!important;
+  }
+
+  /* Key change: metrics no longer look like a narrow right-side column */
+  #medianGapFocus .trainingFacts4,
+  #repeatPriority .trainingFacts4,
+  #unsolvedLibrary .trainingFacts4,
+  #wmWeeklyPlan .weeklyFacts{
+    display:grid!important;
+    grid-template-columns:1fr 1fr!important;
+    gap:9px!important;
+    width:100%!important;
+    margin-top:8px!important;
+  }
+
+  #medianGapFocus .trainingFacts4 .weeklyFact,
+  #repeatPriority .trainingFacts4 .weeklyFact,
+  #unsolvedLibrary .trainingFacts4 .weeklyFact,
+  #wmWeeklyPlan .weeklyFact{
+    box-sizing:border-box!important;
+    min-width:0!important;
+    min-height:82px!important;
+    padding:12px!important;
+    border:1px solid #e2e7ee!important;
+    border-radius:13px!important;
+    background:#fbfcfd!important;
+    box-shadow:none!important;
+  }
+
+  #medianGapFocus .weeklyFact span,
+  #repeatPriority .weeklyFact span,
+  #unsolvedLibrary .weeklyFact span,
+  #wmWeeklyPlan .weeklyFact span{
+    display:block!important;
+    color:#7b8493!important;
+    font-size:9.5px!important;
+    line-height:1.15!important;
+    font-weight:500!important;
+    text-transform:uppercase!important;
+    letter-spacing:.035em!important;
+  }
+
+  #medianGapFocus .weeklyFact strong,
+  #repeatPriority .weeklyFact strong,
+  #unsolvedLibrary .weeklyFact strong,
+  #wmWeeklyPlan .weeklyFact strong{
+    display:block!important;
+    margin-top:7px!important;
+    color:#273142!important;
+    font-size:16px!important;
+    line-height:1.18!important;
+    font-weight:750!important;
+    overflow-wrap:anywhere!important;
+  }
+
+  /* ---------- Coach card: same visual component everywhere ---------- */
+  .trainingCoachNote,
+  .weeklyCoachReason,
+  #wmWeeklyPlan .weeklyCoachReason{
+    box-sizing:border-box!important;
+    width:100%!important;
+    margin:10px 0 0!important;
+    padding:12px 13px!important;
+    border:1px solid #dbe6f4!important;
+    border-radius:13px!important;
+    background:#f7faff!important;
+    color:#5f6b7c!important;
+    font-size:11.5px!important;
+    line-height:1.48!important;
+    box-shadow:none!important;
+  }
+
+  .trainingCoachNote strong,
+  .weeklyCoachReason strong,
+  #wmWeeklyPlan .weeklyCoachReason strong{
+    display:block!important;
+    margin:0 0 5px!important;
+    color:#344054!important;
+    font-size:12px!important;
+    font-weight:750!important;
+  }
+
+  /* ---------- More compact expanded cards ---------- */
+  #medianGapFocus .trainingPuzzleSession[open],
+  #repeatPriority .trainingPuzzleSession[open],
+  #unsolvedLibrary .trainingPuzzleSession[open],
+  #wmWeeklyPlan .weeklySession[open]{
+    padding-bottom:0!important;
+    background:#fff!important;
+  }
+
+  /* ---------- Adaptive Preparation / "Heute trainieren" ----------
+     Same visual language, without touching its structure. */
+  .trainingQuick{
+    border:1px solid #e1e6ee!important;
+    border-radius:16px!important;
+    background:#fff!important;
+    box-shadow:none!important;
+    padding:16px!important;
+  }
+
+  .trainingQuickHero{
+    gap:14px!important;
+    align-items:center!important;
+  }
+
+  .trainingQuickImage{
+    width:96px!important;
+    height:96px!important;
+    border-radius:14px!important;
+    object-fit:cover!important;
+    background:#f4f6f9!important;
+  }
+
+  .trainingQuickMain .eyebrow,
+  .trainingQuickMain .small{
+    color:#7b8493!important;
+  }
+
+  .trainingQuickMain strong{
+    color:#202939!important;
+    font-size:20px!important;
+    line-height:1.15!important;
+    font-weight:750!important;
+  }
+
+  .trainingQuickStats{
+    display:grid!important;
+    grid-template-columns:1fr 1fr!important;
+    gap:9px!important;
+    margin-top:13px!important;
+  }
+
+  .trainingQuickStats > div{
+    box-sizing:border-box!important;
+    min-height:82px!important;
+    padding:12px!important;
+    border:1px solid #e2e7ee!important;
+    border-radius:13px!important;
+    background:#fbfcfd!important;
+  }
+
+  .trainingQuickStats span{
+    display:block!important;
+    color:#7b8493!important;
+    font-size:9.5px!important;
+    line-height:1.15!important;
+    text-transform:uppercase!important;
+    letter-spacing:.035em!important;
+  }
+
+  .trainingQuickStats strong{
+    display:block!important;
+    margin-top:7px!important;
+    color:#273142!important;
+    font-size:16px!important;
+    line-height:1.18!important;
+    font-weight:750!important;
+  }
+
+  .trainingQuickReason{
+    box-sizing:border-box!important;
+    width:100%!important;
+    margin-top:10px!important;
+    padding:12px 13px!important;
+    border:1px solid #dbe6f4!important;
+    border-radius:13px!important;
+    background:#f7faff!important;
+  }
+
+  .trainingQuickReasonText{
+    color:#5f6b7c!important;
+    font-size:11.5px!important;
+    line-height:1.48!important;
+  }
+
+  /* ---------- Weekly-plan list ----------
+     Same look, same existing layout/order/behavior. */
+  #wmWeeklyPlan{
+    gap:12px!important;
+  }
+
+  #wmWeeklyPlan .weeklySession{
+    margin:0!important;
+  }
+
+  #wmWeeklyPlan .weeklyDetail{
+    border-top:0!important;
+  }
+
+  #wmWeeklyPlan .weeklyPills{
+    margin-top:10px!important;
+    gap:6px!important;
+  }
+
+  #wmWeeklyPlan .pill{
+    border:0!important;
+    background:#f2f4f7!important;
+    color:#475467!important;
+    border-radius:999px!important;
+    box-shadow:none!important;
+  }
+
+  /* ---------- Section containers ---------- */
+  .trainingDropdownBody{
+    padding:10px!important;
+  }
+
+  .trainingListIntro{
+    margin:4px 4px 14px!important;
+    color:#77808f!important;
+    line-height:1.45!important;
+  }
+}
+
 </style></head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
