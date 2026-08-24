@@ -864,7 +864,460 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
   #appTraining .trainingListIntro{margin:2px 2px 14px!important;color:#77808f!important;line-height:1.45!important}
 }
 
-</style></head>
+
+/* =========================================================
+   FINAL UNIFIED MOBILE CARD GEOMETRY
+   CSS ONLY — no logic/order/data changes
+   ========================================================= */
+@media(max-width:760px){
+
+  /* ---- Shared summary geometry for ALL puzzle rows ---- */
+  .trainingPuzzleSession > summary,
+  #wmWeeklyPlan .weeklySession > summary{
+    display:grid!important;
+    grid-template-columns:38px 92px minmax(0,1fr) 22px!important;
+    grid-template-rows:auto auto!important;
+    column-gap:12px!important;
+    row-gap:10px!important;
+    align-items:center!important;
+    width:100%!important;
+    min-width:0!important;
+    box-sizing:border-box!important;
+    padding:14px!important;
+  }
+
+  .trainingPuzzleSession .weeklyIndex,
+  #wmWeeklyPlan .weeklyIndex{
+    grid-column:1!important;
+    grid-row:1 / 3!important;
+    align-self:center!important;
+    justify-self:center!important;
+    margin:0!important;
+  }
+
+  .trainingPuzzleSession .weeklyThumb,
+  #wmWeeklyPlan .weeklyThumb{
+    grid-column:2!important;
+    grid-row:1 / 3!important;
+    align-self:center!important;
+    justify-self:center!important;
+    width:92px!important;
+    height:92px!important;
+    max-width:92px!important;
+    max-height:92px!important;
+    margin:0!important;
+  }
+
+  .trainingPuzzleSession .weeklySummaryText,
+  #wmWeeklyPlan .weeklySummaryText{
+    grid-column:3!important;
+    grid-row:1!important;
+    min-width:0!important;
+    width:100%!important;
+    margin:0!important;
+    padding:0!important;
+    align-self:end!important;
+  }
+
+  .trainingPuzzleSession .weeklySessionTitle,
+  #wmWeeklyPlan .weeklySessionTitle{
+    position:static!important;
+    display:block!important;
+    width:100%!important;
+    min-width:0!important;
+    margin:0!important;
+    padding:0!important;
+  }
+
+  .trainingPuzzleSession .weeklySessionTitle strong,
+  #wmWeeklyPlan .weeklySessionTitle strong{
+    display:-webkit-box!important;
+    -webkit-box-orient:vertical!important;
+    -webkit-line-clamp:2!important;
+    overflow:hidden!important;
+    white-space:normal!important;
+    text-overflow:ellipsis!important;
+    word-break:normal!important;
+    overflow-wrap:anywhere!important;
+    max-width:100%!important;
+    margin:0!important;
+    font-size:16px!important;
+    line-height:1.22!important;
+  }
+
+  .trainingPuzzleSession .weeklyPuzzleName,
+  #wmWeeklyPlan .weeklyPuzzleName{
+    display:block!important;
+    width:100%!important;
+    min-width:0!important;
+    margin:4px 0 0!important;
+    white-space:normal!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    overflow-wrap:anywhere!important;
+    font-size:12.5px!important;
+    line-height:1.3!important;
+  }
+
+  .trainingPuzzleSession .weeklySummaryText > .small,
+  #wmWeeklyPlan .weeklySummaryText > .small{
+    display:-webkit-box!important;
+    -webkit-box-orient:vertical!important;
+    -webkit-line-clamp:2!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    margin:4px 0 0!important;
+    overflow:hidden!important;
+    white-space:normal!important;
+    text-overflow:ellipsis!important;
+    overflow-wrap:anywhere!important;
+    font-size:11.5px!important;
+    line-height:1.32!important;
+  }
+
+  /* badge is inline; never steals the text column */
+  .trainingPuzzleSession .weeklyIntensity,
+  #wmWeeklyPlan .weeklyIntensity{
+    position:static!important;
+    display:inline-flex!important;
+    width:auto!important;
+    max-width:100%!important;
+    margin:5px 0 0!important;
+    padding:5px 9px!important;
+    white-space:nowrap!important;
+  }
+
+  .trainingPuzzleSession > summary:after,
+  #wmWeeklyPlan .weeklySession > summary:after{
+    grid-column:4!important;
+    grid-row:1 / 3!important;
+    align-self:center!important;
+    justify-self:center!important;
+    margin:0!important;
+  }
+
+  /* ---- Skip button gets a dedicated row ---- */
+  .trainingPuzzleSession .skipBtnCompact,
+  #wmWeeklyPlan .skipBtnCompact{
+    grid-column:3!important;
+    grid-row:2!important;
+    justify-self:stretch!important;
+    align-self:start!important;
+    display:block!important;
+    width:100%!important;
+    max-width:none!important;
+    min-width:0!important;
+    margin:0!important;
+    box-sizing:border-box!important;
+  }
+
+  /* ---- Expanded detail ALWAYS full width below summary ---- */
+  .trainingPuzzleSession .weeklyDetail,
+  #wmWeeklyPlan .weeklyDetail,
+  #medianGapFocus .weeklyDetail,
+  #repeatPriority .weeklyDetail,
+  #unsolvedLibrary .weeklyDetail{
+    display:block!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    margin:0!important;
+    padding:12px 14px 14px!important;
+    box-sizing:border-box!important;
+    clear:both!important;
+  }
+
+  .trainingPuzzleSession .weeklyFacts,
+  #wmWeeklyPlan .weeklyFacts,
+  .trainingFacts4{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+    gap:10px!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    margin:0!important;
+    box-sizing:border-box!important;
+  }
+
+  .trainingPuzzleSession .weeklyFact,
+  #wmWeeklyPlan .weeklyFact,
+  .trainingFacts4 .weeklyFact{
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    box-sizing:border-box!important;
+    padding:12px!important;
+    min-height:84px!important;
+  }
+
+  .trainingPuzzleSession .weeklyFact span,
+  #wmWeeklyPlan .weeklyFact span{
+    display:block!important;
+    max-width:100%!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+  }
+
+  .trainingPuzzleSession .weeklyFact strong,
+  #wmWeeklyPlan .weeklyFact strong{
+    display:block!important;
+    max-width:100%!important;
+    min-width:0!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+    word-break:normal!important;
+  }
+
+  /* ---- Coach boxes: identical and full width ---- */
+  .trainingCoachNote,
+  .weeklyCoachReason,
+  #wmWeeklyPlan .weeklyCoachReason{
+    display:block!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    margin:10px 0 0!important;
+    padding:12px 13px!important;
+    box-sizing:border-box!important;
+    overflow:hidden!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+  }
+
+  /* ---- Weekly plan: keep current VERTICAL structure ---- */
+  #wmWeeklyPlan{
+    display:block!important;
+    width:100%!important;
+    max-width:100%!important;
+  }
+
+  #wmWeeklyPlan .weeklySession{
+    display:block!important;
+    width:100%!important;
+    max-width:100%!important;
+    margin:0 0 12px!important;
+  }
+
+  /* ---- Adaptive Preparation: same visual proportions without structural changes ---- */
+  .trainingQuick{
+    width:100%!important;
+    max-width:100%!important;
+    box-sizing:border-box!important;
+  }
+
+  .trainingQuickHero{
+    display:grid!important;
+    grid-template-columns:104px minmax(0,1fr)!important;
+    gap:14px!important;
+    width:100%!important;
+    min-width:0!important;
+    align-items:center!important;
+  }
+
+  .trainingQuickImage{
+    width:104px!important;
+    height:104px!important;
+    max-width:104px!important;
+    max-height:104px!important;
+  }
+
+  .trainingQuickMain{
+    min-width:0!important;
+    width:100%!important;
+  }
+
+  .trainingQuickMain strong,
+  .trainingQuickMain .small{
+    max-width:100%!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+  }
+
+  .trainingQuickStats{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+    gap:10px!important;
+    width:100%!important;
+  }
+
+  .trainingQuickStats > div{
+    min-width:0!important;
+    width:100%!important;
+    box-sizing:border-box!important;
+  }
+
+  .trainingQuickReason,
+  .trainingQuickAction{
+    width:100%!important;
+    max-width:100%!important;
+    box-sizing:border-box!important;
+  }
+
+  .trainingQuickAction .skipBtn{
+    width:100%!important;
+    max-width:none!important;
+    box-sizing:border-box!important;
+  }
+
+  /* ---- Hard anti-overflow guards ---- */
+  .trainingPuzzleSession,
+  .trainingPuzzleSession *,
+  #wmWeeklyPlan,
+  #wmWeeklyPlan *,
+  .trainingQuick,
+  .trainingQuick *{
+    box-sizing:border-box!important;
+  }
+
+  .trainingPuzzleSession,
+  #wmWeeklyPlan .weeklySession,
+  .trainingQuick{
+    overflow:hidden!important;
+  }
+}
+
+</style>
+<style id="npc-final-mobile-override">
+@media(max-width:760px){
+  /* one geometry for all training puzzle cards */
+  .trainingPuzzleSession > summary,
+  #wmWeeklyPlan .weeklySession > summary{
+    display:grid!important;
+    grid-template-columns:32px 76px minmax(0,1fr) 18px!important;
+    grid-template-rows:auto auto!important;
+    column-gap:8px!important;
+    row-gap:9px!important;
+    align-items:center!important;
+    width:100%!important;max-width:100%!important;min-width:0!important;
+    padding:12px!important;margin:0!important;box-sizing:border-box!important;
+  }
+  .trainingPuzzleSession .weeklyIndex,#wmWeeklyPlan .weeklyIndex{
+    grid-column:1!important;grid-row:1 / 3!important;align-self:center!important;justify-self:center!important;
+    width:32px!important;height:32px!important;min-width:32px!important;margin:0!important;font-size:14px!important;
+  }
+  .trainingPuzzleSession .weeklyThumb,#wmWeeklyPlan .weeklyThumb{
+    grid-column:2!important;grid-row:1 / 3!important;align-self:center!important;justify-self:center!important;
+    width:76px!important;height:76px!important;max-width:76px!important;max-height:76px!important;margin:0!important;
+    border-radius:12px!important;object-fit:cover!important;
+  }
+  .trainingPuzzleSession .weeklySummaryText,#wmWeeklyPlan .weeklySummaryText{
+    grid-column:3!important;grid-row:1!important;align-self:end!important;
+    width:100%!important;max-width:100%!important;min-width:0!important;margin:0!important;padding:0!important;
+  }
+  .trainingPuzzleSession .weeklySessionTitle,#wmWeeklyPlan .weeklySessionTitle{
+    position:static!important;display:block!important;width:100%!important;max-width:100%!important;min-width:0!important;margin:0!important;padding:0!important;
+  }
+  .trainingPuzzleSession .weeklySessionTitle strong{
+    display:-webkit-box!important;-webkit-box-orient:vertical!important;-webkit-line-clamp:2!important;
+    overflow:hidden!important;text-overflow:ellipsis!important;white-space:normal!important;
+    overflow-wrap:normal!important;word-break:normal!important;hyphens:none!important;
+    width:100%!important;max-width:100%!important;font-size:15px!important;line-height:1.2!important;
+  }
+  #wmWeeklyPlan .weeklySessionTitle strong{
+    display:-webkit-box!important;-webkit-box-orient:vertical!important;-webkit-line-clamp:2!important;
+    overflow:hidden!important;text-overflow:ellipsis!important;white-space:normal!important;
+    overflow-wrap:normal!important;word-break:normal!important;hyphens:none!important;
+    width:100%!important;max-width:100%!important;font-size:14px!important;line-height:1.18!important;
+  }
+  .trainingPuzzleSession .weeklyPuzzleName,#wmWeeklyPlan .weeklyPuzzleName{
+    display:block!important;width:100%!important;max-width:100%!important;min-width:0!important;margin:4px 0 0!important;
+    white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
+    overflow-wrap:normal!important;word-break:normal!important;hyphens:none!important;
+    font-size:11.5px!important;line-height:1.25!important;
+  }
+  .trainingPuzzleSession .weeklySummaryText>.small,#wmWeeklyPlan .weeklySummaryText>.small{
+    display:-webkit-box!important;-webkit-box-orient:vertical!important;-webkit-line-clamp:2!important;
+    width:100%!important;max-width:100%!important;min-width:0!important;margin:4px 0 0!important;
+    overflow:hidden!important;text-overflow:ellipsis!important;white-space:normal!important;
+    overflow-wrap:normal!important;word-break:normal!important;hyphens:none!important;
+    font-size:10.5px!important;line-height:1.25!important;
+  }
+  .trainingPuzzleSession .weeklyIntensity,#wmWeeklyPlan .weeklyIntensity{
+    position:static!important;display:inline-flex!important;width:auto!important;max-width:100%!important;
+    margin:5px 0 0!important;padding:4px 8px!important;white-space:nowrap!important;font-size:10px!important;
+  }
+  .trainingPuzzleSession > summary:after,#wmWeeklyPlan .weeklySession > summary:after{
+    grid-column:4!important;grid-row:1 / 3!important;align-self:center!important;justify-self:center!important;margin:0!important;
+  }
+  /* skip has dedicated row */
+  .trainingPuzzleSession > summary > .skipBtnCompact,
+  #wmWeeklyPlan .weeklySummaryText>.skipBtnCompact,
+  #wmWeeklyPlan .weeklySession > summary > .skipBtnCompact{
+    grid-column:3!important;grid-row:2!important;display:block!important;justify-self:stretch!important;align-self:start!important;
+    width:100%!important;max-width:none!important;min-width:0!important;min-height:38px!important;margin:0!important;padding:8px 9px!important;
+    font-size:11.5px!important;line-height:1.1!important;box-sizing:border-box!important;
+  }
+  /* weekly button is nested in text in existing HTML: keep it inside text but visually full width */
+  #wmWeeklyPlan .weeklySummaryText>.skipBtnCompact{margin-top:9px!important;grid-column:auto!important;grid-row:auto!important}
+  /* full-width detail area */
+  .trainingPuzzleSession .weeklyDetail,#wmWeeklyPlan .weeklyDetail,
+  #medianGapFocus .weeklyDetail,#repeatPriority .weeklyDetail,#unsolvedLibrary .weeklyDetail{
+    display:block!important;width:100%!important;max-width:100%!important;min-width:0!important;
+    margin:0!important;padding:10px 12px 12px!important;box-sizing:border-box!important;clear:both!important;
+  }
+  .trainingPuzzleSession .weeklyFacts,#wmWeeklyPlan .weeklyFacts,.trainingFacts4{
+    display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:8px!important;
+    width:100%!important;max-width:100%!important;min-width:0!important;margin:0!important;box-sizing:border-box!important;
+  }
+  .trainingPuzzleSession .weeklyFact,#wmWeeklyPlan .weeklyFact,.trainingFacts4 .weeklyFact{
+    width:100%!important;max-width:none!important;min-width:0!important;min-height:76px!important;
+    margin:0!important;padding:10px!important;box-sizing:border-box!important;
+  }
+  .trainingPuzzleSession .weeklyFact span,#wmWeeklyPlan .weeklyFact span,
+  .trainingPuzzleSession .weeklyFact strong,#wmWeeklyPlan .weeklyFact strong{
+    display:block!important;max-width:100%!important;min-width:0!important;white-space:normal!important;
+    overflow-wrap:normal!important;word-break:normal!important;
+  }
+  .trainingCoachNote,.weeklyCoachReason,#wmWeeklyPlan .weeklyCoachReason{
+    display:block!important;width:100%!important;max-width:100%!important;min-width:0!important;
+    margin:10px 0 0!important;padding:12px 13px!important;box-sizing:border-box!important;
+    white-space:normal!important;overflow-wrap:normal!important;word-break:normal!important;overflow:hidden!important;
+  }
+  /* adaptive preparation - same visual proportions */
+  .trainingQuick{width:100%!important;max-width:100%!important;box-sizing:border-box!important;overflow:hidden!important}
+  .trainingQuickHero{display:grid!important;grid-template-columns:86px minmax(0,1fr)!important;gap:12px!important;width:100%!important;min-width:0!important;align-items:center!important}
+  .trainingQuickImage{width:86px!important;height:86px!important;max-width:86px!important;max-height:86px!important}
+  .trainingQuickMain{width:100%!important;min-width:0!important}
+  .trainingQuickMain strong,.trainingQuickMain .small{max-width:100%!important;white-space:normal!important;overflow-wrap:normal!important;word-break:normal!important}
+  .trainingQuickStats{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:8px!important;width:100%!important}
+  .trainingQuickStats>div{width:100%!important;min-width:0!important;box-sizing:border-box!important}
+  .trainingQuickReason,.trainingQuickAction{width:100%!important;max-width:100%!important;box-sizing:border-box!important}
+  .trainingQuickAction .skipBtn{width:100%!important;max-width:none!important;box-sizing:border-box!important}
+  /* weekly remains vertical */
+  #wmWeeklyPlan{display:block!important;width:100%!important;max-width:100%!important}
+  #wmWeeklyPlan .weeklySession{display:block!important;width:100%!important;max-width:100%!important;margin:0 0 12px!important;overflow:hidden!important}
+  .trainingPuzzleSession,.trainingPuzzleSession *,#wmWeeklyPlan,#wmWeeklyPlan *,.trainingQuick,.trainingQuick *{box-sizing:border-box!important}
+  .trainingPuzzleSession,.trainingQuick{overflow:hidden!important}
+}
+</style>
+
+
+<style id="npc-narrow-phone-final">
+@media(max-width:400px){
+  .trainingPuzzleSession > summary,#wmWeeklyPlan .weeklySession > summary{
+    grid-template-columns:28px 68px minmax(0,1fr) 16px!important;
+    column-gap:6px!important;padding:10px!important;
+  }
+  .trainingPuzzleSession .weeklyIndex,#wmWeeklyPlan .weeklyIndex{
+    width:28px!important;height:28px!important;min-width:28px!important;font-size:13px!important;
+  }
+  .trainingPuzzleSession .weeklyThumb,#wmWeeklyPlan .weeklyThumb{
+    width:68px!important;height:68px!important;max-width:68px!important;max-height:68px!important;
+  }
+  .trainingPuzzleSession .weeklySessionTitle strong,#wmWeeklyPlan .weeklySessionTitle strong{
+    font-size:12.5px!important;line-height:1.18!important;
+  }
+  .trainingPuzzleSession .weeklyPuzzleName,#wmWeeklyPlan .weeklyPuzzleName{font-size:10.5px!important}
+  .trainingPuzzleSession .weeklySummaryText>.small,#wmWeeklyPlan .weeklySummaryText>.small{font-size:9.5px!important}
+  .trainingPuzzleSession .skipBtnCompact,#wmWeeklyPlan .weeklySummaryText>.skipBtnCompact{font-size:10.5px!important;min-height:36px!important;padding:7px 8px!important}
+  .trainingQuickHero{grid-template-columns:78px minmax(0,1fr)!important;gap:10px!important}
+  .trainingQuickImage{width:78px!important;height:78px!important;max-width:78px!important;max-height:78px!important}
+}
+</style>
+
+</head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
 
