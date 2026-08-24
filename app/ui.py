@@ -578,332 +578,290 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 
 
 /* =========================================================
-   TRAINING VISUAL UNIFICATION — CSS ONLY
-   No logic / order / data / structure changes
+   MOBILE TRAINING VISUAL SYSTEM V2 — CSS ONLY
+   Preserves DOM, section order, data and behavior exactly.
    ========================================================= */
 @media(max-width:760px){
+  /* Never let a training card create horizontal scrolling. */
+  #appTraining,
+  #appTraining *{box-sizing:border-box}
+  #appTraining{overflow-x:hidden}
 
-  /* ---------- Shared card language ---------- */
-  .trainingPuzzleSession,
-  #wmWeeklyPlan .weeklySession{
-    border:1px solid #e1e6ee!important;
+  /* Shared outer card language. */
+  #appTraining .trainingPuzzleSession,
+  #appTraining #wmWeeklyPlan .weeklySession,
+  #appTraining .trainingQuick{
+    border:1px solid #dfe5ed!important;
     border-radius:16px!important;
     background:#fff!important;
-    box-shadow:none!important;
-    overflow:hidden!important;
+    box-shadow:0 1px 2px rgba(16,24,40,.02)!important;
   }
 
-  .trainingPuzzleSession + .trainingPuzzleSession,
-  #wmWeeklyPlan .weeklySession + .weeklySession{
-    margin-top:12px!important;
-  }
-
-  /* ---------- Shared top row ---------- */
-  .trainingPuzzleSession > summary,
-  #wmWeeklyPlan .weeklySession > summary{
+  /* ---------- Ranked/list puzzle cards ---------- */
+  #medianGapFocus .trainingPuzzleSession > summary,
+  #repeatPriority .trainingPuzzleSession > summary,
+  #unsolvedLibrary .trainingPuzzleSession > summary{
+    display:grid!important;
+    grid-template-columns:36px 84px minmax(0,1fr) 18px!important;
+    grid-template-rows:auto auto!important;
+    column-gap:10px!important;
+    row-gap:10px!important;
+    align-items:center!important;
+    width:100%!important;
+    min-width:0!important;
+    min-height:124px!important;
     padding:14px 12px!important;
   }
-
-  .trainingPuzzleSession .weeklyThumb,
-  #wmWeeklyPlan .weeklyThumb{
-    width:82px!important;
-    height:82px!important;
-    max-width:82px!important;
-    max-height:82px!important;
-    border-radius:14px!important;
-    object-fit:cover!important;
-    background:#f4f6f9!important;
+  #medianGapFocus .weeklyIndex,
+  #repeatPriority .weeklyIndex,
+  #unsolvedLibrary .weeklyIndex{
+    grid-column:1!important;grid-row:1 / 3!important;
+    width:36px!important;height:36px!important;min-width:36px!important;
+    margin:0!important;align-self:center!important;
+    border-radius:999px!important;background:#f5f7fa!important;
+    color:#475467!important;font-size:15px!important;font-weight:800!important;
+  }
+  #medianGapFocus .weeklyThumb,
+  #repeatPriority .weeklyThumb,
+  #unsolvedLibrary .weeklyThumb{
+    grid-column:2!important;grid-row:1 / 3!important;
+    width:84px!important;height:84px!important;max-width:84px!important;max-height:84px!important;
+    margin:0!important;align-self:center!important;
+    object-fit:cover!important;border-radius:14px!important;background:#f2f4f7!important;
+  }
+  #medianGapFocus .weeklySummaryText,
+  #repeatPriority .weeklySummaryText,
+  #unsolvedLibrary .weeklySummaryText{
+    grid-column:3!important;grid-row:1!important;
+    min-width:0!important;width:100%!important;margin:0!important;padding:0!important;
+    align-self:center!important;
+  }
+  #medianGapFocus .weeklySessionTitle,
+  #repeatPriority .weeklySessionTitle,
+  #unsolvedLibrary .weeklySessionTitle{
+    display:flex!important;align-items:flex-start!important;gap:6px!important;flex-wrap:wrap!important;
+    min-width:0!important;position:static!important;
+  }
+  #medianGapFocus .weeklySessionTitle strong,
+  #repeatPriority .weeklySessionTitle strong,
+  #unsolvedLibrary .weeklySessionTitle strong{
+    display:-webkit-box!important;-webkit-box-orient:vertical!important;-webkit-line-clamp:2!important;
+    overflow:hidden!important;min-width:0!important;max-width:100%!important;
+    color:#202939!important;font-size:16px!important;line-height:1.2!important;font-weight:800!important;
+  }
+  #medianGapFocus .weeklyPuzzleName,
+  #repeatPriority .weeklyPuzzleName,
+  #unsolvedLibrary .weeklyPuzzleName{
+    margin-top:4px!important;color:#667085!important;font-size:12px!important;line-height:1.25!important;
+    font-weight:650!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
+  }
+  #medianGapFocus .weeklySummaryText>.small,
+  #repeatPriority .weeklySummaryText>.small,
+  #unsolvedLibrary .weeklySummaryText>.small{
+    min-height:0!important;margin-top:4px!important;color:#667085!important;
+    font-size:11px!important;line-height:1.3!important;font-weight:600!important;
+    display:-webkit-box!important;-webkit-box-orient:vertical!important;-webkit-line-clamp:2!important;overflow:hidden!important;
+  }
+  #repeatPriority .weeklyIntensity{
+    position:static!important;left:auto!important;top:auto!important;width:auto!important;
+    flex:0 0 auto!important;margin:0!important;padding:4px 9px!important;
+    border:0!important;border-radius:999px!important;background:#f2f4f7!important;color:#475467!important;
+    font-size:10px!important;line-height:1!important;font-weight:650!important;
+  }
+  #medianGapFocus .trainingPuzzleSession > summary:after,
+  #repeatPriority .trainingPuzzleSession > summary:after,
+  #unsolvedLibrary .trainingPuzzleSession > summary:after{
+    grid-column:4!important;grid-row:1 / 3!important;align-self:center!important;justify-self:center!important;margin:0!important;
+  }
+  #medianGapFocus .trainingPuzzleSession > summary > .skipBtnCompact,
+  #repeatPriority .trainingPuzzleSession > summary > .skipBtnCompact,
+  #unsolvedLibrary .trainingPuzzleSession > summary > .skipBtnCompact{
+    grid-column:3 / 5!important;grid-row:2!important;
+    justify-self:stretch!important;align-self:start!important;
+    width:100%!important;max-width:none!important;min-width:0!important;min-height:40px!important;
+    margin:0!important;padding:9px 12px!important;
+    border:1.5px solid #dc9292!important;border-radius:12px!important;background:#fff!important;
+    color:#a43d3d!important;font-size:12px!important;line-height:1.1!important;font-weight:800!important;
+    white-space:nowrap!important;
   }
 
-  .trainingPuzzleSession .weeklyIndex,
-  #wmWeeklyPlan .weeklyIndex{
-    width:36px!important;
-    height:36px!important;
-    min-width:36px!important;
-    border-radius:50%!important;
-    background:#f5f7fa!important;
-    color:#475467!important;
-    font-size:15px!important;
-    font-weight:700!important;
-  }
-
-  .trainingPuzzleSession .weeklySessionTitle strong,
-  #wmWeeklyPlan .weeklySessionTitle strong{
-    color:#202939!important;
-    font-size:16px!important;
-    line-height:1.22!important;
-    font-weight:750!important;
-  }
-
-  .trainingPuzzleSession .weeklyPuzzleName,
-  #wmWeeklyPlan .weeklyPuzzleName{
-    color:#667085!important;
-    font-size:12.5px!important;
-    line-height:1.3!important;
-    font-weight:600!important;
-  }
-
-  .trainingPuzzleSession .weeklySummaryText > .small,
-  #wmWeeklyPlan .weeklySummaryText > .small{
-    color:#667085!important;
-    font-size:11.5px!important;
-    line-height:1.35!important;
-  }
-
-  .weeklyIntensity{
-    border:0!important;
-    border-radius:999px!important;
-    background:#f2f4f7!important;
-    color:#475467!important;
-    font-weight:600!important;
-    box-shadow:none!important;
-  }
-
-  /* ---------- Skip button: identical everywhere ---------- */
-  .trainingPuzzleSession .skipBtnCompact,
-  #wmWeeklyPlan .skipBtnCompact,
-  .trainingQuickAction .skipBtn{
-    box-sizing:border-box!important;
-    min-height:42px!important;
-    border:1.5px solid #df8e8e!important;
-    border-radius:12px!important;
-    background:#fff!important;
-    color:#a83f3f!important;
-    font-size:12.5px!important;
-    line-height:1.1!important;
-    font-weight:750!important;
-    box-shadow:none!important;
-  }
-
-  #medianGapFocus .trainingPuzzleSession .skipBtnCompact,
-  #repeatPriority .trainingPuzzleSession .skipBtnCompact,
-  #unsolvedLibrary .trainingPuzzleSession .skipBtnCompact{
-    width:100%!important;
-    max-width:none!important;
-    min-width:0!important;
-  }
-
-  /* ---------- Expanded detail: use full usable card width ---------- */
-  #medianGapFocus .weeklyDetail,
-  #repeatPriority .weeklyDetail,
-  #unsolvedLibrary .weeklyDetail,
-  #wmWeeklyPlan .weeklyDetail{
-    box-sizing:border-box!important;
-    margin:0!important;
-    padding:0 14px 14px 14px!important;
-    width:100%!important;
-  }
-
-  /* Key change: metrics no longer look like a narrow right-side column */
-  #medianGapFocus .trainingFacts4,
-  #repeatPriority .trainingFacts4,
-  #unsolvedLibrary .trainingFacts4,
-  #wmWeeklyPlan .weeklyFacts{
-    display:grid!important;
-    grid-template-columns:1fr 1fr!important;
-    gap:9px!important;
-    width:100%!important;
-    margin-top:8px!important;
-  }
-
-  #medianGapFocus .trainingFacts4 .weeklyFact,
-  #repeatPriority .trainingFacts4 .weeklyFact,
-  #unsolvedLibrary .trainingFacts4 .weeklyFact,
-  #wmWeeklyPlan .weeklyFact{
-    box-sizing:border-box!important;
-    min-width:0!important;
-    min-height:82px!important;
-    padding:12px!important;
-    border:1px solid #e2e7ee!important;
-    border-radius:13px!important;
-    background:#fbfcfd!important;
-    box-shadow:none!important;
-  }
-
-  #medianGapFocus .weeklyFact span,
-  #repeatPriority .weeklyFact span,
-  #unsolvedLibrary .weeklyFact span,
-  #wmWeeklyPlan .weeklyFact span{
+  /* Expanded detail must span the ENTIRE card width. High-specificity reset
+     overrides older margin-left rules without changing markup. */
+  #medianGapFocus .trainingPuzzleSession > .weeklyDetail,
+  #repeatPriority .trainingPuzzleSession > .weeklyDetail,
+  #unsolvedLibrary .trainingPuzzleSession > .weeklyDetail{
     display:block!important;
-    color:#7b8493!important;
-    font-size:9.5px!important;
-    line-height:1.15!important;
-    font-weight:500!important;
-    text-transform:uppercase!important;
-    letter-spacing:.035em!important;
+    width:auto!important;max-width:none!important;min-width:0!important;
+    margin:0!important;padding:13px 14px 14px!important;
+    border-top:1px solid #edf0f4!important;
+    overflow:visible!important;
+  }
+  #medianGapFocus .trainingPuzzleSession > .weeklyDetail > .trainingFacts4,
+  #repeatPriority .trainingPuzzleSession > .weeklyDetail > .trainingFacts4,
+  #unsolvedLibrary .trainingPuzzleSession > .weeklyDetail > .trainingFacts4{
+    display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+    gap:9px!important;width:100%!important;max-width:100%!important;margin:0!important;
+  }
+  #medianGapFocus .trainingFacts4>.weeklyFact,
+  #repeatPriority .trainingFacts4>.weeklyFact,
+  #unsolvedLibrary .trainingFacts4>.weeklyFact{
+    position:relative!important;min-width:0!important;min-height:86px!important;
+    padding:12px 10px 11px 46px!important;
+    border:1px solid #e3e8ef!important;border-radius:13px!important;background:#fbfcfe!important;
+    overflow:hidden!important;
+  }
+  #medianGapFocus .trainingFacts4>.weeklyFact:before,
+  #repeatPriority .trainingFacts4>.weeklyFact:before,
+  #unsolvedLibrary .trainingFacts4>.weeklyFact:before{
+    position:absolute!important;left:12px!important;top:18px!important;width:24px!important;
+    font-size:22px!important;line-height:1!important;font-weight:700!important;text-align:center!important;
+  }
+  #medianGapFocus .trainingFacts4>.weeklyFact:nth-child(1):before{content:'◷';color:#3b82f6}
+  #medianGapFocus .trainingFacts4>.weeklyFact:nth-child(2):before{content:'▥';color:#65b84f}
+  #medianGapFocus .trainingFacts4>.weeklyFact:nth-child(3):before{content:'↕';color:#7654c6}
+  #medianGapFocus .trainingFacts4>.weeklyFact:nth-child(4):before{content:'%';color:#e58416}
+  #repeatPriority .trainingFacts4>.weeklyFact:nth-child(1):before{content:'◷';color:#3b82f6}
+  #repeatPriority .trainingFacts4>.weeklyFact:nth-child(2):before{content:'★';color:#e9ad18}
+  #repeatPriority .trainingFacts4>.weeklyFact:nth-child(3):before{content:'▥';color:#65b84f}
+  #repeatPriority .trainingFacts4>.weeklyFact:nth-child(4):before{content:'▣';color:#7c4fd0}
+  #unsolvedLibrary .trainingFacts4>.weeklyFact:nth-child(1):before{content:'◆';color:#3b82f6}
+  #unsolvedLibrary .trainingFacts4>.weeklyFact:nth-child(2):before{content:'▥';color:#e58416}
+  #unsolvedLibrary .trainingFacts4>.weeklyFact:nth-child(3):before{content:'↗';color:#55a944}
+  #unsolvedLibrary .trainingFacts4>.weeklyFact:nth-child(4):before{content:'◎';color:#7c4fd0}
+  #medianGapFocus .trainingFacts4 .weeklyFact span,
+  #repeatPriority .trainingFacts4 .weeklyFact span,
+  #unsolvedLibrary .trainingFacts4 .weeklyFact span{
+    display:block!important;color:#667085!important;font-size:9px!important;line-height:1.15!important;
+    font-weight:600!important;text-transform:uppercase!important;letter-spacing:.035em!important;
+  }
+  #medianGapFocus .trainingFacts4 .weeklyFact strong,
+  #repeatPriority .trainingFacts4 .weeklyFact strong,
+  #unsolvedLibrary .trainingFacts4 .weeklyFact strong{
+    display:block!important;margin-top:5px!important;color:#202939!important;
+    font-size:15px!important;line-height:1.18!important;font-weight:800!important;overflow-wrap:anywhere!important;
+  }
+  #medianGapFocus .trainingPuzzleSession > .weeklyDetail > .trainingCoachNote,
+  #repeatPriority .trainingPuzzleSession > .weeklyDetail > .trainingCoachNote,
+  #unsolvedLibrary .trainingPuzzleSession > .weeklyDetail > .trainingCoachNote{
+    position:relative!important;width:100%!important;max-width:100%!important;
+    margin:10px 0 0!important;padding:12px 12px 12px 40px!important;
+    border:1px solid #d8e5f5!important;border-radius:13px!important;background:#f7faff!important;
+    color:#5f6b7c!important;font-size:11px!important;line-height:1.45!important;overflow-wrap:anywhere!important;
+  }
+  #medianGapFocus .trainingCoachNote:before,
+  #repeatPriority .trainingCoachNote:before,
+  #unsolvedLibrary .trainingCoachNote:before{
+    content:'★';position:absolute;left:13px;top:12px;color:#3b82f6;font-size:17px;line-height:1;
+  }
+  #medianGapFocus .trainingCoachNote strong,
+  #repeatPriority .trainingCoachNote strong,
+  #unsolvedLibrary .trainingCoachNote strong{
+    display:block!important;margin:0 0 5px!important;color:#344054!important;font-size:12px!important;font-weight:800!important;
   }
 
-  #medianGapFocus .weeklyFact strong,
-  #repeatPriority .weeklyFact strong,
-  #unsolvedLibrary .weeklyFact strong,
-  #wmWeeklyPlan .weeklyFact strong{
-    display:block!important;
-    margin-top:7px!important;
-    color:#273142!important;
-    font-size:16px!important;
-    line-height:1.18!important;
-    font-weight:750!important;
-    overflow-wrap:anywhere!important;
+  /* ---------- Adaptive Preparation / current top recommendation ---------- */
+  #appTraining .trainingQuick{
+    padding:14px!important;margin:8px 0 12px!important;overflow:hidden!important;
+  }
+  #appTraining .trainingQuickHero{
+    display:grid!important;grid-template-columns:92px minmax(0,1fr)!important;gap:13px!important;align-items:center!important;
+  }
+  #appTraining .trainingQuickImage{
+    width:92px!important;height:92px!important;max-width:92px!important;border-radius:14px!important;
+    background:#f2f4f7!important;overflow:hidden!important;
+  }
+  #appTraining .trainingQuickImage img{width:100%!important;height:100%!important;object-fit:cover!important}
+  #appTraining .trainingQuickMain{min-width:0!important}
+  #appTraining .trainingQuickMain strong{color:#202939!important;font-size:19px!important;line-height:1.16!important;font-weight:800!important}
+  #appTraining .trainingQuickStats{
+    display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:9px!important;margin-top:12px!important;
+  }
+  #appTraining .trainingQuickStats>div{
+    min-width:0!important;min-height:78px!important;padding:11px!important;
+    border:1px solid #e3e8ef!important;border-radius:13px!important;background:#fbfcfe!important;
+  }
+  #appTraining .trainingQuickStats span{display:block!important;color:#667085!important;font-size:9px!important;line-height:1.15!important;text-transform:uppercase!important;letter-spacing:.035em!important}
+  #appTraining .trainingQuickStats strong{display:block!important;margin-top:5px!important;color:#202939!important;font-size:15px!important;line-height:1.18!important;font-weight:800!important}
+  #appTraining .trainingQuickReason{
+    width:100%!important;margin-top:10px!important;padding:12px!important;
+    border:1px solid #d8e5f5!important;border-radius:13px!important;background:#f7faff!important;
+  }
+  #appTraining .trainingQuickReasonText{display:block!important;color:#5f6b7c!important;font-size:11px!important;line-height:1.45!important}
+  #appTraining .trainingQuickAction{display:block!important;margin-top:10px!important}
+  #appTraining .trainingQuickAction .skipBtn{
+    width:100%!important;max-width:none!important;min-height:40px!important;margin:0!important;padding:9px 12px!important;
+    border:1.5px solid #dc9292!important;border-radius:12px!important;background:#fff!important;
+    color:#a43d3d!important;font-size:12px!important;font-weight:800!important;
   }
 
-  /* ---------- Coach card: same visual component everywhere ---------- */
-  .trainingCoachNote,
-  .weeklyCoachReason,
-  #wmWeeklyPlan .weeklyCoachReason{
-    box-sizing:border-box!important;
-    width:100%!important;
-    margin:10px 0 0!important;
-    padding:12px 13px!important;
-    border:1px solid #dbe6f4!important;
-    border-radius:13px!important;
-    background:#f7faff!important;
-    color:#5f6b7c!important;
-    font-size:11.5px!important;
-    line-height:1.48!important;
-    box-shadow:none!important;
+  /* ---------- Current training week ----------
+     Keep the EXISTING VERTICAL mobile list. No 7-column desktop layout. */
+  #appTraining #wmWeeklyPlan{
+    display:flex!important;flex-direction:column!important;gap:10px!important;width:100%!important;
   }
+  #appTraining #wmWeeklyPlan .weeklySession{
+    width:100%!important;margin:0!important;overflow:hidden!important;
+  }
+  #appTraining #wmWeeklyPlan .weeklySession > summary{
+    display:grid!important;grid-template-columns:36px 84px minmax(0,1fr) 18px!important;
+    gap:10px!important;align-items:center!important;width:100%!important;min-width:0!important;padding:14px 12px!important;
+  }
+  #appTraining #wmWeeklyPlan .weeklyIndex{
+    width:36px!important;height:36px!important;min-width:36px!important;margin:0!important;
+    background:#f5f7fa!important;color:#475467!important;font-size:15px!important;font-weight:800!important;
+  }
+  #appTraining #wmWeeklyPlan .weeklyThumb{
+    width:84px!important;height:84px!important;max-width:84px!important;max-height:84px!important;margin:0!important;
+    border-radius:14px!important;object-fit:cover!important;background:#f2f4f7!important;
+  }
+  #appTraining #wmWeeklyPlan .weeklySummaryText{min-width:0!important;width:100%!important;padding:0!important;margin:0!important}
+  #appTraining #wmWeeklyPlan .weeklySessionTitle{display:flex!important;gap:6px!important;align-items:flex-start!important;flex-wrap:wrap!important;min-width:0!important}
+  #appTraining #wmWeeklyPlan .weeklySessionTitle strong{
+    color:#202939!important;font-size:16px!important;line-height:1.2!important;font-weight:800!important;
+    display:-webkit-box!important;-webkit-box-orient:vertical!important;-webkit-line-clamp:2!important;overflow:hidden!important;
+  }
+  #appTraining #wmWeeklyPlan .weeklyIntensity{
+    position:static!important;width:auto!important;margin:0!important;padding:4px 8px!important;
+    border:0!important;border-radius:999px!important;background:#f2f4f7!important;color:#475467!important;font-size:9.5px!important;line-height:1!important;
+  }
+  #appTraining #wmWeeklyPlan .weeklyPuzzleName{
+    margin-top:4px!important;color:#475467!important;font-size:12px!important;line-height:1.25!important;font-weight:700!important;
+    white-space:normal!important;overflow:visible!important;text-overflow:clip!important;
+  }
+  #appTraining #wmWeeklyPlan .weeklySummaryText>.small{
+    min-height:0!important;margin-top:4px!important;color:#667085!important;font-size:11px!important;line-height:1.35!important;
+    display:-webkit-box!important;-webkit-box-orient:vertical!important;-webkit-line-clamp:2!important;overflow:hidden!important;
+  }
+  #appTraining #wmWeeklyPlan .weeklySummaryText>.skipBtnCompact{
+    display:block!important;width:100%!important;max-width:none!important;min-height:38px!important;
+    margin:9px 0 0!important;padding:8px 10px!important;
+    border:1.5px solid #dc9292!important;border-radius:11px!important;background:#fff!important;
+    color:#a43d3d!important;font-size:11px!important;font-weight:800!important;
+  }
+  #appTraining #wmWeeklyPlan .weeklySession > .weeklyDetail{
+    width:auto!important;max-width:none!important;min-width:0!important;margin:0!important;
+    padding:13px 14px 14px!important;border-top:1px solid #edf0f4!important;
+  }
+  #appTraining #wmWeeklyPlan .weeklyDetail>.weeklyFacts{
+    display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+    gap:9px!important;width:100%!important;margin:0!important;
+  }
+  #appTraining #wmWeeklyPlan .weeklyFact{
+    min-width:0!important;min-height:78px!important;padding:11px!important;
+    border:1px solid #e3e8ef!important;border-radius:13px!important;background:#fbfcfe!important;
+  }
+  #appTraining #wmWeeklyPlan .weeklyFact span{display:block!important;color:#667085!important;font-size:9px!important;line-height:1.15!important;text-transform:uppercase!important;letter-spacing:.035em!important}
+  #appTraining #wmWeeklyPlan .weeklyFact strong{display:block!important;margin-top:5px!important;color:#202939!important;font-size:15px!important;line-height:1.18!important;font-weight:800!important;overflow-wrap:anywhere!important}
+  #appTraining #wmWeeklyPlan .weeklyCoachReason{
+    width:100%!important;margin:10px 0 0!important;padding:12px!important;
+    border:1px solid #d8e5f5!important;border-radius:13px!important;background:#f7faff!important;
+    color:#5f6b7c!important;font-size:11px!important;line-height:1.45!important;
+  }
+  #appTraining #wmWeeklyPlan .weeklyCoachReason strong{display:block!important;margin-bottom:5px!important;color:#344054!important;font-size:12px!important;font-weight:800!important}
 
-  .trainingCoachNote strong,
-  .weeklyCoachReason strong,
-  #wmWeeklyPlan .weeklyCoachReason strong{
-    display:block!important;
-    margin:0 0 5px!important;
-    color:#344054!important;
-    font-size:12px!important;
-    font-weight:750!important;
-  }
-
-  /* ---------- More compact expanded cards ---------- */
-  #medianGapFocus .trainingPuzzleSession[open],
-  #repeatPriority .trainingPuzzleSession[open],
-  #unsolvedLibrary .trainingPuzzleSession[open],
-  #wmWeeklyPlan .weeklySession[open]{
-    padding-bottom:0!important;
-    background:#fff!important;
-  }
-
-  /* ---------- Adaptive Preparation / "Heute trainieren" ----------
-     Same visual language, without touching its structure. */
-  .trainingQuick{
-    border:1px solid #e1e6ee!important;
-    border-radius:16px!important;
-    background:#fff!important;
-    box-shadow:none!important;
-    padding:16px!important;
-  }
-
-  .trainingQuickHero{
-    gap:14px!important;
-    align-items:center!important;
-  }
-
-  .trainingQuickImage{
-    width:96px!important;
-    height:96px!important;
-    border-radius:14px!important;
-    object-fit:cover!important;
-    background:#f4f6f9!important;
-  }
-
-  .trainingQuickMain .eyebrow,
-  .trainingQuickMain .small{
-    color:#7b8493!important;
-  }
-
-  .trainingQuickMain strong{
-    color:#202939!important;
-    font-size:20px!important;
-    line-height:1.15!important;
-    font-weight:750!important;
-  }
-
-  .trainingQuickStats{
-    display:grid!important;
-    grid-template-columns:1fr 1fr!important;
-    gap:9px!important;
-    margin-top:13px!important;
-  }
-
-  .trainingQuickStats > div{
-    box-sizing:border-box!important;
-    min-height:82px!important;
-    padding:12px!important;
-    border:1px solid #e2e7ee!important;
-    border-radius:13px!important;
-    background:#fbfcfd!important;
-  }
-
-  .trainingQuickStats span{
-    display:block!important;
-    color:#7b8493!important;
-    font-size:9.5px!important;
-    line-height:1.15!important;
-    text-transform:uppercase!important;
-    letter-spacing:.035em!important;
-  }
-
-  .trainingQuickStats strong{
-    display:block!important;
-    margin-top:7px!important;
-    color:#273142!important;
-    font-size:16px!important;
-    line-height:1.18!important;
-    font-weight:750!important;
-  }
-
-  .trainingQuickReason{
-    box-sizing:border-box!important;
-    width:100%!important;
-    margin-top:10px!important;
-    padding:12px 13px!important;
-    border:1px solid #dbe6f4!important;
-    border-radius:13px!important;
-    background:#f7faff!important;
-  }
-
-  .trainingQuickReasonText{
-    color:#5f6b7c!important;
-    font-size:11.5px!important;
-    line-height:1.48!important;
-  }
-
-  /* ---------- Weekly-plan list ----------
-     Same look, same existing layout/order/behavior. */
-  #wmWeeklyPlan{
-    gap:12px!important;
-  }
-
-  #wmWeeklyPlan .weeklySession{
-    margin:0!important;
-  }
-
-  #wmWeeklyPlan .weeklyDetail{
-    border-top:0!important;
-  }
-
-  #wmWeeklyPlan .weeklyPills{
-    margin-top:10px!important;
-    gap:6px!important;
-  }
-
-  #wmWeeklyPlan .pill{
-    border:0!important;
-    background:#f2f4f7!important;
-    color:#475467!important;
-    border-radius:999px!important;
-    box-shadow:none!important;
-  }
-
-  /* ---------- Section containers ---------- */
-  .trainingDropdownBody{
-    padding:10px!important;
-  }
-
-  .trainingListIntro{
-    margin:4px 4px 14px!important;
-    color:#77808f!important;
-    line-height:1.45!important;
-  }
+  /* Keep section internals comfortable without changing section order. */
+  #appTraining .trainingDropdownBody{padding:10px!important}
+  #appTraining .trainingListIntro{margin:2px 2px 14px!important;color:#77808f!important;line-height:1.45!important}
 }
 
 </style></head>
