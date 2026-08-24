@@ -360,7 +360,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
     grid-template-columns:36px 74px minmax(0,1fr) 68px 18px!important;
     column-gap:10px!important;
     align-items:center!important;
-    min-height:116px!important;
+    min-height:116px!important;height:auto!important;
     padding:12px 10px!important;
     list-style:none!important
   }
@@ -384,16 +384,16 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
     display:block!important;position:relative!important;min-width:0!important
   }
   .trainingPuzzleSession .weeklySessionTitle strong{
-    display:-webkit-box!important;-webkit-box-orient:vertical!important;-webkit-line-clamp:2!important;
-    overflow:hidden!important;font-size:15px!important;line-height:1.18!important;margin:0!important;max-width:100%!important
+    display:block!important;overflow:visible!important;font-size:15px!important;line-height:1.22!important;
+    margin:0!important;max-width:100%!important;white-space:normal!important;overflow-wrap:anywhere!important
   }
   .trainingPuzzleSession .weeklyPuzzleName{
-    margin-top:3px!important;font-size:12px!important;line-height:1.22!important;
-    white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important
+    margin-top:3px!important;font-size:12px!important;line-height:1.25!important;
+    white-space:normal!important;overflow:visible!important;text-overflow:clip!important;overflow-wrap:anywhere!important
   }
   .trainingPuzzleSession .weeklySummaryText>.small{
-    display:-webkit-box!important;-webkit-box-orient:vertical!important;-webkit-line-clamp:2!important;
-    overflow:hidden!important;margin-top:3px!important;font-size:11px!important;line-height:1.25!important;min-height:28px!important
+    display:block!important;overflow:visible!important;margin-top:3px!important;font-size:11px!important;
+    line-height:1.3!important;min-height:0!important;white-space:normal!important;overflow-wrap:anywhere!important
   }
   .trainingPuzzleSession .weeklyIntensity{
     position:absolute!important;left:calc(100% + 10px)!important;top:0!important;
@@ -446,7 +446,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
     column-gap:10px!important;
     row-gap:8px!important;
     align-items:center!important;
-    min-height:132px!important
+    min-height:132px!important;height:auto!important
   }
 
   #medianGapFocus .trainingPuzzleSession .weeklyIndex,
@@ -1638,6 +1638,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
   #appTraining #unsolvedLibrary .trainingPuzzleSession .weeklyPuzzleName{
     width:100%!important;max-width:100%!important;min-width:0!important;
     white-space:normal!important;
+    overflow:visible!important;text-overflow:clip!important;-webkit-line-clamp:unset!important;
     word-break:normal!important;
     overflow-wrap:break-word!important;
   }
@@ -1648,6 +1649,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
   #appTraining #unsolvedLibrary .trainingPuzzleSession .weeklySummaryText>.small{
     width:100%!important;max-width:100%!important;min-width:0!important;
     white-space:normal!important;
+    overflow:visible!important;text-overflow:clip!important;-webkit-line-clamp:unset!important;
     word-break:normal!important;
     overflow-wrap:break-word!important;
   }
@@ -2390,18 +2392,25 @@ async function loadUnsolvedLibrary(){
    d.items.filter(p=>!isPuzzleUnavailable(p)).map((p,i)=>{
      let diff='–';
      try{
-       const dl=p.difficulty_label||p.msp_insights?.difficulty_label||p.puzzle?.msp_insights?.difficulty_label||'';
-       const dpRaw=p.difficulty_percent??p.msp_insights?.difficulty_percent??p.puzzle?.msp_insights?.difficulty_percent;
+       const insight=p.msp_insights||p.insights||p.puzzle?.msp_insights||p.puzzle?.insights||{};
+       const diffObj=p.difficulty||insight.difficulty||p.puzzle?.difficulty||{};
+       const dl=p.difficulty_label||p.msp_difficulty_label||insight.difficulty_label||
+                diffObj.label||diffObj.name||p.puzzle?.difficulty_label||p.puzzle?.msp_difficulty_label||'';
+       const dpRaw=p.difficulty_percent??p.msp_difficulty_percent??insight.difficulty_percent??
+                   diffObj.percent??diffObj.percentage??p.puzzle?.difficulty_percent??p.puzzle?.msp_difficulty_percent;
        if(dl){
          diff=String(dl);
          const dp=Number(dpRaw);
          if(Number.isFinite(dp)) diff+=` · ${dp>0?'+':''}${dp.toFixed(1)}% ggü. Ø`;
-       }
+       }else if(diffObj && typeof diffObj!=='object'){ diff=String(diffObj); }
      }catch(_){}
      let pred='–';
      try{
-       const pv=p.prediction||p.msp_prediction||p.puzzle?.msp_prediction||'';
-       if(pv) pred=displayPuzzleTime(pv);
+       const insight=p.msp_insights||p.insights||p.puzzle?.msp_insights||p.puzzle?.insights||{};
+       const pv=p.prediction??p.msp_prediction??p.predicted_time??p.prediction_time??p.prediction_seconds??
+                insight.prediction??insight.msp_prediction??insight.predicted_time??insight.prediction_time??insight.prediction_seconds??
+                p.puzzle?.prediction??p.puzzle?.msp_prediction??p.puzzle?.predicted_time??p.puzzle?.prediction_time??p.puzzle?.prediction_seconds;
+       if(pv!==undefined && pv!==null && pv!=='') pred=displayPuzzleTime(pv);
      }catch(_){}
      const coach=(diff!=='–'||pred!=='–')
        ? `Echter First Try${diff!=='–'?` · Difficulty ${diff}`:''}${pred!=='–'?` · MSP Prediction ${pred}`:''}. Gut geeignet für eine unverfälschte Standortbestimmung ohne Erinnerungseffekt.`
