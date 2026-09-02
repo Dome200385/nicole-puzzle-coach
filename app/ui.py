@@ -194,7 +194,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 
 .wmHeroGrid{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:10px;margin:4px 0 12px}.wmHeroReadiness,.wmHeroGoal{border:1px solid var(--line);border-radius:14px;background:#fafafa;padding:14px}.wmHeroReadiness strong{display:block;font-size:34px;margin-top:4px}.wmHeroGoal strong{display:block;font-size:24px;margin-top:4px}.wmMovedPanels{display:grid;gap:10px}.wmMovedPanels .readinessInfo,.wmMovedPanels #readinessTrendPanel{margin:0}
 .wmDashboard .simHero{margin:10px 0 0}.wmProgressCompact{display:flex;gap:8px;flex-wrap:wrap}.wmProgressCompact span{background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:8px 10px;font-size:12px}.wmProgressCompact b{display:block;font-size:9px;text-transform:uppercase;color:var(--muted);letter-spacing:.04em}.wmMobileBars .pbarTime,.wmMobileBars .pbarDate{font-size:9px;white-space:nowrap}
-@media(max-width:760px){.wmDashboard>h2{font-size:19px}.wmHeroGrid{grid-template-columns:1fr 1fr}.wmHeroReadiness{grid-column:1/-1}.wmHeroReadiness strong{font-size:40px}.wmHeroGoal strong{font-size:22px}.wmMovedPanels .readinessInfo{padding:10px}.wmMovedPanels .readinessFormula{grid-template-columns:1fr 1fr}.wmMovedPanels #readinessTrendBars{height:70px}.wmMobileBars{gap:7px}.wmMobileBars .pbarTime,.wmMobileBars .pbarDate{font-size:8px}.wmDashboard .simHero h2{font-size:18px}}
+@media(max-width:760px){.wmDashboard>h2{font-size:19px}.wmHeroGrid{grid-template-columns:1fr 1fr}.wmHeroReadiness{grid-column:1/-1}.wmHeroReadiness strong{font-size:40px}.wmHeroGoal strong{font-size:22px}.wmMovedPanels .readinessInfo{padding:10px}.wmMovedPanels .readinessFormula{grid-template-columns:1fr 1fr}.wmMovedPanels #readinessTrendBars{height:auto!important;min-height:170px!important}.wmMobileBars{gap:7px}.wmMobileBars .pbarTime,.wmMobileBars .pbarDate{font-size:8px}.wmDashboard .simHero h2{font-size:18px}}
 
 /* V6.10.4 hard mobile page isolation: prevents content leaking between tabs */
 @media(max-width:760px){
@@ -3245,13 +3245,15 @@ async function loadAll(){renderUnavailable();
    wmStats.textContent=w.count?`${w.count} × 500er Solo · Best ${w.best} · Median ${w.median} · Ø letzte 5 ${w.recent5} · Ø letzte 10 ${w.recent10} · Ø letzte 20 ${w.recent20}`:'Noch keine 500er-Daten.';
    
    wmTabReadiness.textContent=(w.readiness_score!=null?w.readiness_score+'/100':(w.readiness!=null?w.readiness+'/100':'–'));wmTabFirstTry.textContent=w.wm_goal_first_try||w.wm_goal_realistic||'–';const wmTabRepeat=document.getElementById('wmTabRepeat');if(wmTabRepeat)wmTabRepeat.textContent=w.wm_goal_repeat||w.dynamic_target||'–';wmTabStretch.textContent=w.wm_goal_stretch||'–';
-   let pr=w.progress_recent||[];
+   const wmProgressSummaryEl=document.getElementById('wmProgressSummary');
+   const wmProgressChartEl=document.getElementById('wmProgressChart');
+   let pr=Array.isArray(w.progress_recent)?w.progress_recent:[];
    if(pr.length){
      let vals=pr.map(x=>x.seconds), mn=Math.min(...vals,w.wm_goal_stretch_seconds||99999), mx=Math.max(...vals);
      let span=Math.max(1,mx-mn);
-     wmProgressSummary.innerHTML=`<div class="wmProgressCompact"><span><b>Ø letzte 10</b> ${w.recent10||'–'}</span><span><b>Trainingsziel</b> ${w.dynamic_target||'–'}</span>${w.trend10_percent!=null?`<span><b>Trend</b> ${pct(w.trend10_percent)}</span>`:''}</div>`;
-     wmProgressChart.innerHTML=`<div class="progressBars wmMobileBars">${pr.map((x,i)=>{let h=35+((mx-x.seconds)/span)*105;let d=x.finished_at?new Date(x.finished_at).toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'}):'';let show=(i===0||i===pr.length-1||i%3===0);return `<div class="pbar" title="${x.puzzle_name||''} · ${x.time}"><div class="pbarFill" style="height:${Math.max(20,h)}px"></div><div class="pbarTime">${show?displayPuzzleTime(x.time):''}</div><div class="pbarDate">${show?d:''}</div></div>`}).join('')}</div><div class="progressLegend"><span class="pill">WM-Ziel: ${w.wm_goal_realistic}</span><span class="pill">Stretch: ${w.wm_goal_stretch}</span></div>`;
-   }else{wmProgressSummary.textContent='Noch nicht genügend 500er-Daten.';wmProgressChart.innerHTML='';}
+     if(wmProgressSummaryEl)wmProgressSummaryEl.innerHTML=`<div class="wmProgressCompact"><span><b>Ø letzte 10</b> ${w.recent10||'–'}</span><span><b>Trainingsziel</b> ${w.dynamic_target||'–'}</span>${w.trend10_percent!=null?`<span><b>Trend</b> ${pct(w.trend10_percent)}</span>`:''}</div>`;
+     if(wmProgressChartEl)wmProgressChartEl.innerHTML=`<div class="progressBars wmMobileBars">${pr.map((x,i)=>{let h=35+((mx-x.seconds)/span)*105;let d=x.finished_at?new Date(x.finished_at).toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'}):'';let show=(i===0||i===pr.length-1||i%3===0);return `<div class="pbar" title="${x.puzzle_name||''} · ${x.time}"><div class="pbarFill" style="height:${Math.max(20,h)}px"></div><div class="pbarTime">${show?displayPuzzleTime(x.time):''}</div><div class="pbarDate">${show?d:''}</div></div>`}).join('')}</div><div class="progressLegend"><span class="pill">WM-Ziel: ${w.wm_goal_realistic}</span><span class="pill">Stretch: ${w.wm_goal_stretch}</span></div>`;
+   }else{if(wmProgressSummaryEl)wmProgressSummaryEl.textContent='Noch nicht genügend vergleichbare 500er-Daten.';if(wmProgressChartEl)wmProgressChartEl.innerHTML='';}
 
    // weekly plan is rendered immediately after wm-plan resolves (see above)
 
