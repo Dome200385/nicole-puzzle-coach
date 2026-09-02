@@ -2015,6 +2015,46 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 }
 </style>
 
+
+<style id="npc-wm-visual-v611">
+@media(max-width:760px){
+  body[data-current-page="training"] .todayWmBanner,
+  body[data-current-page="wm"] .todayWmBanner,
+  body[data-current-page="progress"] .todayWmBanner,
+  body[data-current-page="more"] .todayWmBanner,
+  body[data-app-current="training"] .todayWmBanner,
+  body[data-app-current="wm"] .todayWmBanner,
+  body[data-app-current="progress"] .todayWmBanner,
+  body[data-app-current="more"] .todayWmBanner{display:none!important}
+}
+.wmReadinessChart{padding:10px!important;overflow:visible!important;background:#fff}
+.wmReadinessChart svg{min-height:230px!important}
+.wmChartLine{stroke:#2563eb!important;stroke-width:3!important}
+.wmChartDot{fill:#fff!important;stroke:#2563eb!important;stroke-width:2.5!important}
+.wmChartDot.current{fill:#ef4444!important;stroke:#b91c1c!important;stroke-width:2.5!important}
+.wmChartBaseline{stroke:#f59e0b;stroke-width:1.7;stroke-dasharray:6 5}
+.wmChartTarget{stroke:#22c55e;stroke-width:1.7;stroke-dasharray:6 5}
+.wmChartValue{fill:#334155;font-size:11px;font-weight:800;font-family:Inter,system-ui,sans-serif}
+.wmChartValue.current{fill:#dc2626}
+.wmTrendCards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.wmTrendCard{border:1px solid #e4e8ef;border-radius:12px;background:#fff;padding:10px;text-align:center}
+.wmTrendCard b{display:block;font-size:13px}.wmTrendDelta{display:block;font-size:17px;font-weight:900;margin-top:4px}
+.wmTrendDelta.good{color:#15803d}.wmTrendDelta.bad{color:#b91c1c}.wmTrendRange{display:block;color:#70798b;font-size:10px;margin-top:3px}
+.wmProgressDashboard{display:grid;grid-template-columns:170px minmax(0,1fr);gap:12px;align-items:stretch}
+.wmProgressStats{display:grid;gap:8px}.wmProgressStat{border:1px solid #e4e8ef;border-radius:12px;background:#fff;padding:10px;text-align:center}
+.wmProgressStat span{display:block;color:#70798b;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}.wmProgressStat strong{display:block;font-size:21px;margin-top:4px}.wmProgressStat small{display:block;color:#70798b;margin-top:2px}
+.wmProgressGraph{border:1px solid #e4e8ef;border-radius:12px;background:#fff;padding:8px;min-width:0}.wmProgressGraph svg{display:block;width:100%;height:auto;min-height:230px}
+.wmProgressLine{fill:none;stroke:#2563eb;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}.wmProgressDot{fill:#fff;stroke:#2563eb;stroke-width:2.5}.wmProgressDot.current{fill:#ef4444;stroke:#b91c1c}
+.wmProgressGrid{stroke:#e9edf3;stroke-width:1}.wmProgressGoal{stroke:#22c55e;stroke-width:1.8;stroke-dasharray:6 5}.wmProgressAvg{stroke:#ef4444;stroke-width:1.5;stroke-dasharray:4 4}.wmProgressAxis,.wmProgressLabel{fill:#70798b;font-size:10px;font-family:Inter,system-ui,sans-serif}.wmProgressGoalLabel{fill:#15803d;font-size:10px;font-weight:800}.wmProgressAvgLabel{fill:#dc2626;font-size:10px;font-weight:800}
+.wmProgressCoach{margin-top:9px;padding:10px 12px;border-radius:12px;border:1px solid #dbe4ef;background:#f8fafc;font-size:12px;line-height:1.4}.wmProgressCoach.good{border-color:#bbf7d0;background:#f0fdf4;color:#166534}.wmProgressCoach.warn{border-color:#fde68a;background:#fffbeb;color:#92400e}
+@media(max-width:760px){
+ .wmReadinessChart svg{min-height:210px!important}
+ .wmTrendCards{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.wmTrendCard{padding:8px 4px}.wmTrendDelta{font-size:14px}.wmTrendRange{font-size:9px}
+ .wmProgressDashboard{grid-template-columns:1fr}.wmProgressStats{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.wmProgressStat{padding:9px 5px}.wmProgressStat span{font-size:8px}.wmProgressStat strong{font-size:17px}.wmProgressStat small{font-size:9px}
+ .wmProgressGraph svg{min-height:220px}
+}
+</style>
+
 </head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
@@ -3091,59 +3131,53 @@ async function loadAll(){renderUnavailable();
      renderReadinessTrend(d.items||[]);
    }catch(e){}
  }
- function renderReadinessTrend(items){
+  function renderReadinessTrend(items){
    const box=document.getElementById('readinessTrendBars');
    const summary=document.getElementById('readinessTrendSummary');
    const changes=document.getElementById('readinessTrendChanges');
    if(!box||!summary||!changes)return;
    box.innerHTML='';
-   if(!items.length){
-     summary.textContent='Noch keine Verlaufspunkte gespeichert.';
-     changes.textContent='';
-     return;
-   }
+   if(!items.length){summary.textContent='Noch keine Verlaufspunkte gespeichert.';changes.textContent='';return;}
    const recent=items.slice(-30).filter(x=>Number.isFinite(Number(x.readiness)));
-   if(!recent.length){
-     summary.textContent='Noch keine gültigen Verlaufspunkte gespeichert.';
-     changes.textContent='';
-     return;
-   }
+   if(!recent.length){summary.textContent='Noch keine gültigen Verlaufspunkte gespeichert.';changes.textContent='';return;}
    const last=recent[recent.length-1];
    summary.textContent=`Aktuell ${Math.round(Number(last.readiness))}/100 · ${items.length} gespeicherte Tageswerte`;
 
-   const W=640,H=220,L=42,R=14,T=18,B=34;
-   const innerW=W-L-R, innerH=H-T-B;
+   // Zoom the y-axis around Nicole's actual readiness range so small changes are visible,
+   // while always retaining the meaningful 50 (MSP level) and 60 (solid WM form) references.
+   const values=recent.map(d=>Number(d.readiness));
+   let low=Math.floor((Math.min(...values,50)-5)/5)*5;
+   let high=Math.ceil((Math.max(...values,60)+5)/5)*5;
+   low=Math.max(0,low); high=Math.min(100,high);
+   if(high-low<20){const mid=(high+low)/2;low=Math.max(0,Math.floor((mid-10)/5)*5);high=Math.min(100,Math.ceil((mid+10)/5)*5);}
+   const W=640,H=250,L=44,R=18,T=28,B=42,innerW=W-L-R,innerH=H-T-B;
    const x=i=>L+(recent.length===1?innerW/2:(i/(recent.length-1))*innerW);
-   const y=v=>T+((100-Math.max(0,Math.min(100,Number(v))))/100)*innerH;
+   const y=v=>T+((high-Math.max(low,Math.min(high,Number(v))))/(high-low))*innerH;
    const pts=recent.map((d,i)=>`${x(i).toFixed(1)},${y(d.readiness).toFixed(1)}`).join(' ');
-   const grid=[50,60,70,80].map(v=>`
-     <line x1="${L}" y1="${y(v)}" x2="${W-R}" y2="${y(v)}" class="wmChartGrid"/>
-     <text x="${L-7}" y="${y(v)+4}" text-anchor="end" class="wmChartAxis">${v}</text>`).join('');
-   const dots=recent.map((d,i)=>`<circle cx="${x(i)}" cy="${y(d.readiness)}" r="${i===recent.length-1?5:3}" class="${i===recent.length-1?'wmChartDot current':'wmChartDot'}"><title>${readinessEsc(d.day)} · ${Math.round(Number(d.readiness))}/100</title></circle>`).join('');
+   const tickStep=(high-low<=25?5:10);
+   const ticks=[];for(let v=Math.ceil(low/tickStep)*tickStep;v<=high;v+=tickStep)ticks.push(v);
+   const grid=ticks.map(v=>`<line x1="${L}" y1="${y(v)}" x2="${W-R}" y2="${y(v)}" class="wmChartGrid"/><text x="${L-7}" y="${y(v)+4}" text-anchor="end" class="wmChartAxis">${v}</text>`).join('');
+   const dots=recent.map((d,i)=>`<circle cx="${x(i)}" cy="${y(d.readiness)}" r="${i===recent.length-1?5:3.5}" class="${i===recent.length-1?'wmChartDot current':'wmChartDot'}"><title>${readinessEsc(d.day)} · ${Math.round(Number(d.readiness))}/100</title></circle>`).join('');
+   const valueLabels=recent.map((d,i)=>{const show=recent.length<=14||i===0||i===recent.length-1||i%2===0;return show?`<text x="${x(i)}" y="${y(d.readiness)-9}" text-anchor="middle" class="wmChartValue ${i===recent.length-1?'current':''}">${Math.round(Number(d.readiness))}</text>`:''}).join('');
    const firstLabel=readinessEsc(String(recent[0].day||'').slice(5).replace('-','.'));
    const lastLabel=readinessEsc(String(last.day||'').slice(5).replace('-','.'));
    box.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Readiness Verlauf der letzten ${recent.length} Tage">
      ${grid}
-     <line x1="${L}" y1="${y(50)}" x2="${W-R}" y2="${y(50)}" class="wmChartMedian"/>
-     <polyline points="${pts}" class="wmChartLine"/>
-     ${dots}
-     <text x="${L}" y="${H-8}" class="wmChartDate">${firstLabel}</text>
-     <text x="${W-R}" y="${H-8}" text-anchor="end" class="wmChartDate">${lastLabel}</text>
-     <text x="${W-R}" y="${y(50)-6}" text-anchor="end" class="wmChartMedianLabel">50 · MSP-Median</text>
+     ${50>=low&&50<=high?`<line x1="${L}" y1="${y(50)}" x2="${W-R}" y2="${y(50)}" class="wmChartBaseline"/><text x="${W-R}" y="${y(50)-6}" text-anchor="end" class="wmChartMedianLabel">50 · MSP-Niveau</text>`:''}
+     ${60>=low&&60<=high?`<line x1="${L}" y1="${y(60)}" x2="${W-R}" y2="${y(60)}" class="wmChartTarget"/><text x="${W-R}" y="${y(60)-6}" text-anchor="end" class="wmChartMedianLabel">60 · solide WM-Form</text>`:''}
+     <polyline points="${pts}" class="wmChartLine"/>${dots}${valueLabels}
+     <text x="${L}" y="${H-10}" class="wmChartDate">${firstLabel}</text><text x="${W-R}" y="${H-10}" text-anchor="end" class="wmChartDate">${lastLabel}</text>
    </svg>`;
 
-   function delta(days){
-     const target=new Date();
-     target.setDate(target.getDate()-days);
-     const targetDay=target.toISOString().slice(0,10);
-     const previous=[...items].reverse().find(x=>x.day<=targetDay);
+   function trendFor(days){
+     const target=new Date();target.setDate(target.getDate()-days);const targetDay=target.toISOString().slice(0,10);
+     const previous=[...items].reverse().find(x=>x.day<=targetDay&&Number.isFinite(Number(x.readiness)));
      if(!previous)return null;
-     return Number(last.readiness)-Number(previous.readiness);
+     const from=Number(previous.readiness),to=Number(last.readiness);return {delta:to-from,from,to};
    }
-   changes.textContent=[[7,delta(7)],[14,delta(14)],[30,delta(30)]]
-     .map(([d,v])=>v==null?`${d} Tage: noch keine Daten`:`${d} Tage: ${v>=0?'+':''}${v.toFixed(0)} Punkte`)
-     .join(' · ');
- }
+   const trendCards=[7,14,30].map(days=>{const t=trendFor(days);if(!t)return `<div class="wmTrendCard"><b>${days} Tage</b><span class="wmTrendDelta">–</span><span class="wmTrendRange">noch keine Daten</span></div>`;const cls=t.delta>0?'good':t.delta<0?'bad':'';const arrow=t.delta>0?'↗':t.delta<0?'↘':'→';return `<div class="wmTrendCard"><b>${days} Tage</b><span class="wmTrendDelta ${cls}">${t.delta>=0?'+':''}${t.delta.toFixed(0)} Punkte ${arrow}</span><span class="wmTrendRange">${Math.round(t.from)} → ${Math.round(t.to)}</span></div>`}).join('');
+   changes.innerHTML=`<div class="wmTrendCards">${trendCards}</div>`;
+  }
  function readinessZone(score){
    const s=Number(score);
    if(!Number.isFinite(s)) return {title:'Readiness-Zone',text:'Noch keine belastbare Einstufung.'};
@@ -3247,13 +3281,37 @@ async function loadAll(){renderUnavailable();
    wmTabReadiness.textContent=(w.readiness_score!=null?w.readiness_score+'/100':(w.readiness!=null?w.readiness+'/100':'–'));wmTabFirstTry.textContent=w.wm_goal_first_try||w.wm_goal_realistic||'–';const wmTabRepeat=document.getElementById('wmTabRepeat');if(wmTabRepeat)wmTabRepeat.textContent=w.wm_goal_repeat||w.dynamic_target||'–';wmTabStretch.textContent=w.wm_goal_stretch||'–';
    const wmProgressSummaryEl=document.getElementById('wmProgressSummary');
    const wmProgressChartEl=document.getElementById('wmProgressChart');
-   let pr=Array.isArray(w.progress_recent)?w.progress_recent:[];
+   let pr=Array.isArray(w.progress_recent)?w.progress_recent.filter(x=>Number.isFinite(Number(x.seconds))):[];
    if(pr.length){
-     let vals=pr.map(x=>x.seconds), mn=Math.min(...vals,w.wm_goal_stretch_seconds||99999), mx=Math.max(...vals);
-     let span=Math.max(1,mx-mn);
-     if(wmProgressSummaryEl)wmProgressSummaryEl.innerHTML=`<div class="wmProgressCompact"><span><b>Ø letzte 10</b> ${w.recent10||'–'}</span><span><b>Trainingsziel</b> ${w.dynamic_target||'–'}</span>${w.trend10_percent!=null?`<span><b>Trend</b> ${pct(w.trend10_percent)}</span>`:''}</div>`;
-     if(wmProgressChartEl)wmProgressChartEl.innerHTML=`<div class="progressBars wmMobileBars">${pr.map((x,i)=>{let h=35+((mx-x.seconds)/span)*105;let d=x.finished_at?new Date(x.finished_at).toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'}):'';let show=(i===0||i===pr.length-1||i%3===0);return `<div class="pbar" title="${x.puzzle_name||''} · ${x.time}"><div class="pbarFill" style="height:${Math.max(20,h)}px"></div><div class="pbarTime">${show?displayPuzzleTime(x.time):''}</div><div class="pbarDate">${show?d:''}</div></div>`}).join('')}</div><div class="progressLegend"><span class="pill">WM-Ziel: ${w.wm_goal_realistic}</span><span class="pill">Stretch: ${w.wm_goal_stretch}</span></div>`;
-   }else{if(wmProgressSummaryEl)wmProgressSummaryEl.textContent='Noch nicht genügend vergleichbare 500er-Daten.';if(wmProgressChartEl)wmProgressChartEl.innerHTML='';}
+     const vals=pr.map(x=>Number(x.seconds));
+     const avgSec=Number.isFinite(Number(w.recent10_seconds))?Number(w.recent10_seconds):vals.reduce((a,b)=>a+b,0)/vals.length;
+     const goalSec=Number(w.wm_goal_first_try_seconds||w.wm_goal_realistic_seconds||goalTargetSeconds(w.wm_goal_first_try||w.wm_goal_realistic||''));
+     const goalText=Number.isFinite(goalSec)?fmtSeconds(goalSec):(w.wm_goal_first_try||w.wm_goal_realistic||'–');
+     const diff=Number.isFinite(goalSec)?avgSec-goalSec:null;
+     const diffAbs=diff==null?null:Math.abs(diff);
+     const diffText=diff==null?'–':`${diff>0?'+':diff<0?'−':''}${fmtSeconds(diffAbs)}`;
+     const diffCaption=diff==null?'Zielvergleich nicht verfügbar':diff>0?'langsamer als WM-Ziel':diff<0?'schneller als WM-Ziel':'genau im WM-Ziel';
+     if(wmProgressSummaryEl)wmProgressSummaryEl.innerHTML=`<div class="wmProgressStats"><div class="wmProgressStat"><span>WM-Ziel · First Try</span><strong>${goalText}</strong><small>Zielzeit</small></div><div class="wmProgressStat"><span>Aktueller Ø (${vals.length})</span><strong>${fmtSeconds(avgSec)}</strong><small>vergleichbare 500er</small></div><div class="wmProgressStat"><span>Differenz zum Ziel</span><strong>${diffText}</strong><small>${diffCaption}</small></div></div>`;
+
+     const all=[...vals,avgSec];if(Number.isFinite(goalSec))all.push(goalSec);
+     let min=Math.min(...all),max=Math.max(...all);let pad=Math.max(90,(max-min)*.20);min-=pad;max+=pad;
+     const step=150;min=Math.max(0,Math.floor(min/step)*step);max=Math.ceil(max/step)*step;if(max-min<600)max=min+600;
+     const W=640,H=280,L=55,R=74,T=22,B=42,innerW=W-L-R,innerH=H-T-B;
+     const x=i=>L+(vals.length===1?innerW/2:(i/(vals.length-1))*innerW);const y=v=>T+((max-Number(v))/(max-min))*innerH;
+     const pts=vals.map((v,i)=>`${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+     const ticks=[];for(let i=0;i<5;i++)ticks.push(min+(max-min)*i/4);
+     const grid=ticks.map(v=>`<line x1="${L}" y1="${y(v)}" x2="${W-R}" y2="${y(v)}" class="wmProgressGrid"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end" class="wmProgressAxis">${fmtSeconds(v)}</text>`).join('');
+     const dots=vals.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="${i===vals.length-1?5:3.5}" class="${i===vals.length-1?'wmProgressDot current':'wmProgressDot'}"><title>${readinessEsc(pr[i]?.puzzle_name||`Lauf ${i+1}`)} · ${fmtSeconds(v)}</title></circle>`).join('');
+     const xlabels=vals.map((v,i)=>`<text x="${x(i)}" y="${H-11}" text-anchor="middle" class="wmProgressLabel">${i+1}</text>`).join('');
+     const goalLine=Number.isFinite(goalSec)&&goalSec>=min&&goalSec<=max?`<line x1="${L}" y1="${y(goalSec)}" x2="${W-R}" y2="${y(goalSec)}" class="wmProgressGoal"/><text x="${W-5}" y="${y(goalSec)+4}" text-anchor="end" class="wmProgressGoalLabel">Ziel ${goalText}</text>`:'';
+     const avgLine=`<line x1="${L}" y1="${y(avgSec)}" x2="${W-R}" y2="${y(avgSec)}" class="wmProgressAvg"/><text x="${W-5}" y="${y(avgSec)+4}" text-anchor="end" class="wmProgressAvgLabel">Ø ${fmtSeconds(avgSec)}</text>`;
+     const coach=diff==null?'Die letzten vergleichbaren 500er werden als Leistungsbasis angezeigt.':diff<=0?`Sehr stark: Der aktuelle 10er-Schnitt liegt ${fmtSeconds(Math.abs(diff))} innerhalb des First-Try-WM-Ziels.`:`Aktuell fehlen im 10er-Schnitt noch ${fmtSeconds(diff)} bis zum First-Try-WM-Ziel. Entscheidend ist der Trend der neueren Läufe.`;
+     const coachClass=diff!=null&&diff<=0?'good':'warn';
+     if(wmProgressChartEl)wmProgressChartEl.innerHTML=`<div class="wmProgressGraph"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Letzte ${vals.length} vergleichbare 500er"><text x="${L}" y="12" class="wmProgressLabel">Zeit · Läufe älter → neuer</text>${grid}${goalLine}${avgLine}<polyline points="${pts}" class="wmProgressLine"/>${dots}${xlabels}</svg></div><div class="wmProgressCoach ${coachClass}"><strong>${diff!=null&&diff<=0?'🏆 Zielbereich erreicht':'🎯 Weg zum WM-Ziel'}</strong><br>${coach}</div>`;
+   }else{
+     if(wmProgressSummaryEl)wmProgressSummaryEl.textContent='Noch nicht genügend vergleichbare 500er-Daten.';
+     if(wmProgressChartEl)wmProgressChartEl.innerHTML='';
+   }
 
    // weekly plan is rendered immediately after wm-plan resolves (see above)
 
