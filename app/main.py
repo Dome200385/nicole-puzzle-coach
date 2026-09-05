@@ -30,7 +30,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.9.8",
+    version="6.11.2",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -361,7 +361,7 @@ def pwa_manifest():
 
 @app.get("/sw.js")
 def pwa_service_worker():
-    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v696';
+    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v6112-oldest';
 const SHELL=['/manifest.webmanifest','/pwa/icon-192.png','/pwa/icon-512.png','/pwa/icon-maskable-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(SHELL)).catch(()=>{}));
@@ -1059,6 +1059,68 @@ def repeat_priority(limit:int=5, db:Session=Depends(get_db)):
         return {"available":bool(items),"items":items,"count":len(items),"snapshot_id":snapshot_id,"data_source":source,
                 "message":"Priorisierung bereits gelöster 500er – Trainingsnutzen aus MSP-Daten, keine eigene Zeitprognose."}
     except Exception as exc:return {"available":False,"items":[],"count":0,"message":"Wiederholungs-Priorität derzeit nicht verfügbar.","error":str(exc)}
+
+@app.get("/coach/oldest-solved")
+def oldest_solved(limit:int=10, db:Session=Depends(get_db)):
+    """500-piece library puzzles Nicole solved before, ordered by longest time since last Solo solve."""
+    payload,source,snapshot_id=_best_available_payload(db)
+    if not payload:
+        return {"available":False,"items":[],"count":0,"message":"Noch keine synchronisierten MySpeedPuzzling-Daten vorhanden."}
+    try:
+        rows=normalize_results(payload.get("results") or {})
+        from app.wm_coach import _extract_library_puzzles,_history_for_puzzle,_days_since_last_solve
+        items=[]
+        for p in _extract_library_puzzles(payload.get("collections") or {}):
+            if not isinstance(p,dict):
+                continue
+            try:
+                if int(p.get("pieces") or 0)!=500:
+                    continue
+            except (TypeError,ValueError):
+                continue
+            hist=[r for r in _history_for_puzzle(rows,p) if r.get("mode")=="solo"]
+            if not hist:
+                continue
+            vals=[]
+            for r in hist:
+                try:
+                    sec=int(r.get("seconds"))
+                    if sec>0: vals.append(sec)
+                except Exception:
+                    pass
+            if not vals:
+                continue
+            latest=vals[0]
+            best=min(vals)
+            days=_days_since_last_solve(hist)
+            # Entries without a usable date are kept behind dated entries.
+            sort_days=days if days is not None else -1
+            ins=p.get("msp_insights") or {}
+            stats=ins.get("statistics") or p.get("statistics") or {}
+            solo=stats.get("solo") if isinstance(stats,dict) else {}
+            try:
+                median=int((solo or {}).get("median_seconds")) if (solo or {}).get("median_seconds") is not None else None
+            except Exception:
+                median=None
+            items.append({
+                "id":p.get("id"),"name":p.get("name"),"manufacturer":p.get("manufacturer"),
+                "pieces":p.get("pieces"),"image_url":p.get("image_url"),
+                "latest":_fmt_seconds(latest),"best":_fmt_seconds(best),
+                "median":_fmt_seconds(median) if median is not None else None,
+                "solo_solves":len(vals),"days_since_last_solve":days,
+                "_sort_days":sort_days,
+            })
+        items.sort(key=lambda x:(x.get("_sort_days",-1), x.get("solo_solves",0)), reverse=True)
+        items=items[:max(1,min(int(limit or 10),10))]
+        for item in items:
+            item.pop("_sort_days",None)
+        return {
+            "available":bool(items),"items":items,"count":len(items),
+            "snapshot_id":snapshot_id,"data_source":source,
+            "message":"Bereits gelöste 500er, die am längsten nicht mehr als Solo-Puzzle gemacht wurden."
+        }
+    except Exception as exc:
+        return {"available":False,"items":[],"count":0,"message":"Langzeit-Wiederholungen derzeit nicht verfügbar.","error":str(exc)}
 
 @app.get("/coach/unsolved-library")
 async def unsolved_library(db:Session=Depends(get_db)):

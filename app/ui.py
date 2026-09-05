@@ -2055,6 +2055,21 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 }
 </style>
 
+
+<style id="npc-oldest-solved-training-v6111">
+@media(max-width:760px){
+  #oldestSolvedFocus .trainingPuzzleSession>summary{height:auto!important;max-height:none!important;overflow:visible!important;align-items:start!important}
+  #oldestSolvedFocus .trainingPuzzleSession .weeklySummaryText{height:auto!important;max-height:none!important;overflow:visible!important;align-self:start!important}
+  #oldestSolvedFocus .trainingPuzzleSession .weeklyPuzzleName,
+  #oldestSolvedFocus .trainingPuzzleSession .weeklySessionTitle,
+  #oldestSolvedFocus .trainingPuzzleSession .weeklySessionTitle strong{display:block!important;height:auto!important;max-height:none!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;-webkit-line-clamp:unset!important;-webkit-box-orient:initial!important;overflow-wrap:anywhere!important}
+  #oldestSolvedFocus .trainingPuzzleSession>.weeklyDetail{display:block!important;width:auto!important;max-width:none!important;min-width:0!important;margin:0!important;padding:13px 14px 14px!important;border-top:1px solid #edf0f4!important}
+  #oldestSolvedFocus .trainingFacts4{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:9px!important;width:100%!important}
+  #oldestSolvedFocus .trainingCoachNote{width:100%!important;margin:10px 0 0!important}
+  #oldestSolvedFocus .trainingPuzzleSession>summary>.skipBtnCompact{grid-column:3 / 5!important;grid-row:2!important;justify-self:stretch!important;width:100%!important;max-width:none!important;min-width:0!important;min-height:40px!important;margin:0!important}
+}
+</style>
+
 </head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
@@ -2099,6 +2114,11 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <details class="item trainingDropdown">
 <summary>🔁 Wo lohnt sich die nächste Wiederholung am meisten?</summary>
 <div id="repeatPriority" class="small trainingDropdownBody">Wiederholungs-Priorität wird berechnet…</div>
+</details>
+
+<details class="item trainingDropdown">
+<summary>🕰️ Am längsten nicht mehr gemacht · Top 10</summary>
+<div id="oldestSolvedFocus" class="small trainingDropdownBody">Langzeit-Wiederholungen werden geladen…</div>
 </details>
 
 <details class="item trainingDropdown">
@@ -2465,7 +2485,7 @@ async function refreshFromMSP(){
     // /sync itself succeeded. Secondary dashboard panels must never turn this
     // into the misleading message "Sync fehlgeschlagen".
     const reloadJobs=[loadAll()];
-    if(trainingExtrasLoaded)reloadJobs.push(loadMedianGapFocus(),loadRepeatPriority(),loadUnsolvedLibrary());
+    if(trainingExtrasLoaded)reloadJobs.push(loadMedianGapFocus(),loadRepeatPriority(),loadOldestSolvedFocus(),loadUnsolvedLibrary());
     if(progressExtrasLoaded)reloadJobs.push(loadPuzzleProgress());
     const reloadResults=await Promise.allSettled(reloadJobs);
     const partialReload=reloadResults.some(x=>x.status==='rejected');
@@ -2505,6 +2525,41 @@ async function loadPuzzleProgress(){
   }catch(e){
     el.textContent='Puzzle-Fortschritt derzeit nicht verfügbar.';
   }
+}
+
+async function loadOldestSolvedFocus(){
+ const el=document.getElementById('oldestSolvedFocus'); if(!el)return;
+ try{
+  const d=await getj('/coach/oldest-solved?limit=10');
+  if(!d.available||!d.items?.length){el.textContent=d.message||'Keine bereits gelösten 500er gefunden.';return}
+  el.innerHTML=`<div class="small trainingListIntro">${d.message||''}</div>`+
+   d.items.filter(p=>!isPuzzleUnavailable(p)).map((p,i)=>{
+    const days=p.days_since_last_solve;
+    const ago=days!=null?(days===0?'heute':days===1?'vor 1 Tag':`vor ${days} Tagen`):'Datum nicht verfügbar';
+    const coach=days!=null
+      ? `Dieses Puzzle wurde seit ${days} Tag${days===1?'':'en'} nicht mehr gelöst. Dadurch ist der Erinnerungsvorteil kleiner und es eignet sich gut als realistische Wiederholung.`
+      : 'Bereits gelöstes Puzzle ohne verlässliches letztes Datum. Für eine Wiederholung geeignet.';
+    return `<details class="item weeklySession trainingPuzzleSession"><summary>
+      <div class="weeklyIndex">${i+1}</div>
+      ${p.image_url?`<img class="weeklyThumb" src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.style.display='none'">`:`<div class="weeklyThumb weeklyThumbEmpty">🧩</div>`}
+      <div class="weeklySummaryText">
+        <div class="weeklySessionTitle"><strong>${readinessEsc(p.name||'Puzzle')}</strong></div>
+        <div class="weeklyPuzzleName">${p.manufacturer?readinessEsc(p.manufacturer):'Puzzle'}</div>
+        <div class="small">Zuletzt ${ago}</div>
+      </div>
+      ${summarySkipButtonHtml(p)}
+     </summary>
+     <div class="weeklyDetail">
+       <div class="weeklyFacts trainingFacts4">
+         <div class="weeklyFact"><span>Letzte Zeit</span><strong>${p.latest||'–'}</strong></div>
+         <div class="weeklyFact"><span>Best</span><strong>${p.best||'–'}</strong></div>
+         <div class="weeklyFact"><span>MSP-Median</span><strong>${p.median||'–'}</strong></div>
+         <div class="weeklyFact"><span>Solo-Läufe</span><strong>${p.solo_solves!=null?p.solo_solves:'–'}</strong></div>
+       </div>
+       <div class="trainingCoachNote"><strong>Coach</strong>${readinessEsc(coach)}</div>
+     </div></details>`;
+   }).join('');
+ }catch(e){el.textContent='Langzeit-Wiederholungen derzeit nicht verfügbar.'}
 }
 
 async function loadUnsolvedLibrary(){
@@ -2731,10 +2786,11 @@ function updateTodaySummary(w){
     btn.onclick=()=>showAppPage('training');
   }
 }
+window.addEventListener('DOMContentLoaded',()=>ensureOldestSolvedTrainingSection());
 if('serviceWorker' in navigator){
   window.addEventListener('load',async()=>{
     try{
-      const reg=await navigator.serviceWorker.register('/sw.js?v=6120');
+      const reg=await navigator.serviceWorker.register('/sw.js?v=6112-oldest');
       await reg.update();
       let reloading=false;
       navigator.serviceWorker.addEventListener('controllerchange',()=>{
@@ -2746,10 +2802,36 @@ if('serviceWorker' in navigator){
   });
 }
 let trainingExtrasLoaded=false,progressExtrasLoaded=false;
+function ensureOldestSolvedTrainingSection(){
+  let el=document.getElementById('oldestSolvedFocus');
+  if(el)return el;
+  const host=document.querySelector('#appTraining .trainingAnalysisBottom.trainingOnlyPuzzleLists') || document.querySelector('#appTraining .trainingAnalysisBottom');
+  if(!host)return null;
+  const unsolved=document.getElementById('unsolvedLibrary');
+  const unsolvedDetails=unsolved?unsolved.closest('details.trainingDropdown'):null;
+  const details=document.createElement('details');
+  details.className='item trainingDropdown';
+  details.id='oldestSolvedDropdown';
+  details.innerHTML='<summary>🕰️ Am längsten nicht mehr gemacht · Top 10</summary><div id="oldestSolvedFocus" class="small trainingDropdownBody">Langzeit-Wiederholungen werden geladen…</div>';
+  if(unsolvedDetails&&unsolvedDetails.parentNode===host)host.insertBefore(details,unsolvedDetails);
+  else host.appendChild(details);
+  return document.getElementById('oldestSolvedFocus');
+}
 function loadTrainingExtrasOnce(){
-  if(trainingExtrasLoaded)return;
+  const oldestEl=ensureOldestSolvedTrainingSection();
+  if(trainingExtrasLoaded){
+    if(oldestEl && !oldestEl.dataset.loaded){
+      loadOldestSolvedFocus().finally(()=>{if(oldestEl)oldestEl.dataset.loaded='1'});
+    }
+    return;
+  }
   trainingExtrasLoaded=true;
-  Promise.allSettled([loadMedianGapFocus(),loadRepeatPriority(),loadUnsolvedLibrary()]);
+  Promise.allSettled([
+    loadMedianGapFocus(),
+    loadRepeatPriority(),
+    loadOldestSolvedFocus().finally(()=>{const e=document.getElementById('oldestSolvedFocus');if(e)e.dataset.loaded='1'}),
+    loadUnsolvedLibrary()
+  ]);
 }
 function loadProgressExtrasOnce(){
   if(progressExtrasLoaded)return;
@@ -3191,71 +3273,6 @@ async function loadAll(){renderUnavailable();
 
  try{
    let w=await wmPlanPromise;
-
-   // V6.12: render WM progress immediately after the WM payload arrives.
-   // This block is deliberately self-contained and runs BEFORE the more complex
-   // weekly-plan / recommendation UI. A failure in one of those panels must not
-   // leave "Fortschritt wird berechnet…" on screen forever.
-   try{
-     const _sum=document.getElementById('wmProgressSummary');
-     const _chart=document.getElementById('wmProgressChart');
-     if(_sum&&_chart){
-       const _rows=(Array.isArray(w&&w.progress_recent)?w.progress_recent:[])
-         .filter(r=>r&&Number.isFinite(Number(r.seconds)))
-         .slice(-10);
-       const _fmt=(value)=>{
-         const n=Number(value);
-         if(!Number.isFinite(n)||n<0)return '–';
-         const sec=Math.round(n),min=Math.floor(sec/60),ss=sec%60;
-         return `${min}:${String(ss).padStart(2,'0')}`;
-       };
-       const _esc=(v)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-       const _parseTime=(v)=>{
-         if(v==null||v==='')return null;
-         if(Number.isFinite(Number(v)))return Number(v);
-         const a=String(v).trim().split(':').map(Number);
-         if(a.some(x=>!Number.isFinite(x)))return null;
-         return a.length===3?a[0]*3600+a[1]*60+a[2]:a.length===2?a[0]*60+a[1]:null;
-       };
-       if(!_rows.length){
-         _sum.textContent='Noch nicht genügend vergleichbare 500er-Daten.';
-         _chart.innerHTML='<div class="small">Sobald vergleichbare 500er-Solo-Läufe vorhanden sind, erscheint hier der WM-Fortschritt.</div>';
-       }else{
-         const _vals=_rows.map(r=>Number(r.seconds));
-         const _avg=Number.isFinite(Number(w.recent10_seconds))?Number(w.recent10_seconds):(_vals.reduce((a,b)=>a+b,0)/_vals.length);
-         const _goalCandidates=[w.wm_goal_first_try_seconds,w.wm_goal_realistic_seconds,w.dynamic_target_seconds,w.wm_goal_first_try,w.wm_goal_realistic,w.dynamic_target];
-         let _goal=null;
-         for(const c of _goalCandidates){const n=_parseTime(c);if(Number.isFinite(n)&&n>0){_goal=n;break;}}
-         const _diff=Number.isFinite(_goal)?_avg-_goal:null;
-         const _diffText=_diff==null?'–':`${_diff>0?'+':_diff<0?'−':''}${_fmt(Math.abs(_diff))}`;
-         const _diffCaption=_diff==null?'Zielvergleich nicht verfügbar':_diff>0?'langsamer als WM-Ziel':_diff<0?'schneller als WM-Ziel':'genau im WM-Ziel';
-         _sum.innerHTML=`<div class="wmProgressStats"><div class="wmProgressStat"><span>WM-Ziel · First Try</span><strong>${_goal?_fmt(_goal):'–'}</strong><small>Zielzeit</small></div><div class="wmProgressStat"><span>Aktueller Ø (${_vals.length})</span><strong>${_fmt(_avg)}</strong><small>vergleichbare 500er</small></div><div class="wmProgressStat"><span>Differenz zum Ziel</span><strong>${_diffText}</strong><small>${_diffCaption}</small></div></div>`;
-
-         const _all=[..._vals,_avg];if(Number.isFinite(_goal))_all.push(_goal);
-         let _min=Math.min(..._all),_max=Math.max(..._all);
-         const _pad=Math.max(90,(_max-_min)*0.20);_min=Math.max(0,_min-_pad);_max+=_pad;
-         const _step=150;_min=Math.floor(_min/_step)*_step;_max=Math.ceil(_max/_step)*_step;if(_max-_min<600)_max=_min+600;
-         const W=640,H=280,L=55,R=78,T=24,B=42,IW=W-L-R,IH=H-T-B;
-         const X=i=>L+(_vals.length===1?IW/2:(i/(_vals.length-1))*IW);
-         const Y=v=>T+((_max-Number(v))/(_max-_min))*IH;
-         const _pts=_vals.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
-         const _ticks=Array.from({length:5},(_,i)=>_min+(_max-_min)*i/4);
-         const _grid=_ticks.map(v=>`<line x1="${L}" y1="${Y(v)}" x2="${W-R}" y2="${Y(v)}" class="wmProgressGrid"/><text x="${L-8}" y="${Y(v)+4}" text-anchor="end" class="wmProgressAxis">${_fmt(v)}</text>`).join('');
-         const _dots=_vals.map((v,i)=>`<circle cx="${X(i)}" cy="${Y(v)}" r="${i===_vals.length-1?5:3.5}" class="${i===_vals.length-1?'wmProgressDot current':'wmProgressDot'}"><title>${_esc(_rows[i].puzzle_name||`Lauf ${i+1}`)} · ${_fmt(v)}</title></circle>`).join('');
-         const _labels=_vals.map((_,i)=>`<text x="${X(i)}" y="${H-11}" text-anchor="middle" class="wmProgressLabel">${i+1}</text>`).join('');
-         const _goalLine=Number.isFinite(_goal)&&_goal>=_min&&_goal<=_max?`<line x1="${L}" y1="${Y(_goal)}" x2="${W-R}" y2="${Y(_goal)}" class="wmProgressGoal"/><text x="${W-5}" y="${Y(_goal)+4}" text-anchor="end" class="wmProgressGoalLabel">Ziel ${_fmt(_goal)}</text>`:'';
-         const _avgLine=`<line x1="${L}" y1="${Y(_avg)}" x2="${W-R}" y2="${Y(_avg)}" class="wmProgressAvg"/><text x="${W-5}" y="${Y(_avg)+4}" text-anchor="end" class="wmProgressAvgLabel">Ø ${_fmt(_avg)}</text>`;
-         const _coach=_diff==null?'Die letzten vergleichbaren 500er bilden die aktuelle Leistungsbasis.':_diff<=0?`Der aktuelle Schnitt liegt ${_fmt(Math.abs(_diff))} innerhalb des First-Try-WM-Ziels.`:`Im aktuellen Schnitt fehlen noch ${_fmt(_diff)} bis zum First-Try-WM-Ziel.`;
-         _chart.innerHTML=`<div class="wmProgressGraph"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Letzte ${_vals.length} vergleichbare 500er"><text x="${L}" y="14" class="wmProgressLabel">Zeit · Läufe älter → neuer</text>${_grid}${_goalLine}${_avgLine}<polyline points="${_pts}" class="wmProgressLine"/>${_dots}${_labels}</svg></div><div class="wmProgressCoach ${_diff!=null&&_diff<=0?'good':'warn'}"><strong>${_diff!=null&&_diff<=0?'🏆 Zielbereich erreicht':'🎯 Weg zum WM-Ziel'}</strong><br>${_coach}</div>`;
-       }
-     }
-   }catch(progressError){
-     const _sum=document.getElementById('wmProgressSummary');
-     const _chart=document.getElementById('wmProgressChart');
-     if(_sum)_sum.textContent='WM-Fortschritt konnte nicht dargestellt werden.';
-     if(_chart)_chart.innerHTML='<div class="small">Die WM-Daten sind vorhanden, aber die Darstellung ist fehlgeschlagen. Bitte neu laden.</div>';
-     console.error('WM progress early render failed',progressError);
-   }
    setTimeout(()=>renderWeeklyPlanFallback(w),0);
    const weeklyPlanEl=document.getElementById('wmWeeklyPlan');
    if(weeklyPlanEl){
@@ -3394,10 +3411,6 @@ async function loadAll(){renderUnavailable();
 
  }catch(e){
    wmRecommendation.textContent='WM-Coach konnte nicht live aktualisiert werden. Der letzte Server-Snapshot bleibt erhalten.';
-   const _ps=document.getElementById('wmProgressSummary');
-   const _pc=document.getElementById('wmProgressChart');
-   if(_ps&&_ps.textContent.includes('wird berechnet'))_ps.textContent='WM-Fortschritt derzeit nicht verfügbar.';
-   if(_pc&&!_pc.innerHTML)_pc.innerHTML='<div class="small">WM-Plan konnte nicht geladen werden. Nach der nächsten erfolgreichen Synchronisierung wird der Fortschritt automatisch berechnet.</div>';
  }
 
 
@@ -3451,6 +3464,6 @@ def dashboard():
             "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
             "Pragma": "no-cache",
             "Expires": "0",
-            "X-NPC-Version": "6.13.2",
+            "X-NPC-Version": "6.11.2",
         },
     )
