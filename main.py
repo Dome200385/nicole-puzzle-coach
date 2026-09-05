@@ -1,8 +1,9 @@
 import json
+import asyncio
 import secrets
 import os
 from fastapi import FastAPI, HTTPException, Request, Depends
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.responses import RedirectResponse, HTMLResponse, Response, FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from starlette.middleware.sessions import SessionMiddleware
@@ -29,7 +30,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.8.17",
+    version="6.9.8",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -278,10 +279,127 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.8.17","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.8.18","status":"online","dashboard":"/dashboard","docs":"/docs"}
+
+
+def _ensure_readiness_history_table(db):
+    db.execute(text("""
+        CREATE TABLE IF NOT EXISTS readiness_history (
+            day VARCHAR(10) PRIMARY KEY,
+            readiness FLOAT NOT NULL,
+            form_signal FLOAT NULL,
+            consistency FLOAT NULL,
+            median_hits INTEGER NULL,
+            comparable_count INTEGER NULL
+        )
+    """))
+    db.commit()
+
+def _readiness_history_rows(db, limit=180):
+    _ensure_readiness_history_table(db)
+    rows=db.execute(text("""
+        SELECT day, readiness, form_signal, consistency, median_hits, comparable_count
+        FROM readiness_history
+        ORDER BY day ASC
+    """)).mappings().all()
+    rows=list(rows)[-max(1,min(int(limit or 180),365)):]
+    return [dict(r) for r in rows]
+
+@app.get("/coach/readiness-history")
+def readiness_history(limit:int=180, db:Session=Depends(get_db)):
+    return {"items":_readiness_history_rows(db,limit)}
+
+@app.post("/coach/readiness-history/capture")
+async def capture_readiness_history(request:Request, db:Session=Depends(get_db)):
+    from datetime import datetime
+    body=await request.json()
+    if body.get("readiness") is None:
+        raise HTTPException(status_code=400, detail="readiness required")
+    _ensure_readiness_history_table(db)
+    day=datetime.utcnow().date().isoformat()
+
+    existing=db.execute(
+        text("SELECT day FROM readiness_history WHERE day=:day"),
+        {"day":day}
+    ).first()
+
+    values={
+        "day":day,
+        "readiness":float(body.get("readiness")),
+        "form_signal":body.get("form_signal"),
+        "consistency":body.get("consistency"),
+        "median_hits":body.get("median_hits"),
+        "comparable_count":body.get("comparable_count"),
+    }
+    if existing:
+        db.execute(text("""
+            UPDATE readiness_history
+            SET readiness=:readiness,
+                form_signal=:form_signal,
+                consistency=:consistency,
+                median_hits=:median_hits,
+                comparable_count=:comparable_count
+            WHERE day=:day
+        """), values)
+    else:
+        db.execute(text("""
+            INSERT INTO readiness_history
+            (day, readiness, form_signal, consistency, median_hits, comparable_count)
+            VALUES (:day, :readiness, :form_signal, :consistency, :median_hits, :comparable_count)
+        """), values)
+    db.commit()
+    return {"status":"captured","items":_readiness_history_rows(db,180)}
+
+
+@app.get("/manifest.webmanifest")
+def pwa_manifest():
+    return Response(
+        content='{"id": "/dashboard", "name": "Nicole Puzzle Coach", "short_name": "Puzzle Coach", "description": "Speed-Puzzling Training & Turniervorbereitung", "start_url": "/dashboard?source=pwa", "scope": "/", "display": "standalone", "background_color": "#f5f7fb", "theme_color": "#f5f7fb", "orientation": "portrait-primary", "icons": [{"src": "/pwa/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"}, {"src": "/pwa/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"}, {"src": "/pwa/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}',
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+@app.get("/sw.js")
+def pwa_service_worker():
+    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v696';
+const SHELL=['/manifest.webmanifest','/pwa/icon-192.png','/pwa/icon-512.png','/pwa/icon-maskable-512.png'];
+self.addEventListener('install',event=>{
+  event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(SHELL)).catch(()=>{}));
+  self.skipWaiting();
+});
+self.addEventListener('activate',event=>{
+  event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k)))));
+  self.clients.claim();
+});
+self.addEventListener('fetch',event=>{
+  const req=event.request;
+  if(req.method!=='GET') return;
+  const url=new URL(req.url);
+  if(url.origin!==self.location.origin) return;
+  if(req.mode==='navigate'){
+    event.respondWith(fetch(req).catch(()=>caches.match('/dashboard')));
+    return;
+  }
+  if(url.pathname.startsWith('/pwa/')||url.pathname==='/manifest.webmanifest'){
+    event.respondWith(caches.match(req).then(hit=>hit||fetch(req).then(resp=>{
+      const copy=resp.clone();
+      caches.open(CACHE_NAME).then(cache=>cache.put(req,copy)).catch(()=>{});
+      return resp;
+    })));
+  }
+});""", media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"})
+
+@app.get("/pwa/{filename}")
+def pwa_asset(filename:str):
+    allowed={"icon-192.png","icon-512.png","icon-maskable-512.png"}
+    if filename not in allowed:
+        raise HTTPException(status_code=404, detail="Not Found")
+    path=os.path.join(os.path.dirname(os.path.dirname(__file__)),"pwa_assets",filename)
+    return FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.8.17"}
+def health(): return {"status":"ok","version":"6.8.18"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -296,7 +414,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.8.17",
+        "version":"6.8.18",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -492,15 +610,15 @@ async def msp_api_test(db:Session=Depends(get_db)):
         return {"ok":False,"mode":"pat","reason":"MSP_PERSONAL_ACCESS_TOKEN not configured"}
     try:
         profile=await get_profile(token)
-        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.17","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
+        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.18","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
     except Exception as exc:
-        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.17","error":str(exc)}
+        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.18","error":str(exc)}
 
 @app.get("/msp/sync-status")
 def msp_sync_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     return {
-        "version":"6.8.17",
+        "version":"6.8.18",
         "snapshot_id":snap.id if snap else None,
         "synced_at":snap.synced_at if snap else None,
         "data_available":snap is not None,
@@ -942,38 +1060,135 @@ def repeat_priority(limit:int=5, db:Session=Depends(get_db)):
                 "message":"Priorisierung bereits gelöster 500er – Trainingsnutzen aus MSP-Daten, keine eigene Zeitprognose."}
     except Exception as exc:return {"available":False,"items":[],"count":0,"message":"Wiederholungs-Priorität derzeit nicht verfügbar.","error":str(exc)}
 
-@app.get("/coach/unsolved-library")
-def unsolved_library(db:Session=Depends(get_db)):
+@app.get("/coach/oldest-solved")
+def oldest_solved(limit:int=10, db:Session=Depends(get_db)):
+    """500-piece library puzzles Nicole solved before, ordered by longest time since last Solo solve."""
     payload,source,snapshot_id=_best_available_payload(db)
-    if not payload:return {"available":False,"items":[],"count":0,"message":"Noch keine synchronisierten MySpeedPuzzling-Daten vorhanden."}
+    if not payload:
+        return {"available":False,"items":[],"count":0,"message":"Noch keine synchronisierten MySpeedPuzzling-Daten vorhanden."}
+    try:
+        rows=normalize_results(payload.get("results") or {})
+        from app.wm_coach import _extract_library_puzzles,_history_for_puzzle,_days_since_last_solve
+        items=[]
+        for p in _extract_library_puzzles(payload.get("collections") or {}):
+            if not isinstance(p,dict):
+                continue
+            try:
+                if int(p.get("pieces") or 0)!=500:
+                    continue
+            except (TypeError,ValueError):
+                continue
+            hist=[r for r in _history_for_puzzle(rows,p) if r.get("mode")=="solo"]
+            if not hist:
+                continue
+            vals=[]
+            for r in hist:
+                try:
+                    sec=int(r.get("seconds"))
+                    if sec>0: vals.append(sec)
+                except Exception:
+                    pass
+            if not vals:
+                continue
+            latest=vals[0]
+            best=min(vals)
+            days=_days_since_last_solve(hist)
+            # Entries without a usable date are kept behind dated entries.
+            sort_days=days if days is not None else -1
+            ins=p.get("msp_insights") or {}
+            stats=ins.get("statistics") or p.get("statistics") or {}
+            solo=stats.get("solo") if isinstance(stats,dict) else {}
+            try:
+                median=int((solo or {}).get("median_seconds")) if (solo or {}).get("median_seconds") is not None else None
+            except Exception:
+                median=None
+            items.append({
+                "id":p.get("id"),"name":p.get("name"),"manufacturer":p.get("manufacturer"),
+                "pieces":p.get("pieces"),"image_url":p.get("image_url"),
+                "latest":_fmt_seconds(latest),"best":_fmt_seconds(best),
+                "median":_fmt_seconds(median) if median is not None else None,
+                "solo_solves":len(vals),"days_since_last_solve":days,
+                "_sort_days":sort_days,
+            })
+        items.sort(key=lambda x:(x.get("_sort_days",-1), x.get("solo_solves",0)), reverse=True)
+        items=items[:max(1,min(int(limit or 10),10))]
+        for item in items:
+            item.pop("_sort_days",None)
+        return {
+            "available":bool(items),"items":items,"count":len(items),
+            "snapshot_id":snapshot_id,"data_source":source,
+            "message":"Bereits gelöste 500er, die am längsten nicht mehr als Solo-Puzzle gemacht wurden."
+        }
+    except Exception as exc:
+        return {"available":False,"items":[],"count":0,"message":"Langzeit-Wiederholungen derzeit nicht verfügbar.","error":str(exc)}
+
+@app.get("/coach/unsolved-library")
+async def unsolved_library(db:Session=Depends(get_db)):
+    """Unsolved 500-piece library puzzles with official MSP insights."""
+    payload,source,snapshot_id=_best_available_payload(db)
+    if not payload:
+        return {"available":False,"items":[],"count":0,"message":"Noch keine synchronisierten MySpeedPuzzling-Daten vorhanden."}
     try:
         rows=normalize_results(payload.get("results") or {})
         from app.wm_coach import _extract_library_puzzles,_history_for_puzzle
-        items=[]
+        candidates=[]
         for p in _extract_library_puzzles(payload.get("collections") or {}):
-            if not isinstance(p,dict):continue
+            if not isinstance(p,dict): continue
             try:
-                if int(p.get("pieces") or 0) != 500:
-                    continue
-            except (TypeError, ValueError):
-                continue
-            hist=_history_for_puzzle(rows,p)
-            if any(r.get("mode")=="solo" for r in hist):continue
-            ins=p.get("msp_insights") or {}
-            diff=ins.get("difficulty") if isinstance(ins,dict) else {}
-            pred=ins.get("prediction") if isinstance(ins,dict) else {}
-            diff=diff if isinstance(diff,dict) else {}
-            pred=pred if isinstance(pred,dict) else {}
-            ps=pred.get("predicted_seconds") or pred.get("seconds") or p.get("predicted_seconds")
-            lo=pred.get("range_low_seconds") or pred.get("rangeLowSeconds") or p.get("prediction_range_low_seconds")
-            hi=pred.get("range_high_seconds") or pred.get("rangeHighSeconds") or p.get("prediction_range_high_seconds")
-            items.append({"id":p.get("id"),"name":p.get("name"),"manufacturer":p.get("manufacturer"),"pieces":p.get("pieces"),"image_url":p.get("image_url"),
-              "difficulty_label":diff.get("label") or diff.get("level") or p.get("difficulty_label"),"difficulty_percent":diff.get("percent") if diff.get("percent") is not None else p.get("difficulty_percent"),
-              "prediction":_fmt_seconds(int(ps)) if ps else None,"prediction_low":_fmt_seconds(int(lo)) if lo else None,"prediction_high":_fmt_seconds(int(hi)) if hi else None})
-        items.sort(key=lambda p:(int(p.get("pieces") or 99999),str(p.get("name") or "").lower()))
+                if int(p.get("pieces") or 0)!=500: continue
+            except (TypeError,ValueError): continue
+            if any(r.get("mode")=="solo" for r in _history_for_puzzle(rows,p)): continue
+            candidates.append(p)
+
+        token=None
+        try: token=await _valid_access_token(db)
+        except Exception: token=None
+        semaphore=asyncio.Semaphore(4)
+        async def official_insights(puzzle):
+            base=puzzle.get("msp_insights") if isinstance(puzzle.get("msp_insights"),dict) else {}
+            merged=dict(base)
+            have_prediction=merged.get("prediction_seconds") is not None or bool(merged.get("prediction_text"))
+            have_difficulty=bool(merged.get("difficulty_label")) or merged.get("difficulty_percent") is not None
+            pid=puzzle.get("id")
+            if token and pid and not (have_prediction and have_difficulty):
+                try:
+                    async with semaphore: raw=await get_predicted_time(token,pid)
+                    live=normalize_predicted_time_response(raw)
+                    if isinstance(live,dict):
+                        for k,v in live.items():
+                            if v is not None: merged[k]=v
+                except Exception: pass
+            return merged
+
+        insights_list=await asyncio.gather(*(official_insights(p) for p in candidates)) if candidates else []
+        items=[]
+        for p,ins in zip(candidates,insights_list):
+            ps=ins.get("prediction_seconds"); ptext=ins.get("prediction_text")
+            lo=ins.get("prediction_range_from_seconds"); hi=ins.get("prediction_range_to_seconds")
+            diff_label=ins.get("difficulty_label") or p.get("difficulty_label")
+            diff_raw=ins.get("difficulty_percent") if ins.get("difficulty_percent") is not None else p.get("difficulty_percent")
+            diff_percent=None
+            if diff_raw is not None:
+                try:
+                    dv=float(diff_raw)
+                    # MSP difficulty is a multiplier around 1.0.
+                    # 1.10 = 10% above average, 0.90 = 10% below average.
+                    diff_percent=(dv-1.0)*100.0 if 0.25 <= dv <= 3.0 else dv
+                except (TypeError,ValueError):
+                    diff_percent=None
+            items.append({
+                "id":p.get("id"),"name":p.get("name"),"manufacturer":p.get("manufacturer"),"pieces":p.get("pieces"),"image_url":p.get("image_url"),
+                "difficulty_label":diff_label,"difficulty_percent":diff_percent,
+                "prediction":_fmt_seconds(int(ps)) if ps is not None else ptext,
+                "prediction_seconds":int(ps) if ps is not None else None,
+                "prediction_low":_fmt_seconds(int(lo)) if lo is not None else None,
+                "prediction_high":_fmt_seconds(int(hi)) if hi is not None else None,
+                "msp_insights":ins})
+        items.sort(key=lambda x:(int(x.get("pieces") or 99999),str(x.get("name") or "").lower()))
         return {"available":bool(items),"items":items,"count":len(items),"snapshot_id":snapshot_id,"data_source":source,
-          "message":f"{len(items)} Puzzle in der Library haben noch kein Solo-Ergebnis." if items else "Alle Puzzle in der Library haben bereits ein Solo-Ergebnis."}
-    except Exception as exc:return {"available":False,"items":[],"count":0,"message":"Ungelöste Library derzeit nicht verfügbar.","error":str(exc)}
+                "message":f"{len(items)} Puzzle in der Library haben noch kein Solo-Ergebnis." if items else "Alle Puzzle in der Library haben bereits ein Solo-Ergebnis."}
+    except Exception as exc:
+        return {"available":False,"items":[],"count":0,"message":"Ungelöste Library derzeit nicht verfügbar.","error":str(exc)}
 
 @app.get("/coach/puzzle-progress")
 def puzzle_progress(limit:int=8, db:Session=Depends(get_db)):
