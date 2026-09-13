@@ -2070,6 +2070,27 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 }
 </style>
 
+
+<style id="npc-training-options-v6113">
+@media(max-width:760px){
+  /* Adaptive Preparation now deliberately uses the same card language as the
+     Median Top-5 list. Target-time tile removed; training type is a badge. */
+  #appTraining .trainingQuick{padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;overflow:visible!important;margin:8px 0 12px!important}
+  #appTraining .trainingQuickCard{margin:0!important;border:1px solid #dfe5ed!important;border-radius:16px!important;background:#fff!important;overflow:hidden!important}
+  #appTraining .trainingQuickCard>summary{display:grid!important;grid-template-columns:38px 92px minmax(0,1fr) 22px!important;grid-template-rows:auto auto!important;column-gap:12px!important;row-gap:10px!important;align-items:center!important;padding:14px!important;min-height:124px!important}
+  #appTraining .trainingQuickCard #trainingQuickImage{grid-column:2!important;grid-row:1/3!important;width:92px!important;height:92px!important;max-width:92px!important;max-height:92px!important;border-radius:14px!important;overflow:hidden!important;background:#f2f4f7!important;display:flex!important;align-items:center!important;justify-content:center!important}
+  #appTraining .trainingQuickCard #trainingQuickImage img{width:100%!important;height:100%!important;object-fit:cover!important}
+  #appTraining .trainingQuickCard .weeklySummaryText{grid-column:3!important;grid-row:1!important;min-width:0!important;align-self:center!important}
+  #appTraining .trainingQuickCard #trainingQuickSkipBtn{grid-column:3/5!important;grid-row:2!important;width:100%!important;max-width:none!important;min-width:0!important;margin:0!important;min-height:40px!important}
+  #appTraining .trainingQuickCard>.weeklyDetail{margin:0!important;padding:13px 14px 14px!important;border-top:1px solid #edf0f4!important;width:auto!important}
+  #appTraining .trainingQuickCard .trainingFacts4{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:9px!important;width:100%!important}
+  #appTraining .trainingQuickCard .trainingCoachNote{width:100%!important;margin:10px 0 0!important;padding:12px!important}
+  /* Make sure every weekly option remains visible; the backend supplies five
+     distinct puzzles regardless of completed weekly sessions. */
+  #appTraining #wmWeeklyPlan .weeklySession{display:block!important}
+}
+</style>
+
 </head>
 <body><div class="wrap">
 <header><div><h1>🧩 Nicole Puzzle Coach</h1><div class="sub">Speed-Puzzling Training & Turniervorbereitung</div></div><div class="headerRight"><span class="techStatus"><strong id="systemKpi">–</strong> <span id="systemText">System</span> · <strong id="mspKpi">–</strong> <span id="mspText">MySpeedPuzzling</span></span><div id="systemBadge" class="badge">System wird geprüft…</div><button id="mspRefreshBtn" class="secondary compactRefresh" onclick="refreshFromMSP()">↻ MySpeedPuzzling aktualisieren</button><span id="syncStatusText" class="syncStatusText" aria-live="polite"></span></div></header>
@@ -2088,15 +2109,27 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 <section class="card full" data-app-page="today"><h2>✅ Meine bestätigten Turniere</h2><div id="mspCompetitions" class="list"></div></section>
 
 <section class="card full hero appSection" id="appTraining" data-app-page="training"><h2>🏁 WM Coach · Adaptive Preparation</h2><div class="mobileOnly trainingQuick">
-<div class="trainingQuickHero"><div id="trainingQuickImage" class="trainingQuickImage">🧩</div><div class="trainingQuickMain"><div class="label">Heute trainieren</div><strong id="trainingQuickPuzzle">Wird geladen…</strong><div id="trainingQuickMeta" class="small"></div></div></div>
-<div class="trainingQuickStats"><div><span class="label">Training</span><strong id="trainingQuickType">–</strong></div><div><span class="label">Ziel</span><strong id="trainingQuickTarget">–</strong></div></div>
-<div class="trainingQuickFacts">
-  <div><span>MSP-Median</span><strong id="trainingQuickMedian">–</strong></div>
-  <div><span>Letzte Zeit</span><strong id="trainingQuickLast">–</strong></div>
-  <div><span>vs. Median</span><strong id="trainingQuickDelta">–</strong></div>
-  <div><span>WM-Fit</span><strong id="trainingQuickFit">–</strong></div>
+<details class="item weeklySession trainingPuzzleSession trainingQuickCard" open>
+<summary>
+  <div class="weeklyIndex">★</div>
+  <div id="trainingQuickImage" class="weeklyThumb weeklyThumbEmpty">🧩</div>
+  <div class="weeklySummaryText">
+    <div class="weeklySessionTitle"><strong id="trainingQuickPuzzle">Wird geladen…</strong><span id="trainingQuickType" class="pill weeklyIntensity">–</span></div>
+    <div id="trainingQuickMeta" class="weeklyPuzzleName"></div>
+    <div class="small">Aktuelle Coach-Empfehlung</div>
+  </div>
+  <button type="button" id="trainingQuickSkipBtn" class="skipBtn skipBtnCompact" onclick="event.preventDefault();event.stopPropagation();skipCurrentTrainingQuick()">Skip – aktuell ausgeliehen</button>
+</summary>
+<div class="weeklyDetail">
+  <div class="weeklyFacts trainingFacts4">
+    <div class="weeklyFact"><span>MSP-Median</span><strong id="trainingQuickMedian">–</strong></div>
+    <div class="weeklyFact"><span>Letzte Zeit</span><strong id="trainingQuickLast">–</strong></div>
+    <div class="weeklyFact"><span>vs. Median</span><strong id="trainingQuickDelta">–</strong></div>
+    <div class="weeklyFact"><span>WM-Fit</span><strong id="trainingQuickFit">–</strong></div>
+  </div>
+  <div id="trainingQuickReason" class="trainingCoachNote"><strong>Coach</strong></div>
 </div>
-<div id="trainingQuickReason" class="trainingQuickReason"></div>
+</details>
 </div><div class="trainingPriorityGroup"><div class="item trainingDuplicatePuzzle" style="margin-top:12px"><strong>🧩 Nächstes empfohlenes Puzzle</strong><div id="wmNextPuzzle" class="small">Bibliothek wird ausgewertet…</div></div>
 <div class="item" style="margin-top:10px"><strong>📅 Plan für die aktuelle Trainingswoche</strong><div id="wmWeeklyPlan" class="list" style="margin-top:8px"></div></div>
 
@@ -2244,7 +2277,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 
 <div id="infoModal" class="modal" onclick="if(event.target===this)closeInfo()"><div class="modalbox"><div id="infoContent"></div><button class="secondary" onclick="closeInfo()">Schliessen</button></div></div>
 <script>
-const NPC_FRONTEND_VERSION='6.13.2';
+const NPC_FRONTEND_VERSION='6.11.5';
 function showInfo(type){
  const form=`<h2>ℹ️ Was bedeutet Form?</h2><p><b>Form</b> zeigt, ob Nicole aktuell schneller oder langsamer puzzelt als in der vorherigen Vergleichsperiode. Dafür werden die letzten 10 Solo-Ergebnisse mit den vorherigen 10 verglichen und auf <b>Zeit pro 100 Teile</b> normalisiert.</p><div class="scale"><div><b>Positiver Wert:</b> aktuell schneller. Beispiel +11,7 % = die normalisierte Zeit ist rund 11,7 % besser als zuvor.</div><div><b>Um 0 %:</b> Leistung weitgehend stabil.</div><div><b>Negativer Wert:</b> aktuell langsamer als in der vorherigen Periode.</div></div><p class="small">Die Zahl ist ein Trendindikator, keine Gewinnwahrscheinlichkeit und keine Prognose einer einzelnen Puzzlezeit.</p>`;
  const con=`<h2>ℹ️ Was bedeutet Konsistenz?</h2><p><b>Konsistenz</b> misst, wie ähnlich die letzten 10 normalisierten Solo-Leistungen sind. Auch hier wird Zeit pro 100 Teile verwendet, damit verschiedene Teilezahlen besser vergleichbar sind.</p><div class="scale"><div><b>90–100:</b> sehr konstante Leistungen</div><div><b>80–89:</b> gute bis hohe Konstanz</div><div><b>70–79:</b> merkliche Schwankungen</div><div><b>unter 70:</b> starke Schwankungen; Ursachen genauer analysieren</div></div><p class="small">Ein hoher Wert bedeutet nicht automatisch schnell. Ideal ist eine hohe Konsistenz zusammen mit einer starken bzw. steigenden Form.</p>`;
@@ -2254,7 +2287,7 @@ function closeInfo(){infoModal.classList.remove('open')}
 
 function timeToSeconds(v){if(!v)return null;let p=v.split(':').map(Number);if(p.some(Number.isNaN))return null;if(p.length===3)return p[0]*3600+p[1]*60+p[2];if(p.length===2)return p[0]*60+p[1];return Number(v)}
 function displayPuzzleTime(v){if(!v)return '–';let sec=timeToSeconds(String(v));if(sec==null||!Number.isFinite(sec))return v;let h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),ss=Math.floor(sec%60);return h>0?`${h}:${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`:`${m}:${String(ss).padStart(2,'0')}`}
-async function getj(u){let r=await fetch(u),d=await r.json();if(!r.ok)throw new Error(d.detail||'Fehler');return d}
+async function getj(u){let r=await fetch(u,{cache:'no-store',headers:{'X-NPC-Frontend':NPC_FRONTEND_VERSION}}),d=await r.json();if(!r.ok)throw new Error(d.detail||'Fehler');return d}
 function dateText(v){if(!v)return'–';try{return new Date(v).toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit',year:'numeric'})}catch(e){return v}}
 function countdownText(v){if(!v)return'';let ms=new Date(v)-new Date();if(ms<=0)return'Heute / gestartet';let d=Math.floor(ms/86400000),h=Math.floor((ms%86400000)/3600000);return d>1?`Noch ${d} Tage`:d===1?`Noch 1 Tag ${h} Std.`:`Noch ${h} Stunden`}
 function pct(v){if(v==null)return'–';return `${v>0?'+':''}${v}%`}
@@ -2354,6 +2387,13 @@ function skipPuzzle(p){
   wmWeeklyPlan.innerHTML='<div class="small">Wochenplan wird mit verfügbaren Puzzles neu berechnet…</div>';
   renderUnavailable();
   loadAll();
+  // Lists based on client-side skip state must refill immediately. Oldest Top
+  // 10 requests a larger candidate pool and slices only after this filter.
+  if(trainingExtrasLoaded){
+    Promise.allSettled([loadMedianGapFocus(),loadRepeatPriority(),loadOldestSolvedFocus(),loadUnsolvedLibrary()]);
+  }else if(document.body.dataset.appCurrent==='training'){
+    loadOldestSolvedFocus();
+  }
 }
 function restorePuzzle(id){
   saveUnavailablePuzzles(getUnavailablePuzzles().filter(x=>String(x.id)!==String(id)));
@@ -2530,10 +2570,10 @@ async function loadPuzzleProgress(){
 async function loadOldestSolvedFocus(){
  const el=document.getElementById('oldestSolvedFocus'); if(!el)return;
  try{
-  const d=await getj('/coach/oldest-solved?limit=10');
+  const d=await getj('/coach/oldest-solved?limit=60');
   if(!d.available||!d.items?.length){el.textContent=d.message||'Keine bereits gelösten 500er gefunden.';return}
   el.innerHTML=`<div class="small trainingListIntro">${d.message||''}</div>`+
-   d.items.filter(p=>!isPuzzleUnavailable(p)).map((p,i)=>{
+   d.items.filter(p=>!isPuzzleUnavailable(p)).slice(0,10).map((p,i)=>{
     const days=p.days_since_last_solve;
     const ago=days!=null?(days===0?'heute':days===1?'vor 1 Tag':`vor ${days} Tagen`):'Datum nicht verfügbar';
     const coach=days!=null
@@ -2568,7 +2608,7 @@ async function loadUnsolvedLibrary(){
   const d=await getj('/coach/unsolved-library');
   if(!d.available||!d.items?.length){el.textContent=d.message||'Keine ungelösten Library-Puzzle gefunden.';return}
   el.innerHTML=`<div class="small trainingListIntro"><strong>${d.count}</strong> Puzzle ohne Solo-Ergebnis.</div>`+
-   d.items.filter(p=>!isPuzzleUnavailable(p)).map((p,i)=>{
+   d.items.filter(p=>!isPuzzleUnavailable(p)).slice(0,10).map((p,i)=>{
      let diff='–';
      let diffLabel='–';
      let diffDelta='';
@@ -2733,22 +2773,30 @@ function renderWeeklyPlanFallback(w){
   }
 }
 
+let _currentTrainingQuickPuzzle=null;
+function skipCurrentTrainingQuick(){
+  if(_currentTrainingQuickPuzzle) skipPuzzle(_currentTrainingQuickPuzzle);
+}
 function updateTrainingQuick(w){
  const p=w?.next_puzzle||{};
+ _currentTrainingQuickPuzzle=p&&p.id!=null?p:null;
  const img=document.getElementById('trainingQuickImage'),name=document.getElementById('trainingQuickPuzzle'),meta=document.getElementById('trainingQuickMeta');
- const type=document.getElementById('trainingQuickType'),target=document.getElementById('trainingQuickTarget');
+ const type=document.getElementById('trainingQuickType');
  const median=document.getElementById('trainingQuickMedian'),last=document.getElementById('trainingQuickLast'),delta=document.getElementById('trainingQuickDelta'),fit=document.getElementById('trainingQuickFit'),reason=document.getElementById('trainingQuickReason');
+ const skipBtn=document.getElementById('trainingQuickSkipBtn');
  const pick=(...v)=>v.find(x=>x!==undefined&&x!==null&&x!=='');
  if(name)name.textContent=p.name||'Noch keine Empfehlung';
  if(meta)meta.textContent=[p.manufacturer,p.pieces?`${p.pieces} Teile`:null].filter(Boolean).join(' · ');
- if(type)type.textContent=pick(w?.next_training?.type,w?.next_training_type,'–');
- if(target)target.textContent=pick(w?.dynamic_target,w?.wm_goal_first_try,p?.target_time,'–');
+ if(type)type.textContent=pick(w?.next_training?.type,w?.next_training_type,'Training');
  const mt=(p.median_target&&typeof p.median_target==='object')?p.median_target:{};
  const med=pick(mt.median,p.msp_median,p.median_time,p.median,p.target_median);
- const lst=pick(mt.last,p.last_time,p.latest_time,p.last_result);
+ const lst=pick(mt.last,p.last_time,p.latest_time,p.last_result,p.msp_last_time);
  let dlt=pick(p.delta_vs_median,p.median_delta,p.vs_median);
  if((dlt===undefined||dlt===null||dlt==='')&&mt.last_seconds!=null&&mt.median_seconds!=null&&Number(mt.median_seconds)>0){
    dlt=((Number(mt.last_seconds)-Number(mt.median_seconds))/Number(mt.median_seconds))*100;
+ }
+ if((dlt===undefined||dlt===null||dlt==='')&&p.msp_last_time_seconds!=null&&p.msp_median_seconds!=null&&Number(p.msp_median_seconds)>0){
+   dlt=((Number(p.msp_last_time_seconds)-Number(p.msp_median_seconds))/Number(p.msp_median_seconds))*100;
  }
  const wfRaw=pick(p.wm_fit,p.wm_fit_score,p.fit_score);
  const wf=(wfRaw&&typeof wfRaw==='object')?pick(wfRaw.score,wfRaw.value,wfRaw.fit_score):wfRaw;
@@ -2760,11 +2808,14 @@ function updateTrainingQuick(w){
  }
  if(fit)fit.textContent=(wf!==undefined&&wf!==null&&wf!=='')?(String(wf).includes('/100')?wf:`${wf}/100`):'–';
  if(reason){
-   const reasonText=readinessEsc(pick(p.reason,p.recommendation_reason,p.note,''));
-   const action=!isPuzzleUnavailable(p)?`<span class="trainingQuickAction">${skipButtonHtml(p,'Skip – aktuell ausgeliehen')}</span>`:'';
-   reason.innerHTML=`<span class="trainingQuickReasonText">${reasonText}</span>${action}`;
+   const reasonText=readinessEsc(pick(p.reason,p.recommendation_reason,p.note,'Passend für das heutige Training.'));
+   reason.innerHTML=`<strong>Coach</strong>${reasonText}`;
  }
- if(img)img.innerHTML=p.image_url?`<img src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.parentElement.textContent='🧩'">`:'🧩';
+ if(skipBtn) skipBtn.style.display=(p&&p.id!=null&&!isPuzzleUnavailable(p))?'block':'none';
+ if(img){
+   img.classList.toggle('weeklyThumbEmpty',!p.image_url);
+   img.innerHTML=p.image_url?`<img src="${p.image_url}" alt="${readinessEsc(p.name||'Puzzle')}" loading="lazy" onerror="this.parentElement.textContent='🧩'">`:'🧩';
+ }
 }
 
 function updateTodaySummary(w){
@@ -2790,7 +2841,7 @@ window.addEventListener('DOMContentLoaded',()=>ensureOldestSolvedTrainingSection
 if('serviceWorker' in navigator){
   window.addEventListener('load',async()=>{
     try{
-      const reg=await navigator.serviceWorker.register('/sw.js?v=6112-oldest');
+      const reg=await navigator.serviceWorker.register('/sw.js?v=6115-pathfix',{updateViaCache:'none'});
       await reg.update();
       let reloading=false;
       navigator.serviceWorker.addEventListener('controllerchange',()=>{
@@ -3464,6 +3515,6 @@ def dashboard():
             "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
             "Pragma": "no-cache",
             "Expires": "0",
-            "X-NPC-Version": "6.11.2",
+            "X-NPC-Version": "6.11.5",
         },
     )

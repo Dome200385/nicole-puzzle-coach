@@ -30,7 +30,7 @@ from app.ui import dashboard
 
 app = FastAPI(
     title="Nicole Puzzle Coach API",
-    version="6.11.2",
+    version="6.11.5",
     description="Personal speed-puzzling coach and tournament preparation."
 )
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
@@ -279,7 +279,7 @@ def dashboard_route(): return dashboard()
 
 @app.get("/api")
 def api_root():
-    return {"app":"Nicole Puzzle Coach API","version":"6.8.18","status":"online","dashboard":"/dashboard","docs":"/docs"}
+    return {"app":"Nicole Puzzle Coach API","version":"6.11.5","status":"online","dashboard":"/dashboard","docs":"/docs"}
 
 
 def _ensure_readiness_history_table(db):
@@ -354,14 +354,14 @@ async def capture_readiness_history(request:Request, db:Session=Depends(get_db))
 @app.get("/manifest.webmanifest")
 def pwa_manifest():
     return Response(
-        content='{"id": "/dashboard", "name": "Nicole Puzzle Coach", "short_name": "Puzzle Coach", "description": "Speed-Puzzling Training & Turniervorbereitung", "start_url": "/dashboard?source=pwa", "scope": "/", "display": "standalone", "background_color": "#f5f7fb", "theme_color": "#f5f7fb", "orientation": "portrait-primary", "icons": [{"src": "/pwa/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"}, {"src": "/pwa/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"}, {"src": "/pwa/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}',
+        content='{"id": "/dashboard", "name": "Nicole Puzzle Coach", "short_name": "Puzzle Coach", "description": "Speed-Puzzling Training & Turniervorbereitung", "start_url": "/dashboard?source=pwa&v=6115-pathfix", "scope": "/", "display": "standalone", "background_color": "#f5f7fb", "theme_color": "#f5f7fb", "orientation": "portrait-primary", "icons": [{"src": "/pwa/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"}, {"src": "/pwa/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"}, {"src": "/pwa/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}',
         media_type="application/manifest+json",
         headers={"Cache-Control": "no-cache"},
     )
 
 @app.get("/sw.js")
 def pwa_service_worker():
-    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v6112-oldest';
+    return Response(content="""const CACHE_NAME='nicole-puzzle-coach-v6115-pathfix';
 const SHELL=['/manifest.webmanifest','/pwa/icon-192.png','/pwa/icon-512.png','/pwa/icon-maskable-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(SHELL)).catch(()=>{}));
@@ -377,7 +377,10 @@ self.addEventListener('fetch',event=>{
   const url=new URL(req.url);
   if(url.origin!==self.location.origin) return;
   if(req.mode==='navigate'){
-    event.respondWith(fetch(req).catch(()=>caches.match('/dashboard')));
+    // Dashboard/navigation must always come from the network. Never serve an
+    // older cached HTML shell, otherwise new UI logic can be hidden by an old
+    // service worker after a successful Render deployment.
+    event.respondWith(fetch(req,{cache:'no-store'}));
     return;
   }
   if(url.pathname.startsWith('/pwa/')||url.pathname==='/manifest.webmanifest'){
@@ -388,7 +391,7 @@ self.addEventListener('fetch',event=>{
     })));
   }
 });""", media_type="application/javascript",
-        headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"})
+        headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma":"no-cache", "Expires":"0"})
 
 @app.get("/pwa/{filename}")
 def pwa_asset(filename:str):
@@ -399,7 +402,7 @@ def pwa_asset(filename:str):
     return FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"6.8.18"}
+def health(): return {"status":"ok","version":"6.11.5"}
 
 @app.get("/db/health")
 def db_health(db:Session=Depends(get_db)):
@@ -414,7 +417,7 @@ def coach_status(db:Session=Depends(get_db)):
     configured=bool(MSP_CLIENT_ID and MSP_CLIENT_ID!="pending")
     pat_configured=bool(_pat_token())
     return {
-        "version":"6.8.18",
+        "version":"6.11.5",
         "database":"ok",
         "has_myspeedpuzzling_data":snap is not None or has_legacy,
         "latest_snapshot_id":snap.id if snap else None,
@@ -610,15 +613,15 @@ async def msp_api_test(db:Session=Depends(get_db)):
         return {"ok":False,"mode":"pat","reason":"MSP_PERSONAL_ACCESS_TOKEN not configured"}
     try:
         profile=await get_profile(token)
-        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.18","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
+        return {"ok":True,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.11.5","player_id":profile.get("id") if isinstance(profile,dict) else None,"player_name":profile.get("name") if isinstance(profile,dict) else None}
     except Exception as exc:
-        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.8.18","error":str(exc)}
+        return {"ok":False,"mode":"pat","api_only":True,"user_agent":"NicolePuzzleCoach/6.11.5","error":str(exc)}
 
 @app.get("/msp/sync-status")
 def msp_sync_status(db:Session=Depends(get_db)):
     snap=_latest_snapshot(db)
     return {
-        "version":"6.8.18",
+        "version":"6.11.5",
         "snapshot_id":snap.id if snap else None,
         "synced_at":snap.synced_at if snap else None,
         "data_available":snap is not None,
@@ -1111,7 +1114,7 @@ def oldest_solved(limit:int=10, db:Session=Depends(get_db)):
                 "_sort_days":sort_days,
             })
         items.sort(key=lambda x:(x.get("_sort_days",-1), x.get("solo_solves",0)), reverse=True)
-        items=items[:max(1,min(int(limit or 10),10))]
+        items=items[:max(1,min(int(limit or 10),100))]
         for item in items:
             item.pop("_sort_days",None)
         return {
@@ -1365,6 +1368,98 @@ def median_gap_focus(db:Session=Depends(get_db)):
             "error":str(exc),
         }
 
+def _ensure_five_weekly_puzzles(plan, rows, library_payload, excluded_ids=None):
+    """Keep five DISTINCT 500-piece puzzle options in the weekly plan.
+
+    Existing coach choices stay first. Missing/duplicate/non-puzzle slots are
+    filled from Nicole's current library, preferring Ravensburger and puzzles
+    that have not been solved recently. This is intentionally a post-processing
+    layer so a completed/taper week still offers five usable alternatives.
+    """
+    if not isinstance(plan, dict):
+        return plan
+    excluded={str(x) for x in (excluded_ids or []) if x is not None}
+    try:
+        from app.wm_coach import _extract_library_puzzles, _history_for_puzzle, _days_since_last_solve
+    except Exception:
+        return plan
+
+    def key_for(p):
+        if not isinstance(p,dict): return None
+        pid=p.get("id")
+        if pid is not None and str(pid).strip(): return "id:"+str(pid)
+        name=str(p.get("name") or "").strip().lower()
+        return "name:"+name if name else None
+
+    kept=[]; seen=set()
+    for sess in (plan.get("weekly_plan") or []):
+        if not isinstance(sess,dict): continue
+        puz=sess.get("puzzle") or {}
+        k=key_for(puz)
+        if not k or not puz.get("available") or str(puz.get("id") or "") in excluded or k in seen:
+            continue
+        seen.add(k); kept.append(sess)
+        if len(kept)>=5: break
+
+    candidates=[]
+    for puz in _extract_library_puzzles(library_payload or {}):
+        if not isinstance(puz,dict): continue
+        try:
+            if int(puz.get("pieces") or 0)!=500: continue
+        except Exception:
+            continue
+        k=key_for(puz)
+        if not k or k in seen or str(puz.get("id") or "") in excluded: continue
+        hist=[r for r in _history_for_puzzle(rows,puz) if r.get("mode")=="solo"]
+        days=_days_since_last_solve(hist) if hist else None
+        vals=[]
+        for r in hist:
+            try:
+                sec=int(r.get("seconds"));
+                if sec>0: vals.append(sec)
+            except Exception: pass
+        last=vals[0] if vals else None
+        ins=puz.get("msp_insights") if isinstance(puz.get("msp_insights"),dict) else {}
+        stats=ins.get("statistics") if isinstance(ins.get("statistics"),dict) else (puz.get("statistics") if isinstance(puz.get("statistics"),dict) else {})
+        solo=stats.get("solo") if isinstance(stats,dict) and isinstance(stats.get("solo"),dict) else {}
+        try: med=int(solo.get("median_seconds")) if solo.get("median_seconds") is not None else None
+        except Exception: med=None
+        enriched=dict(puz)
+        enriched.update({
+            "available":True,
+            "previous_solo_solves":len(vals),
+            "days_since_last_solve":days,
+            "msp_last_time_seconds":last,
+            "msp_last_time":_fmt_seconds(last) if last else None,
+            "msp_median_seconds":med,
+            "msp_median":_fmt_seconds(med) if med else None,
+            "reason":"Zusätzliche Trainingsoption, damit jederzeit fünf verschiedene 500er zur Auswahl stehen.",
+        })
+        brand=str(puz.get("manufacturer") or "").strip().lower()
+        # Ravensburger first; among solved puzzles prefer the longest break.
+        # Unsolved 500ers remain strong alternatives and sort near the front.
+        sort_age=10**6 if days is None and not vals else (days if days is not None else -1)
+        candidates.append((1 if brand=="ravensburger" else 0, 1 if not vals else 0, sort_age, enriched))
+    candidates.sort(key=lambda x:(x[0],x[1],x[2]), reverse=True)
+
+    dynamic=plan.get("dynamic_target") or plan.get("wm_goal_first_try") or "aktueller Zielkorridor"
+    for _,_,_,puz in candidates:
+        if len(kept)>=5: break
+        k=key_for(puz)
+        if not k or k in seen: continue
+        seen.add(k)
+        kept.append({
+            "session":"Zusätzliche Trainingsoption",
+            "goal":f"Alternative für diese Trainingswoche · 500er im Bereich {dynamic} sauber und wettkampfnah lösen.",
+            "intensity":"Moderat",
+            "puzzle":puz,
+        })
+
+    plan["weekly_plan"]=kept[:5]
+    plan["weekly_plan_option_count"]=len(plan["weekly_plan"])
+    return plan
+
+
 @app.get("/coach/wm-plan")
 async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
     payload,source,snapshot_id=_best_available_payload(db)
@@ -1400,6 +1495,9 @@ async def wm_plan(exclude_puzzle_ids:str|None=None, db:Session=Depends(get_db)):
         library_payload=payload.get("collections") or {},
         target_pieces=500,
         excluded_puzzle_ids=excluded
+    )
+    plan=_ensure_five_weekly_puzzles(
+        plan, rows, payload.get("collections") or {}, excluded_ids=excluded
     )
 
     # Puzzle enrichment only if a real library is available.
