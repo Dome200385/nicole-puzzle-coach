@@ -2277,7 +2277,7 @@ button,.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;cursor
 
 <div id="infoModal" class="modal" onclick="if(event.target===this)closeInfo()"><div class="modalbox"><div id="infoContent"></div><button class="secondary" onclick="closeInfo()">Schliessen</button></div></div>
 <script>
-const NPC_FRONTEND_VERSION='6.11.5';
+const NPC_FRONTEND_VERSION='6.11.6';
 function showInfo(type){
  const form=`<h2>ℹ️ Was bedeutet Form?</h2><p><b>Form</b> zeigt, ob Nicole aktuell schneller oder langsamer puzzelt als in der vorherigen Vergleichsperiode. Dafür werden die letzten 10 Solo-Ergebnisse mit den vorherigen 10 verglichen und auf <b>Zeit pro 100 Teile</b> normalisiert.</p><div class="scale"><div><b>Positiver Wert:</b> aktuell schneller. Beispiel +11,7 % = die normalisierte Zeit ist rund 11,7 % besser als zuvor.</div><div><b>Um 0 %:</b> Leistung weitgehend stabil.</div><div><b>Negativer Wert:</b> aktuell langsamer als in der vorherigen Periode.</div></div><p class="small">Die Zahl ist ein Trendindikator, keine Gewinnwahrscheinlichkeit und keine Prognose einer einzelnen Puzzlezeit.</p>`;
  const con=`<h2>ℹ️ Was bedeutet Konsistenz?</h2><p><b>Konsistenz</b> misst, wie ähnlich die letzten 10 normalisierten Solo-Leistungen sind. Auch hier wird Zeit pro 100 Teile verwendet, damit verschiedene Teilezahlen besser vergleichbar sind.</p><div class="scale"><div><b>90–100:</b> sehr konstante Leistungen</div><div><b>80–89:</b> gute bis hohe Konstanz</div><div><b>70–79:</b> merkliche Schwankungen</div><div><b>unter 70:</b> starke Schwankungen; Ursachen genauer analysieren</div></div><p class="small">Ein hoher Wert bedeutet nicht automatisch schnell. Ideal ist eine hohe Konsistenz zusammen mit einer starken bzw. steigenden Form.</p>`;
@@ -2755,7 +2755,7 @@ function renderWeeklyPlanFallback(w){
         }
         details=`<div class="weeklyDetail"><div class="weeklyFacts">
           <div class="weeklyFact"><span>MSP-Median</span><strong>${p.msp_median||'–'}</strong></div>
-          <div class="weeklyFact"><span>Letzte Zeit</span><strong>${p.msp_last_time||'–'}</strong></div>
+          <div class="weeklyFact"><span>Letzte Zeit</span><strong>${p.msp_last_time||(p.previous_solo_solves===0?'Noch nie Solo':'–')}</strong></div>
           <div class="weeklyFact"><span>vs. Median</span><strong>${delta}</strong></div>
           <div class="weeklyFact"><span>WM-Fit</span><strong>${p.wm_fit?.score!=null?p.wm_fit.score+'/100':'–'}</strong></div>
         </div><div class="weeklyCoachReason"><strong>Coach:</strong> ${p.reason||'Passend für diese Einheit.'}</div></div>`;
@@ -2841,7 +2841,7 @@ window.addEventListener('DOMContentLoaded',()=>ensureOldestSolvedTrainingSection
 if('serviceWorker' in navigator){
   window.addEventListener('load',async()=>{
     try{
-      const reg=await navigator.serviceWorker.register('/sw.js?v=6115-pathfix',{updateViaCache:'none'});
+      const reg=await navigator.serviceWorker.register('/sw.js?v=6116-weekdata',{updateViaCache:'none'});
       await reg.update();
       let reloading=false;
       navigator.serviceWorker.addEventListener('controllerchange',()=>{
@@ -3339,7 +3339,7 @@ async function loadAll(){renderUnavailable();
          medianDelta=`${d>0?'+':''}${d.toFixed(1)}% ${d<=0?'unter':'über'} Median`;
        }else if(p.median_gap){medianDelta=p.median_gap+' über Median';}
        let detail=p.available
-         ? `<div class="weeklyDetail"><div class="weeklyFacts"><div class="weeklyFact"><span>MSP-Median</span><strong>${p.msp_median||'–'}</strong></div><div class="weeklyFact"><span>Letzte Zeit</span><strong>${p.msp_last_time||'–'}</strong></div><div class="weeklyFact"><span>vs. Median</span><strong>${medianDelta}</strong></div><div class="weeklyFact"><span>MSP Prediction</span><strong>${displayPuzzleTime(p.msp_prediction)}</strong></div><div class="weeklyFact"><span>Difficulty</span><strong>${diff}</strong></div><div class="weeklyFact"><span>WM-Fit</span><strong>${p.wm_fit?.score!=null?p.wm_fit.score+'/100':'–'}</strong></div></div><div class="weeklyCoachReason"><strong>Coach:</strong> ${p.reason||p.wm_fit?.summary||'Passend für diese Trainingseinheit.'}</div><div class="weeklyPills"><span class="pill">${p.previous_solo_solves||0} Solo-Läufe</span>${p.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${p.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}${p.wm_suitability?`<span class="pill ${p.wm_suitability.level==='hoch'||p.wm_suitability.level==='gut'?'wmGood':''}">${p.wm_suitability.label}</span>`:''}</div>${p.competition_risk?.score>=80?`<div class="small riskHigh" style="padding:7px;border-radius:8px;margin-top:7px">⚠️ ${p.competition_risk.reason}</div>`:''}</div>`
+         ? `<div class="weeklyDetail"><div class="weeklyFacts"><div class="weeklyFact"><span>MSP-Median</span><strong>${p.msp_median||'–'}</strong></div><div class="weeklyFact"><span>Letzte Zeit</span><strong>${p.msp_last_time||(p.previous_solo_solves===0?'Noch nie Solo':'–')}</strong></div><div class="weeklyFact"><span>vs. Median</span><strong>${medianDelta!=='–'?medianDelta:(p.previous_solo_solves===0?'Noch kein Vergleich':'–')}</strong></div><div class="weeklyFact"><span>MSP Prediction</span><strong>${displayPuzzleTime(p.msp_prediction)}</strong></div><div class="weeklyFact"><span>Difficulty</span><strong>${diff}</strong></div><div class="weeklyFact"><span>WM-Fit</span><strong>${p.wm_fit?.score!=null?p.wm_fit.score+'/100':'–'}</strong></div></div><div class="weeklyCoachReason"><strong>Coach:</strong> ${p.reason||p.wm_fit?.summary||'Passend für diese Trainingseinheit.'}</div><div class="weeklyPills"><span class="pill">${p.previous_solo_solves||0} Solo-Läufe</span>${p.days_since_last_solve!=null?`<span class="pill">zuletzt vor ${p.days_since_last_solve} Tagen</span>`:'<span class="pill">noch nie Solo gelöst</span>'}${p.wm_suitability?`<span class="pill ${p.wm_suitability.level==='hoch'||p.wm_suitability.level==='gut'?'wmGood':''}">${p.wm_suitability.label}</span>`:''}</div>${p.competition_risk?.score>=80?`<div class="small riskHigh" style="padding:7px;border-radius:8px;margin-top:7px">⚠️ ${p.competition_risk.reason}</div>`:''}</div>`
          : `<div class="weeklyDetail small">${p.reason||'Für diese Technik-/Recovery-Einheit ist kein vollständiges Puzzle nötig.'}</div>`;
        let displayName=p.available?compactName:'';
        return `<details class="item weeklySession trainingPuzzleSession"${i===0?' open':''}><summary><div class="weeklyIndex">${i+1}</div>${compactImage}<div class="weeklySummaryText"><div class="weeklySessionTitle"><strong>${s.session}</strong><span class="pill weeklyIntensity">${s.intensity}</span></div>${displayName?`<div class="weeklyPuzzleName">${displayName}</div>`:''}<div class="small">${s.goal}</div>${p.available?summarySkipButtonHtml(p):''}</div></summary>${detail}</details>`;
@@ -3515,6 +3515,6 @@ def dashboard():
             "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
             "Pragma": "no-cache",
             "Expires": "0",
-            "X-NPC-Version": "6.11.5",
+            "X-NPC-Version": "6.11.6",
         },
     )

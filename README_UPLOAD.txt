@@ -1,9 +1,12 @@
-WICHTIG: Diese Dateien muessen im Repository unter app/ liegen.
+Nicole Puzzle Coach V6.11.6 – Weekly Training Data Fix
 
-Zielpfade:
+Upload these files to the SAME repository paths:
 - app/main.py
 - app/ui.py
 
-Nicht als main.py / ui.py im Repository-Root ablegen.
-Nach dem Commit muss Render einen NEUEN Commit-SHA deployen.
-Im Render-Log sollte danach /sw.js?v=6115-pathfix erscheinen.
+Fixes:
+- 5 weekly training options remain active.
+- Supplemental weekly puzzles now receive WM-Fit and WM-suitability data.
+- Solved puzzles with complete MSP median + last-time data are preferred for supplemental slots.
+- Truly unsolved puzzles are labelled "Noch nie Solo" / "Noch kein Vergleich" instead of looking like missing data.
+- Cache/frontend version: 6116-weekdata.
